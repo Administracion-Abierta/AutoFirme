@@ -6,3 +6,7 @@ work/
 *.rpm
 *.exe
 *.jar
+.bullet/state/
+.bullet/meta/
+.bullet/worktrees/
+.bullet/logs/

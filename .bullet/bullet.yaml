@@ -1,0 +1,41 @@
+# bullet configuration — lives at <target-repo>/.bullet/bullet.yaml (created by `bullet init`).
+# bullet reads ONLY this file + the forge. No daemon state.
+
+forge: forgejo
+url: https://git.eduard3v.com
+repo: EduarD3V/AutoFirme
+
+branches:
+  trunk: main   # PRs land here (from remote HEAD)
+  ship: main
+
+# hard cap 10 — fleet slots enforced per tick (global across repos)
+agents: 10
+split:                          # optional; defaults coder 7 / reviewer 2 / fixer 1 of agents
+  coder: 7
+  reviewer: 2
+  fixer: 1
+
+models:
+  coder: nan/deepseek-v4-flash
+  reviewer: 9router/reviewer    # must be a DIFFERENT family than coder
+  fixer: nan/deepseek-v4-flash
+
+# gates run in the worktree before push; all must exit 0. Empty list = diff-only check.
+gates:
+  - "test -d decompiled"
+  - "find decompiled -name '*.java' | grep -q ."
+
+# deps for gate runs in fresh worktrees (integration); optional
+# setup:
+#   - bun install
+
+budget_minutes: 45              # per agent session
+stall_minutes: 15               # no activity → nudge
+kill_minutes: 60                # no activity → kill + blocked
+merge: operator                 # operator (default) | auto (planned, F-24)
+
+# runtime tree: default <repo>/.bullet (state/ meta/ worktrees/ logs/ inside it);
+# set run_root to relocate worktrees+state elsewhere (e.g. ~/.bullet for big repos)
+# run_root: ~/.bullet
+omp_path: ~/.bun/bin/omp        # headless agent CLI (any omp-compatible)
