@@ -1,0 +1,70 @@
+package org.spongycastle.asn1.cmc;
+
+import java.util.HashMap;
+import java.util.Map;
+import org.spongycastle.asn1.ASN1Integer;
+import org.spongycastle.asn1.ASN1Object;
+import org.spongycastle.asn1.ASN1Primitive;
+
+/* JADX INFO: loaded from: autofirmaConfigurador.jar:org/spongycastle/asn1/cmc/CMCFailInfo.class */
+public class CMCFailInfo extends ASN1Object {
+    public static final CMCFailInfo badAlg = new CMCFailInfo(new ASN1Integer(0));
+    public static final CMCFailInfo badMessageCheck = new CMCFailInfo(new ASN1Integer(1));
+    public static final CMCFailInfo badRequest = new CMCFailInfo(new ASN1Integer(2));
+    public static final CMCFailInfo badTime = new CMCFailInfo(new ASN1Integer(3));
+    public static final CMCFailInfo badCertId = new CMCFailInfo(new ASN1Integer(4));
+    public static final CMCFailInfo unsupportedExt = new CMCFailInfo(new ASN1Integer(5));
+    public static final CMCFailInfo mustArchiveKeys = new CMCFailInfo(new ASN1Integer(6));
+    public static final CMCFailInfo badIdentity = new CMCFailInfo(new ASN1Integer(7));
+    public static final CMCFailInfo popRequired = new CMCFailInfo(new ASN1Integer(8));
+    public static final CMCFailInfo popFailed = new CMCFailInfo(new ASN1Integer(9));
+    public static final CMCFailInfo noKeyReuse = new CMCFailInfo(new ASN1Integer(10));
+    public static final CMCFailInfo internalCAError = new CMCFailInfo(new ASN1Integer(11));
+    public static final CMCFailInfo tryLater = new CMCFailInfo(new ASN1Integer(12));
+    public static final CMCFailInfo authDataFail = new CMCFailInfo(new ASN1Integer(13));
+    private static Map range = new HashMap();
+    private final ASN1Integer value;
+
+    static {
+        range.put(badAlg.value, badAlg);
+        range.put(badMessageCheck.value, badMessageCheck);
+        range.put(badRequest.value, badRequest);
+        range.put(badTime.value, badTime);
+        range.put(badCertId.value, badCertId);
+        range.put(popRequired.value, popRequired);
+        range.put(unsupportedExt.value, unsupportedExt);
+        range.put(mustArchiveKeys.value, mustArchiveKeys);
+        range.put(badIdentity.value, badIdentity);
+        range.put(popRequired.value, popRequired);
+        range.put(popFailed.value, popFailed);
+        range.put(badCertId.value, badCertId);
+        range.put(popRequired.value, popRequired);
+        range.put(noKeyReuse.value, noKeyReuse);
+        range.put(internalCAError.value, internalCAError);
+        range.put(tryLater.value, tryLater);
+        range.put(authDataFail.value, authDataFail);
+    }
+
+    private CMCFailInfo(ASN1Integer value) {
+        this.value = value;
+    }
+
+    public static CMCFailInfo getInstance(Object o) {
+        if (o instanceof CMCFailInfo) {
+            return (CMCFailInfo) o;
+        }
+        if (o != null) {
+            CMCFailInfo status = (CMCFailInfo) range.get(ASN1Integer.getInstance(o));
+            if (status != null) {
+                return status;
+            }
+            throw new IllegalArgumentException("unknown object in getInstance(): " + o.getClass().getName());
+        }
+        return null;
+    }
+
+    @Override // org.spongycastle.asn1.ASN1Object, org.spongycastle.asn1.ASN1Encodable
+    public ASN1Primitive toASN1Primitive() {
+        return this.value;
+    }
+}
