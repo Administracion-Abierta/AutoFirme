@@ -1,46 +1,52 @@
-# AGENTS.md — AutoFirme
+# AGENTS.md — AutoFirme → AutoFirma Web
 
-Uni task (Computer Basics): reverse-engineer the **AutoFirma v1.9** sample programs the
-teacher distributed as platform installers, recover the Java source, and study it.
+Origin: uni task (Computer Basics) — reverse-engineer AutoFirma v1.9 installers,
+recover the Java source. **That phase is DONE** (11,487 files under `decompiled/`).
+
+## Current goal
+
+Build **AutoFirma Web**: a client-side rendered web app that replicates AutoFirma's
+core (sign documents with X.509 certificates, verify signatures) — prettier, online,
+self-hostable by anyone.
+
+- **Client-side rendered SPA.** Signing/verification runs in the browser
+  (WebCrypto API + WASM where needed). No signing server: private keys never
+  leave the client.
+- **Self-host first:** static build deployable on any nginx/k3s/static host,
+  zero backend required for core flows.
+- **Reference, don't port:** `decompiled/` is READ-ONLY reference for understanding
+  formats and flows. Write new TypeScript from the architecture doc (`docs/architecture.md`),
+  not line-by-line translation. AutoFirma is GPL — keep the new code clean-roomed
+  from it and license the app GPL-compatible.
 
 ## Hard rules
 
-1. **NEVER commit anything in `original/`.** It holds the teacher's installers
-   (~270 MB of zips: Windows EXE, Debian `.deb`, Fedora `.rpm`). `.gitignore` already
-   excludes it — keep it that way. Never `git add -f`, never `git add -A` blindly.
-2. **Never commit extracted installers either.** `extracted/` and `work/` are scratch
-   space (gitignored). Only tracked artifacts belong in git.
-3. **What IS tracked:** `decompiled/**/*.java` (recovered source), notes, docs, build
-   scripts. Decompiled Java is text — small, diffable, safe.
-4. No git LFS, no binaries in the tree. If an agent must store a binary artifact,
-   store it under `extracted/` (ignored) and reference it by path in notes.
+1. **NEVER commit anything in `original/`.** Teacher's installers (~270 MB zips:
+   EXE/deb/rpm). `.gitignore` excludes it — keep it that way. Never `git add -f`,
+   never `git add -A` blindly.
+2. Never commit `extracted/` or `work/` (scratch, gitignored). Binaries stay out of
+   the tree; reference them by path.
+3. `decompiled/**/*.java` IS tracked (work product / reference). Don't edit files there.
+4. New app lives in `webapp/` — SvelteKit, Svelte 5, Tailwind v4, TypeScript.
+   Static adapter for deploy; node adapter only if a real backend need appears.
 5. Commit but do not push unless the user asks.
 
 ## Layout
 
 ```
 original/            # teacher's installers — INPUT, gitignored, read-only
-  Autofirma64.zip              → Autofirma_64_v1_9_installer.exe (Windows, Inno Setup)
-  Autofirma_Linux_Debian.zip   → autofirma_1_9.deb
-  Autofirma_Linux_Fedora.zip   → autofirma-1.9-1.noarch_FEDORA.rpm + GPG key
 extracted/           # unpacked installers — scratch, gitignored
-decompiled/          # jadx output — TRACKED (the deliverable)
-docs/                # analysis notes (REVERSING-NOTES.md etc.)
+decompiled/          # jadx output — TRACKED, read-only reference
+docs/                # architecture.md (signing-core map), REVERSING-NOTES.md
+webapp/              # the product — SvelteKit SPA (Svelte 5 + Tailwind v4)
 ```
-
-## How to work with the samples
-
-AutoFirma is a Java application. Same code inside every installer:
-
-- `.deb` → `ar x`, unpack `data.tar.*` → `usr/lib/autofirma/autofirma.jar` (approx path)
-- `.rpm` → `rpm2cpio | cpio -idmv` → same JAR
-- Windows `.exe` → Inno Setup installer; the deb/rpm JAR already covers it — extract
-  the EXE only if the Windows build must be compared
-- Decompile: `jadx -d decompiled/ <jar>` (toolchain via `brew install jadx openjdk`)
 
 ## Agent workflow
 
 - Work on branches; `Refs #N` only in commits (never closing keywords).
-- The analysis is scoped to the *decompiled* source. Run REA tooling against the
-  original artifacts only for inventory/verification — never re-upload them anywhere.
-- Deliverables are study notes + recovered source, not a runnable rebuild.
+- Issues on Forgejo (git.eduard3v.com/EduarD3V/AutoFirme) drive the fleet (bullet).
+  Big problems get split into ≤~400-line deliverables per issue.
+- Crypto code MUST ship with a verification check (e.g. generated signature verified
+  by `openssl cms -verify` in a script/test) before the issue can move to review.
+- UI: clean, modern, accessible; ES/EN copy. Prettier than AutoFirma is a requirement,
+  not a joke.
