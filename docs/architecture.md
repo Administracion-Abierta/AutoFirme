@@ -87,8 +87,10 @@ Two format-level wrinkles the rewrite must keep:
   `Pkcs1Utils.encodeSignature/decodeSignature` convert both ways
   (`core/signers/Pkcs1Utils.java:15,32`). WebCrypto's `subtle.sign` returns **raw `r‖s`** too —
   same conversion is needed client-side.
-- **Algorithm policy.** `AOPkcs1Signer` catches provider-level errors and retries
-  (`:47`), and recognises `es.gob.jmulticard.jse.provider.SignatureAuthException` (`:64`) —
+- **Algorithm policy.** After signing, `AOPkcs1Signer` re-verifies the returned PKCS#1 against
+  the signer certificate (`:44-52`), and maps provider failures onto app exceptions:
+  `es.gob.jmulticard.{CancelledOperationException, jse.provider.SignatureAuthException}` →
+  `AOCancelledSMOperationException` / `AuthenticationException` / `PinException` (`:60-71`) —
   i.e. the on-card-signing provider (§5) plugs in *under* the same interface.
 
 **Rewrite note:** tri-phase is not legacy baggage to delete — it is the correct browser design.
@@ -132,7 +134,7 @@ JS/WASM. The remote-server leg is the only part that becomes dead.
 | Item | Value |
 |---|---|
 | Entry | `signers/pades/AOPDFSigner.java` |
-| PDF toolkit | **repackaged iText** as `com.aowagie.text.pdf.*` (`PdfReader`, `PdfStamper`, `PdfPKCS7`, `AcroFields`, `PdfSignatureAppearance`) — `AOPDFSigner.java:3-14`, `pades/PdfUtil.java:3-14` |
+| PDF toolkit | **repackaged iText** as `com.aowagie.text.pdf.*` (`PdfReader`, `PdfStamper`, `PdfPKCS7`, `AcroFields`, `PdfSignatureAppearance`) — `AOPDFSigner.java:3-8`, `pades/{PdfUtil,PdfSessionManager,PdfTriPhaseSession}.java` |
 | Also on classpath | BouncyCastle JCE provider (`org.bouncycastle.jce.provider.BouncyCastleProvider`, `AOPDFSigner.java:39`) |
 | Call chain | `sign()` → optional `PdfPreProcessor` (`:3-11`, visible-signature graphics/text) → `PdfTriPhaseSession` (`:3`, `PdfSignatureAppearance`) → CAdES bytes → iText inserts signature dict + `/ByteRange` |
 | Tri-phase | `PAdESTriPhaseSigner.preSign/postSign` (`:29,46`) returning `PdfSignResult` (`signers/pades/PdfSignResult.java`); client leg `padestri/client/AOPDFTriPhaseSigner.java` |
@@ -161,7 +163,7 @@ No tri-phase variant is registered.
 ### 3.6 Validation
 
 `signvalidation/` gives format detection + verification independent of signing:
-`SignatureFormatDetector{CadesPades,Xades}.java`, `ValidateBinarySignature`, `ValidatePdfSignature`,
+`SignatureFormatDetector{PadesCades,Xades}.java`, `ValidateBinarySignature`, `ValidatePdfSignature`,
 `ValidateXMLSignature`, orchestrated by `SignValiderFactory`/`SignValider`. The web rewrite needs
 this whole package (or a JS equivalent) for the "verify" flow.
 
@@ -181,7 +183,8 @@ cert-store and key-store `PasswordCallback`s.
 | `WINADDRESSBOOK` / `WINCA` | `Windows-ADDRESSBOOK` / `Windows-ROOT` | other-people / CA stores | Windows |
 | `APPLE` | `KeychainStore` | macOS Keychain | macOS |
 | `SHARED_NSS` / `MOZ_UNI` | `PKCS11` | Mozilla NSS profile (`keystores/mozilla/`) | any |
-| `PKCS11` / `KNOWN_SMARTCARDS` | `PKCS11` | any PKCS#11 module | any |
+| `PKCS11` | `PKCS11` | any PKCS#11 module | any |
+| `KNOWN_SMARTCARDS` | `SMARTCARDS` (internal marker) | known cards via `SmartCardUnifiedKeyStoreManager` | any |
 | `TEMD` | `PKCS11` | MoD card | any |
 | `CERES` / `CERES_430` | `CERES`/`CERES430` | FNMT-RCM CERES card via jmulticard | any |
 | `DNIEJAVA` | `DNIeWaitPanel.PROP_DNIE_REQUESTED` | DNIe / FNMT-TIF via jmulticard | any |
@@ -244,7 +247,7 @@ Full shaded inventory: REVERSING-NOTES.md §6. Classification for the rewrite:
 | `com.sun.jna` / `jna.platform` | **dead for browsers** | native access (PC/SC fixups, Windows COM, Apple) |
 | Apache PDFBox (`org.apache.pdfbox`) | **not used in the signing core** | appears only as `…contentstream.operator.OperatorName` imports in unrelated classes (e.g. `XAdESSigner.java:62`, `keystores/KeyStoreUtilities.java:32`) — a jadx constant-resolution artifact, not real usage `[INFERENCE]` |
 | Swing UI (`standalone/ui/**`, `es/gob/afirma/ui`), `standalone/protocol/**` (WebSocket/`afirma://`) | **dead** | replaced by the SPA |
-| Rhino + `proxy-vole`, twelve-monkeys ImageIO, `ini4j`, `Java-WebSocket` | **dead** | proxy autodiscovery, image IO, prefs, the local socket server |
+| Rhino + `proxy-vole`, twelve-monkeys ImageIO, `ini4j`, `Java-WebSocket` | **dead** | Rhino only reachable via iText AcroForm JS / MSV validation / PAC autodiscovery — the signing path never runs it; the rest are image IO, prefs, the local socket server |
 | `massive/` (batch/directory signing) | out of scope | batch mode has no browser equivalent; revisit later |
 
 ## 6. Browser-migration notes
