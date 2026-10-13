@@ -27,7 +27,7 @@ self-hostable by anyone.
 2. Never commit `extracted/` or `work/` (scratch, gitignored). Binaries stay out of
    the tree; reference them by path.
 3. `decompiled/**/*.java` IS tracked (work product / reference). Don't edit files there.
-4. New app lives in `webapp/` — SvelteKit, Svelte 5, Tailwind v4, TypeScript.
+4. New app lives in `web/` — SvelteKit, Svelte 5, Tailwind v4, TypeScript.
    Static adapter for deploy; node adapter only if a real backend need appears.
 5. Commit but do not push unless the user asks.
 
@@ -38,7 +38,8 @@ original/            # teacher's installers — INPUT, gitignored, read-only
 extracted/           # unpacked installers — scratch, gitignored
 decompiled/          # jadx output — TRACKED, read-only reference
 docs/                # architecture.md (signing-core map), REVERSING-NOTES.md
-webapp/              # the product — SvelteKit SPA (Svelte 5 + Tailwind v4)
+web/                 # the product — SvelteKit SPA (Svelte 5 + Tailwind v4)
+Containerfile        # multi-stage build: node build -> caddy serve (context = repo root)
 ```
 
 ## Agent workflow
