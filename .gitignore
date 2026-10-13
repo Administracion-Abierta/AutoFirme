@@ -1,0 +1,8 @@
+original/
+extracted/
+work/
+*.zip
+*.deb
+*.rpm
+*.exe
+*.jar
