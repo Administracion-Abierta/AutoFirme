@@ -1,0 +1,22 @@
+package org.spongycastle.cert.cmp;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import org.spongycastle.asn1.ASN1Encodable;
+import org.spongycastle.asn1.DEROutputStream;
+
+/* JADX INFO: loaded from: autofirma.jar:org/spongycastle/cert/cmp/CMPUtil.class */
+class CMPUtil {
+    CMPUtil() {
+    }
+
+    static void derEncodeToStream(ASN1Encodable obj, OutputStream stream) {
+        DEROutputStream dOut = new DEROutputStream(stream);
+        try {
+            dOut.writeObject(obj);
+            dOut.close();
+        } catch (IOException e) {
+            throw new CMPRuntimeException("unable to DER encode object: " + e.getMessage(), e);
+        }
+    }
+}

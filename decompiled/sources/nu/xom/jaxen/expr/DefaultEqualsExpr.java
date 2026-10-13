@@ -1,0 +1,28 @@
+package nu.xom.jaxen.expr;
+
+/* JADX INFO: loaded from: autofirma.jar:nu/xom/jaxen/expr/DefaultEqualsExpr.class */
+class DefaultEqualsExpr extends DefaultEqualityExpr {
+    private static final long serialVersionUID = -8327599812627931648L;
+
+    DefaultEqualsExpr(Expr expr, Expr expr2) {
+        super(expr, expr2);
+    }
+
+    @Override // nu.xom.jaxen.expr.DefaultBinaryExpr, nu.xom.jaxen.expr.BinaryExpr
+    public String getOperator() {
+        return "=";
+    }
+
+    @Override // nu.xom.jaxen.expr.DefaultEqualityExpr, nu.xom.jaxen.expr.DefaultTruthExpr, nu.xom.jaxen.expr.DefaultBinaryExpr
+    public String toString() {
+        return new StringBuffer().append("[(DefaultEqualsExpr): ").append(getLHS()).append(", ").append(getRHS()).append("]").toString();
+    }
+
+    @Override // nu.xom.jaxen.expr.DefaultEqualityExpr
+    protected boolean evaluateObjectObject(Object obj, Object obj2) {
+        if (eitherIsNumber(obj, obj2)) {
+            return ((Double) obj).doubleValue() == ((Double) obj2).doubleValue();
+        }
+        return obj.equals(obj2);
+    }
+}

@@ -1,0 +1,29 @@
+package org.spongycastle.cert.crmf;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import org.spongycastle.asn1.DERBitString;
+import org.spongycastle.asn1.crmf.PKMACValue;
+import org.spongycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.spongycastle.operator.MacCalculator;
+
+/* JADX INFO: loaded from: autofirma.jar:org/spongycastle/cert/crmf/PKMACValueGenerator.class */
+class PKMACValueGenerator {
+    private PKMACBuilder builder;
+
+    public PKMACValueGenerator(PKMACBuilder builder) {
+        this.builder = builder;
+    }
+
+    public PKMACValue generate(char[] password, SubjectPublicKeyInfo keyInfo) throws CRMFException {
+        MacCalculator calculator = this.builder.build(password);
+        OutputStream macOut = calculator.getOutputStream();
+        try {
+            macOut.write(keyInfo.getEncoded("DER"));
+            macOut.close();
+            return new PKMACValue(calculator.getAlgorithmIdentifier(), new DERBitString(calculator.getMac()));
+        } catch (IOException e) {
+            throw new CRMFException("exception encoding mac input: " + e.getMessage(), e);
+        }
+    }
+}

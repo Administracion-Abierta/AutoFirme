@@ -1,0 +1,17 @@
+package org.spongycastle.operator;
+
+import org.spongycastle.asn1.x509.AlgorithmIdentifier;
+
+/* JADX INFO: loaded from: autofirma.jar:org/spongycastle/operator/SymmetricKeyUnwrapper.class */
+public abstract class SymmetricKeyUnwrapper implements KeyUnwrapper {
+    private AlgorithmIdentifier algorithmId;
+
+    protected SymmetricKeyUnwrapper(AlgorithmIdentifier algorithmId) {
+        this.algorithmId = algorithmId;
+    }
+
+    @Override // org.spongycastle.operator.KeyUnwrapper
+    public AlgorithmIdentifier getAlgorithmIdentifier() {
+        return this.algorithmId;
+    }
+}

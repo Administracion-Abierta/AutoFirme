@@ -1,0 +1,24 @@
+package org.spongycastle.jce.exception;
+
+import java.security.cert.CertPath;
+import java.security.cert.CertPathValidatorException;
+
+/* JADX INFO: loaded from: autofirma.jar:org/spongycastle/jce/exception/ExtCertPathValidatorException.class */
+public class ExtCertPathValidatorException extends CertPathValidatorException implements ExtException {
+    private Throwable cause;
+
+    public ExtCertPathValidatorException(String message, Throwable cause) {
+        super(message);
+        this.cause = cause;
+    }
+
+    public ExtCertPathValidatorException(String msg, Throwable cause, CertPath certPath, int index) {
+        super(msg, cause, certPath, index);
+        this.cause = cause;
+    }
+
+    @Override // java.lang.Throwable, org.spongycastle.jce.exception.ExtException
+    public Throwable getCause() {
+        return this.cause;
+    }
+}

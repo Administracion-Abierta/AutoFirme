@@ -1,0 +1,240 @@
+package nu.xom;
+
+import com.sun.jna.platform.win32.WinError;
+import java.io.Writer;
+
+/* JADX INFO: loaded from: autofirma.jar:nu/xom/ISOGreekWriter.class */
+class ISOGreekWriter extends TextWriter {
+    ISOGreekWriter(Writer writer, String str) {
+        super(writer, str);
+    }
+
+    @Override // nu.xom.TextWriter
+    boolean needsEscaping(char c) {
+        if (c < 127) {
+            return false;
+        }
+        switch (c) {
+            case 900:
+                return false;
+            case 901:
+                return false;
+            case 902:
+                return false;
+            case 903:
+                return true;
+            case 904:
+                return false;
+            case 905:
+                return false;
+            case 906:
+                return false;
+            case 907:
+                return true;
+            case 908:
+                return false;
+            case 909:
+                return true;
+            case 910:
+                return false;
+            case 911:
+                return false;
+            case 912:
+                return false;
+            case 913:
+                return false;
+            case 914:
+                return false;
+            case 915:
+                return false;
+            case 916:
+                return false;
+            case 917:
+                return false;
+            case 918:
+                return false;
+            case 919:
+                return false;
+            case 920:
+                return false;
+            case 921:
+                return false;
+            case 922:
+                return false;
+            case 923:
+                return false;
+            case 924:
+                return false;
+            case 925:
+                return false;
+            case 926:
+                return false;
+            case 927:
+                return false;
+            case 928:
+                return false;
+            case 929:
+                return false;
+            case 930:
+                return true;
+            case 931:
+                return false;
+            case 932:
+                return false;
+            case 933:
+                return false;
+            case 934:
+                return false;
+            case 935:
+                return false;
+            case 936:
+                return false;
+            case 937:
+                return false;
+            case 938:
+                return false;
+            case 939:
+                return false;
+            case 940:
+                return false;
+            case 941:
+                return false;
+            case 942:
+                return false;
+            case 943:
+                return false;
+            case 944:
+                return false;
+            case 945:
+                return false;
+            case 946:
+                return false;
+            case 947:
+                return false;
+            case 948:
+                return false;
+            case 949:
+                return false;
+            case 950:
+                return false;
+            case 951:
+                return false;
+            case 952:
+                return false;
+            case 953:
+                return false;
+            case 954:
+                return false;
+            case 955:
+                return false;
+            case 956:
+                return false;
+            case 957:
+                return false;
+            case 958:
+                return false;
+            case 959:
+                return false;
+            case 960:
+                return false;
+            case 961:
+                return false;
+            case 962:
+                return false;
+            case 963:
+                return false;
+            case 964:
+                return false;
+            case 965:
+                return false;
+            case 966:
+                return false;
+            case 967:
+                return false;
+            case 968:
+                return false;
+            case 969:
+                return false;
+            case 970:
+                return false;
+            case 971:
+                return false;
+            case 972:
+                return false;
+            case 973:
+                return false;
+            case 974:
+                return false;
+            default:
+                switch (c) {
+                    case 160:
+                        return false;
+                    case 161:
+                        return true;
+                    case 162:
+                        return true;
+                    case 163:
+                        return false;
+                    case 164:
+                        return true;
+                    case 165:
+                        return true;
+                    case 166:
+                        return false;
+                    case 167:
+                        return false;
+                    case 168:
+                        return false;
+                    case 169:
+                        return false;
+                    case 170:
+                        return true;
+                    case 171:
+                        return false;
+                    case 172:
+                        return false;
+                    case 173:
+                        return false;
+                    case 174:
+                        return true;
+                    case 175:
+                        return true;
+                    case 176:
+                        return false;
+                    case 177:
+                        return false;
+                    case 178:
+                        return false;
+                    case 179:
+                        return false;
+                    case 180:
+                        return true;
+                    case 181:
+                        return true;
+                    case 182:
+                        return true;
+                    case 183:
+                        return false;
+                    case 184:
+                        return true;
+                    case 185:
+                        return true;
+                    case 186:
+                        return true;
+                    case 187:
+                        return false;
+                    case 188:
+                        return true;
+                    case 189:
+                        return false;
+                    default:
+                        switch (c) {
+                            case WinError.ERROR_DS_CANT_ON_NON_LEAF /* 8213 */:
+                                return false;
+                            default:
+                                return true;
+                        }
+                }
+        }
+    }
+}

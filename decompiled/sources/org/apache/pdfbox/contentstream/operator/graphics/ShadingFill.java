@@ -1,0 +1,25 @@
+package org.apache.pdfbox.contentstream.operator.graphics;
+
+import java.io.IOException;
+import java.util.List;
+import org.apache.pdfbox.contentstream.operator.MissingOperandException;
+import org.apache.pdfbox.contentstream.operator.Operator;
+import org.apache.pdfbox.contentstream.operator.OperatorName;
+import org.apache.pdfbox.cos.COSBase;
+import org.apache.pdfbox.cos.COSName;
+
+/* JADX INFO: loaded from: autofirma.jar:org/apache/pdfbox/contentstream/operator/graphics/ShadingFill.class */
+public final class ShadingFill extends GraphicsOperatorProcessor {
+    @Override // org.apache.pdfbox.contentstream.operator.OperatorProcessor
+    public void process(Operator operator, List<COSBase> operands) throws IOException {
+        if (operands.isEmpty()) {
+            throw new MissingOperandException(operator, operands);
+        }
+        this.context.shadingFill((COSName) operands.get(0));
+    }
+
+    @Override // org.apache.pdfbox.contentstream.operator.OperatorProcessor
+    public String getName() {
+        return OperatorName.SHADING_FILL;
+    }
+}
