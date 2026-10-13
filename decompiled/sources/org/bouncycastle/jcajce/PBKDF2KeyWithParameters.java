@@ -1,0 +1,27 @@
+package org.bouncycastle.jcajce;
+
+import javax.crypto.interfaces.PBEKey;
+import org.bouncycastle.crypto.CharToByteConverter;
+import org.bouncycastle.util.Arrays;
+
+/* JADX INFO: loaded from: autofirma.jar:org/bouncycastle/jcajce/PBKDF2KeyWithParameters.class */
+public class PBKDF2KeyWithParameters extends PBKDF2Key implements PBEKey {
+    private final byte[] salt;
+    private final int iterationCount;
+
+    public PBKDF2KeyWithParameters(char[] cArr, CharToByteConverter charToByteConverter, byte[] bArr, int i) {
+        super(cArr, charToByteConverter);
+        this.salt = Arrays.clone(bArr);
+        this.iterationCount = i;
+    }
+
+    @Override // javax.crypto.interfaces.PBEKey
+    public byte[] getSalt() {
+        return this.salt;
+    }
+
+    @Override // javax.crypto.interfaces.PBEKey
+    public int getIterationCount() {
+        return this.iterationCount;
+    }
+}

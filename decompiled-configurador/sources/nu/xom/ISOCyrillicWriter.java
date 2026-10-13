@@ -1,0 +1,221 @@
+package nu.xom;
+
+import java.io.Writer;
+import org.spongycastle.crypto.tls.CipherSuite;
+
+/* JADX INFO: loaded from: autofirmaConfigurador.jar:nu/xom/ISOCyrillicWriter.class */
+class ISOCyrillicWriter extends TextWriter {
+    ISOCyrillicWriter(Writer writer, String str) {
+        super(writer, str);
+    }
+
+    @Override // nu.xom.TextWriter
+    boolean needsEscaping(char c) {
+        if (c <= 160) {
+            return false;
+        }
+        switch (c) {
+            case 1025:
+                return false;
+            case 1026:
+                return false;
+            case 1027:
+                return false;
+            case 1028:
+                return false;
+            case 1029:
+                return false;
+            case 1030:
+                return false;
+            case 1031:
+                return false;
+            case 1032:
+                return false;
+            case 1033:
+                return false;
+            case 1034:
+                return false;
+            case 1035:
+                return false;
+            case 1036:
+                return false;
+            case 1037:
+                return true;
+            case 1038:
+                return false;
+            case 1039:
+                return false;
+            case 1040:
+                return false;
+            case 1041:
+                return false;
+            case 1042:
+                return false;
+            case 1043:
+                return false;
+            case 1044:
+                return false;
+            case 1045:
+                return false;
+            case 1046:
+                return false;
+            case 1047:
+                return false;
+            case 1048:
+                return false;
+            case 1049:
+                return false;
+            case 1050:
+                return false;
+            case 1051:
+                return false;
+            case 1052:
+                return false;
+            case 1053:
+                return false;
+            case 1054:
+                return false;
+            case 1055:
+                return false;
+            case 1056:
+                return false;
+            case 1057:
+                return false;
+            case 1058:
+                return false;
+            case 1059:
+                return false;
+            case 1060:
+                return false;
+            case 1061:
+                return false;
+            case 1062:
+                return false;
+            case 1063:
+                return false;
+            case 1064:
+                return false;
+            case 1065:
+                return false;
+            case 1066:
+                return false;
+            case 1067:
+                return false;
+            case 1068:
+                return false;
+            case 1069:
+                return false;
+            case 1070:
+                return false;
+            case 1071:
+                return false;
+            case 1072:
+                return false;
+            case 1073:
+                return false;
+            case 1074:
+                return false;
+            case 1075:
+                return false;
+            case 1076:
+                return false;
+            case 1077:
+                return false;
+            case 1078:
+                return false;
+            case 1079:
+                return false;
+            case 1080:
+                return false;
+            case 1081:
+                return false;
+            case 1082:
+                return false;
+            case 1083:
+                return false;
+            case 1084:
+                return false;
+            case 1085:
+                return false;
+            case 1086:
+                return false;
+            case 1087:
+                return false;
+            case 1088:
+                return false;
+            case 1089:
+                return false;
+            case 1090:
+                return false;
+            case 1091:
+                return false;
+            case 1092:
+                return false;
+            case 1093:
+                return false;
+            case 1094:
+                return false;
+            case 1095:
+                return false;
+            case 1096:
+                return false;
+            case 1097:
+                return false;
+            case 1098:
+                return false;
+            case 1099:
+                return false;
+            case 1100:
+                return false;
+            case 1101:
+                return false;
+            case 1102:
+                return false;
+            case 1103:
+                return false;
+            case 1104:
+                return true;
+            case 1105:
+                return false;
+            case 1106:
+                return false;
+            case 1107:
+                return false;
+            case 1108:
+                return false;
+            case 1109:
+                return false;
+            case 1110:
+                return false;
+            case 1111:
+                return false;
+            case 1112:
+                return false;
+            case 1113:
+                return false;
+            case 1114:
+                return false;
+            case 1115:
+                return false;
+            case 1116:
+                return false;
+            case 1117:
+                return true;
+            case 1118:
+                return false;
+            case 1119:
+                return false;
+            default:
+                switch (c) {
+                    case CipherSuite.TLS_DH_anon_WITH_AES_256_GCM_SHA384 /* 167 */:
+                        return false;
+                    case CipherSuite.TLS_RSA_PSK_WITH_AES_256_GCM_SHA384 /* 173 */:
+                        return false;
+                    case 8470:
+                        return false;
+                    default:
+                        return true;
+                }
+        }
+    }
+}

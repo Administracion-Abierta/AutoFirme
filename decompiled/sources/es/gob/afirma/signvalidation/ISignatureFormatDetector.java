@@ -1,0 +1,52 @@
+package es.gob.afirma.signvalidation;
+
+/* JADX INFO: loaded from: autofirma.jar:es/gob/afirma/signvalidation/ISignatureFormatDetector.class */
+public interface ISignatureFormatDetector {
+    public static final String FORMAT_UNRECOGNIZED = "No reconocido";
+    public static final String FORMAT_CADES_A = "CAdES-A";
+    public static final String FORMAT_CADES_XL1 = "CAdES-XL1";
+    public static final String FORMAT_CADES_XL2 = "CAdES-XL2";
+    public static final String FORMAT_CADES_X1 = "CAdES-X1";
+    public static final String FORMAT_CADES_X2 = "CAdES-X2";
+    public static final String FORMAT_CADES_C = "CAdES-C";
+    public static final String FORMAT_CADES_T = "CAdES-T";
+    public static final String FORMAT_CADES_EPES = "CAdES-EPES";
+    public static final String FORMAT_CADES_BES = "CAdES-BES";
+    public static final String FORMAT_CMS = "CMS";
+    public static final String FORMAT_CMS_T = "CMS-T";
+    public static final String FORMAT_XADES_A = "XAdES-A";
+    public static final String FORMAT_XADES_XL1 = "XAdES-XL1";
+    public static final String FORMAT_XADES_XL2 = "XAdES-XL2";
+    public static final String FORMAT_XADES_X1 = "XAdES-X1";
+    public static final String FORMAT_XADES_X2 = "XAdES-X2";
+    public static final String FORMAT_XADES_C = "XAdES-C";
+    public static final String FORMAT_XADES_T = "XAdES-T";
+    public static final String FORMAT_XADES_EPES = "XAdES-EPES";
+    public static final String FORMAT_XADES_BES = "XAdES-BES";
+    public static final String FORMAT_PDF = "PDF";
+    public static final String FORMAT_PADES_BASIC = "PAdES-Basic";
+    public static final String FORMAT_PADES_BES = "PAdES-BES";
+    public static final String FORMAT_PADES_EPES = "PAdES-EPES";
+    public static final String FORMAT_PADES_LTV = "PAdES-LTV";
+    public static final String FORMAT_CADES_B_LEVEL = "CAdES B-Level";
+    public static final String FORMAT_CADES_B_B_LEVEL = "CAdES B-B-Level";
+    public static final String FORMAT_CADES_T_LEVEL = "CAdES T-Level";
+    public static final String FORMAT_CADES_LT_LEVEL = "CAdES LT-Level";
+    public static final String FORMAT_CADES_LTA_LEVEL = "CAdES LTA-Level";
+    public static final String FORMAT_XADES_B_LEVEL = "XAdES B-Level";
+    public static final String FORMAT_XADES_B_B_LEVEL = "XAdES B-B-Level";
+    public static final String FORMAT_XADES_T_LEVEL = "XAdES T-Level";
+    public static final String FORMAT_XADES_LT_LEVEL = "XAdES LT-Level";
+    public static final String FORMAT_XADES_LTA_LEVEL = "XAdES LTA-Level";
+    public static final String FORMAT_PADES_B_LEVEL = "PAdES B-Level";
+    public static final String FORMAT_PADES_B_B_LEVEL = "PAdES B-B-Level";
+    public static final String FORMAT_PADES_T_LEVEL = "PAdES T-Level";
+    public static final String FORMAT_PADES_LT_LEVEL = "PAdES LT-Level";
+    public static final String FORMAT_PADES_LTA_LEVEL = "PAdES LTA-Level";
+    public static final String FORMAT_ASIC_S_B_LEVEL = "ASiC-S B-Level";
+    public static final String FORMAT_ASIC_S_T_LEVEL = "ASiC-S T-Level";
+    public static final String FORMAT_ASIC_S_LT_LEVEL = "ASiC-S LT-Level";
+    public static final String FORMAT_ASIC_S_LTA_LEVEL = "ASiC-S LTA-Level";
+    public static final String CADES_BASIC_FORMAT = "CADES";
+    public static final String PKCS7_BASIC_FORMAT = "PKCS7";
+}

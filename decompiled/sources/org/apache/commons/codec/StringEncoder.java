@@ -1,0 +1,6 @@
+package org.apache.commons.codec;
+
+/* JADX INFO: loaded from: autofirma.jar:org/apache/commons/codec/StringEncoder.class */
+public interface StringEncoder extends Encoder {
+    String encode(String str) throws EncoderException;
+}

@@ -1,0 +1,14 @@
+package org.spongycastle.crypto.tls;
+
+/* JADX INFO: loaded from: autofirmaConfigurador.jar:org/spongycastle/crypto/tls/ExporterLabel.class */
+public class ExporterLabel {
+    public static final String client_finished = "client finished";
+    public static final String server_finished = "server finished";
+    public static final String master_secret = "master secret";
+    public static final String key_expansion = "key expansion";
+    public static final String client_EAP_encryption = "client EAP encryption";
+    public static final String ttls_keying_material = "ttls keying material";
+    public static final String ttls_challenge = "ttls challenge";
+    public static final String dtls_srtp = "EXTRACTOR-dtls_srtp";
+    public static final String extended_master_secret = "extended master secret";
+}

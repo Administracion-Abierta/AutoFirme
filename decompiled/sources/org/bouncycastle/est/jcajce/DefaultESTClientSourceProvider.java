@@ -1,0 +1,88 @@
+package org.bouncycastle.est.jcajce;
+
+import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import org.bouncycastle.est.ESTClientSourceProvider;
+import org.bouncycastle.est.Source;
+import org.bouncycastle.util.Strings;
+
+/* JADX INFO: loaded from: autofirma.jar:org/bouncycastle/est/jcajce/DefaultESTClientSourceProvider.class */
+class DefaultESTClientSourceProvider implements ESTClientSourceProvider {
+    private final SSLSocketFactory sslSocketFactory;
+    private final JsseHostnameAuthorizer hostNameAuthorizer;
+    private final int timeout;
+    private final ChannelBindingProvider bindingProvider;
+    private final Set<String> cipherSuites;
+    private final Long absoluteLimit;
+    private final boolean filterSupportedSuites;
+
+    public DefaultESTClientSourceProvider(SSLSocketFactory sSLSocketFactory, JsseHostnameAuthorizer jsseHostnameAuthorizer, int i, ChannelBindingProvider channelBindingProvider, Set<String> set, Long l, boolean z) throws GeneralSecurityException {
+        this.sslSocketFactory = sSLSocketFactory;
+        this.hostNameAuthorizer = jsseHostnameAuthorizer;
+        this.timeout = i;
+        this.bindingProvider = channelBindingProvider;
+        this.cipherSuites = set;
+        this.absoluteLimit = l;
+        this.filterSupportedSuites = z;
+    }
+
+    @Override // org.bouncycastle.est.ESTClientSourceProvider
+    public Source makeSource(String str, int i) throws IOException {
+        SSLSocket sSLSocket = (SSLSocket) this.sslSocketFactory.createSocket(str, i);
+        sSLSocket.setSoTimeout(this.timeout);
+        if (this.cipherSuites != null && !this.cipherSuites.isEmpty()) {
+            if (this.filterSupportedSuites) {
+                HashSet hashSet = new HashSet();
+                String[] supportedCipherSuites = sSLSocket.getSupportedCipherSuites();
+                for (int i2 = 0; i2 != supportedCipherSuites.length; i2++) {
+                    hashSet.add(supportedCipherSuites[i2]);
+                }
+                ArrayList arrayList = new ArrayList();
+                for (String str2 : this.cipherSuites) {
+                    if (hashSet.contains(str2)) {
+                        arrayList.add(str2);
+                    }
+                }
+                if (arrayList.isEmpty()) {
+                    throw new IllegalStateException("No supplied cipher suite is supported by the provider.");
+                }
+                sSLSocket.setEnabledCipherSuites((String[]) arrayList.toArray(new String[arrayList.size()]));
+            } else {
+                sSLSocket.setEnabledCipherSuites((String[]) this.cipherSuites.toArray(new String[this.cipherSuites.size()]));
+            }
+        }
+        sSLSocket.startHandshake();
+        if (this.hostNameAuthorizer != null && !this.hostNameAuthorizer.verified(str, sSLSocket.getSession())) {
+            throw new IOException("Host name could not be verified.");
+        }
+        String lowerCase = Strings.toLowerCase(sSLSocket.getSession().getCipherSuite());
+        if (lowerCase.contains("_des_") || lowerCase.contains("_des40_") || lowerCase.contains("_3des_")) {
+            throw new IOException("EST clients must not use DES ciphers");
+        }
+        if (Strings.toLowerCase(sSLSocket.getSession().getCipherSuite()).contains("null")) {
+            throw new IOException("EST clients must not use NULL ciphers");
+        }
+        if (Strings.toLowerCase(sSLSocket.getSession().getCipherSuite()).contains("anon")) {
+            throw new IOException("EST clients must not use anon ciphers");
+        }
+        if (Strings.toLowerCase(sSLSocket.getSession().getCipherSuite()).contains("export")) {
+            throw new IOException("EST clients must not use export ciphers");
+        }
+        if (sSLSocket.getSession().getProtocol().equalsIgnoreCase("tlsv1")) {
+            try {
+                sSLSocket.close();
+            } catch (Exception e) {
+            }
+            throw new IOException("EST clients must not use TLSv1");
+        }
+        if (this.hostNameAuthorizer == null || this.hostNameAuthorizer.verified(str, sSLSocket.getSession())) {
+            return new LimitedSSLSocketSource(sSLSocket, this.bindingProvider, this.absoluteLimit);
+        }
+        throw new IOException("Hostname was not verified: " + str);
+    }
+}
