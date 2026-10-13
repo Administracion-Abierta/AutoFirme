@@ -10,3 +10,6 @@ work/
 .bullet/meta/
 .bullet/worktrees/
 .bullet/logs/
+node_modules/
+web/.svelte-kit/
+web/build/
