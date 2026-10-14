@@ -90,8 +90,9 @@ Two format-level wrinkles the rewrite must keep:
 - **Algorithm policy.** After signing, `AOPkcs1Signer` re-verifies the returned PKCS#1 against
   the signer certificate (`:44-52`), and maps provider failures onto app exceptions:
   `es.gob.jmulticard.{CancelledOperationException, jse.provider.SignatureAuthException}` →
-  `AOCancelledSMOperationException` / `AuthenticationException` / `PinException` (`:60-71`) —
-  i.e. the on-card-signing provider (§4) plugs in *under* the same interface.
+  `AOCancelledSMOperationException` / `LockedKeyStoreException` / `AuthenticationException` /
+  `PinException` (`:60-71`) — i.e. the on-card-signing provider (§4) plugs in *under* the same
+  interface.
 
 **Rewrite note:** tri-phase is not legacy baggage to delete — it is the correct browser design.
 Phase 2 is `crypto.subtle.sign`; phases 1 and 3 are pure byte manipulation and belong in
