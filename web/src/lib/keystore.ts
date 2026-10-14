@@ -60,9 +60,12 @@ function readPrivateKeyInfo(der: Bytes): PrivateKeyInfo {
 	throw new Pkcs12Error('unsupported-key', `unsupported private key algorithm ${algorithmOid}`);
 }
 
-function toSignerCert(certificate: Certificate, algorithm: SigningAlgorithm | null, key: CryptoKey | null, now: Date): SignerCert {
+function toSignerCert(certificate: Certificate, algorithm: SigningAlgorithm | null, key: CryptoKey | null, now: Date, position: number): SignerCert {
 	return {
-		id: certificate.serial,
+		// Position-prefixed: serial numbers are only unique per issuer (RFC 5280), so one
+		// container may hold two certificates with the same serial; the picker keys its
+		// list by id and a keyed each throws on duplicates.
+		id: `${position}:${certificate.serial}`,
 		commonName: certificate.commonName,
 		subject: certificate.subject,
 		issuer: certificate.issuer,
@@ -105,10 +108,10 @@ export async function loadSignerSession(
 	}
 
 	const now = options.now ?? new Date();
-	const signerCerts = parsed.map((certificate) =>
+	const signerCerts = parsed.map((certificate, position) =>
 		samePublicKey(certificate.publicKey, info.publicKey)
-			? toSignerCert(certificate, info.algorithm, key, now)
-			: toSignerCert(certificate, null, null, now)
+			? toSignerCert(certificate, info.algorithm, key, now, position)
+			: toSignerCert(certificate, null, null, now, position)
 	);
 	const signer = signerCerts.find((certificate) => certificate.key !== null);
 	if (!signer) throw new Pkcs12Error('key-mismatch', 'no signable certificate in this container');
