@@ -212,4 +212,19 @@ describe('PAdES B-B signing', () => {
 			/Verification successful/i
 		);
 	});
+
+	it('keeps accented signer text readable (UTF-16 dict strings, WinAnsi appearance)', async () => {
+		const signed = await signSource({ name: 'José García', reason: 'Conformidad', visible: { rect: [60, 60, 260, 120] } });
+		const extracted = await extractSignature(signed);
+
+		const name = extracted.signature.lookup(PDFName.of('Name'));
+		if (!(name instanceof PDFString || name instanceof PDFHexString)) throw new Error('/Name is not a string');
+		expect(name.decodeText()).toBe('José García');
+
+		const appearance = extracted.field.lookup(PDFName.of('AP'), PDFDict);
+		const form = extracted.document.context.lookup(appearance.lookup(PDFName.of('N')) as PDFRef, PDFStream);
+		const contentStream = new TextDecoder('latin1').decode(form.getContents());
+		expect(contentStream).toContain('(Jos\\351 Garc\\355a)');
+		expect(contentStream).not.toContain('Ã');
+	});
 });

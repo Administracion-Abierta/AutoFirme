@@ -219,6 +219,31 @@ function pdfLiteral(value: string): string {
 	return value.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
 
+/** PDF text string: ASCII literal, else UTF-16BE with BOM as hex (ISO 32000-1 §7.9.4). */
+function pdfTextString(value: string): string {
+	if (/^[\x00-\x7f]*$/.test(value)) return `(${pdfLiteral(value)})`;
+	let hex = 'feff';
+	for (let index = 0; index < value.length; index += 1) {
+		hex += value.charCodeAt(index).toString(16).padStart(4, '0');
+	}
+	return `<${hex}>`;
+}
+
+/** Content-stream literal: WinAnsi bytes, non-printables octal-escaped (WinAnsi font in /AP). */
+function pdfStreamString(value: string): string {
+	let out = '';
+	for (const char of value) {
+		const cp = char.codePointAt(0) ?? 0x3f;
+		// ponytail: identity ≤ U+00FF + '?' beyond; add the cp1252 0x80–0x9F block (€ “ ” –)
+		// or subset embedded fonts when copy needs more than Spanish Latin-1.
+		const byte = cp <= 0xff ? cp : 0x3f;
+		if (byte === 0x28 || byte === 0x29 || byte === 0x5c) out += '\\' + String.fromCharCode(byte);
+		else if (byte < 0x20 || byte > 0x7e) out += '\\' + byte.toString(8).padStart(3, '0');
+		else out += String.fromCharCode(byte);
+	}
+	return out;
+}
+
 function pdfDate(date: Date): string {
 	const pad = (value: number, width = 2) => String(value).padStart(width, '0');
 	return (
@@ -264,7 +289,7 @@ function appearanceContent(rect: [number, number, number, number], text: string)
 		`0.25 0.25 ${Math.max(width - 0.5, 0)} ${Math.max(height - 0.5, 0)} re S`,
 		'BT /Helv 8 Tf 0 0 0 rg',
 		`4 ${Math.max(height - 12, 1)} Td`,
-		`(${pdfLiteral(label)}) Tj`,
+		`(${pdfStreamString(label)}) Tj`,
 		'ET',
 		'Q',
 		''
@@ -357,9 +382,9 @@ export async function signPdf(
 	contentsOffset = base + out.length;
 	out.push(`<${'0'.repeat(contentsHexLength)}>\n`);
 	out.push(`/M (${pdfDate(signingTime)})\n`);
-	if (options.name) out.push(`/Name (${pdfLiteral(options.name)})\n`);
-	if (options.reason) out.push(`/Reason (${pdfLiteral(options.reason)})\n`);
-	if (options.location) out.push(`/Location (${pdfLiteral(options.location)})\n`);
+	if (options.name) out.push(`/Name ${pdfTextString(options.name)}\n`);
+	if (options.reason) out.push(`/Reason ${pdfTextString(options.reason)}\n`);
+	if (options.location) out.push(`/Location ${pdfTextString(options.location)}\n`);
 	out.push('>>');
 	closeObject();
 
