@@ -69,7 +69,7 @@ function parse(xml: string): Document {
 	return new DOMParser().parseFromString(xml, 'application/xml');
 }
 
-function elements(root: ParentNode, namespace: string, localName: string): Element[] {
+function elements(root: Element, namespace: string, localName: string): Element[] {
 	return [...root.getElementsByTagNameNS(namespace, localName)];
 }
 
