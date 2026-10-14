@@ -1,0 +1,26 @@
+@import 'tailwindcss';
+
+@theme {
+	--color-ink-50: #f6f7f9;
+	--color-ink-100: #eceef2;
+	--color-ink-700: #2f3542;
+	--color-ink-900: #14181f;
+	--color-brand-500: #1f6feb;
+	--color-brand-600: #1558c0;
+	--font-sans:
+		'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html {
+	color-scheme: light dark;
+}
+
+body {
+	@apply bg-ink-50 text-ink-900 antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+	body {
+		@apply bg-ink-900 text-ink-50;
+	}
+}
