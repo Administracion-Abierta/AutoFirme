@@ -95,7 +95,12 @@ function namespacesToRender(el: Element, rendered: Map<string, string>, exclusiv
 	const pending: Array<[string, string]> = [];
 	for (const [prefix, uri] of inScopeNamespaces(el)) {
 		if (rendered.get(prefix) === uri) continue;
-		if (exclusive && !utilized(prefix)) continue;
+		if (exclusive && !utilized(prefix)) {
+			// exc-c14n still renders xmlns="" when an unprefixed element carries no namespace
+			// while a non-empty default namespace is in the output: skipping it would change meaning.
+			const unsetDefault = prefix === '' && uri === '' && !el.prefix && !!rendered.get('');
+			if (!unsetDefault) continue;
+		}
 		pending.push([prefix, uri]);
 	}
 	return pending.sort((a, b) => compareNames(a[0], b[0]));
