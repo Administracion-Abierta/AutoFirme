@@ -191,3 +191,17 @@ export function canonicalize(node: Node, options: C14nOptions = {}): Bytes {
 	writeElement(node as Element, out, options, new Map(), new Map());
 	return new TextEncoder().encode(out.join(''));
 }
+
+/**
+ * OOXML (#10) entry points. The package signature digests the octets (`canonicalizeBytes`) and its
+ * tests compare the text against `xmllint`, so the string form is exposed directly; `exclusive`
+ * selects Exclusive C14N over the default inclusive C14N 1.0.
+ */
+export function canonicalizeBytes(node: Node, exclusive = false): Bytes {
+	return canonicalize(node, exclusive ? { exclusive: true } : {});
+}
+
+/** Canonical form of `node` as text — the shape `xmllint --c14n` prints. */
+export function canonicalizeToString(node: Node, exclusive = false): string {
+	return new TextDecoder().decode(canonicalizeBytes(node, exclusive));
+}

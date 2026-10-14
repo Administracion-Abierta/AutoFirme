@@ -7,8 +7,12 @@
  * verified through the digests it recomputes.
  */
 
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { canonicalize } from './c14n';
+import { canonicalize, canonicalizeToString } from './c14n';
 
 function parse(xml: string): Document {
 	const doc = new DOMParser().parseFromString(xml, 'application/xml');
@@ -98,5 +102,40 @@ describe('canonicalize', () => {
 				})
 			)
 		).toBe('<a xmlns:x="urn:x" b="1"></a>');
+	});
+});
+
+/**
+ * Byte-compatibility against `xmllint`, the oracle #10 pinned for the OOXML package digests —
+ * the inherited-namespace and default-namespace-reset cases the signer depends on.
+ */
+const hasXmllint = (() => {
+	try {
+		execFileSync('xmllint', ['--version'], { stdio: 'ignore' });
+		return true;
+	} catch {
+		return false;
+	}
+})();
+
+const XMLLINT_SAMPLES = [
+	// default namespace declared, reset on a prefixed element, unprefixed namespaced child
+	'<r xmlns:p="urn:p" xmlns="urn:x"><p:c xmlns=""><n/></p:c></r>',
+	// inherited prefixed namespaces over a signature-shaped subtree
+	'<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:Reference URI="#x"/></ds:SignedInfo></ds:Signature>',
+	// mixed prefixes, attribute order, default ns on a prefixed root, text escaping
+	'<a:b xmlns:a="urn:a" xmlns:z="urn:z" a:x="1" z:y="2" xmlns="urn:d">t&amp;x &lt;y</a:b>'
+];
+
+describe('canonicalize — xmllint parity', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'c14n-'));
+	it.runIf(hasXmllint)('matches xmllint --c14n and --exc-c14n byte for byte', () => {
+		for (const [index, xml] of XMLLINT_SAMPLES.entries()) {
+			const path = join(dir, `sample-${index}.xml`);
+			writeFileSync(path, xml);
+			const doc = parse(xml);
+			expect(canonicalizeToString(doc)).toBe(execFileSync('xmllint', ['--c14n', path], { encoding: 'utf8' }));
+			expect(canonicalizeToString(doc, true)).toBe(execFileSync('xmllint', ['--exc-c14n', path], { encoding: 'utf8' }));
+		}
 	});
 });
