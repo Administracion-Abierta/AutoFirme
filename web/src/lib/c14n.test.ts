@@ -75,6 +75,19 @@ describe('canonicalize', () => {
 		);
 	});
 
+	it('separates document-level nodes with a newline, as libxml2 does', () => {
+		const doc = parse('<?pi a?><!-- note --><a/>');
+		expect(new TextDecoder().decode(canonicalize(doc, { exclusive: true }))).toBe('<?pi a?>\n<a></a>');
+		expect(new TextDecoder().decode(canonicalize(doc, { exclusive: true, withComments: true }))).toBe(
+			'<?pi a?>\n<!-- note -->\n<a></a>'
+		);
+		const lone = parse('<!-- note --><a/>');
+		expect(new TextDecoder().decode(canonicalize(lone, { exclusive: true }))).toBe('<a></a>');
+		expect(new TextDecoder().decode(canonicalize(lone, { exclusive: true, withComments: true }))).toBe(
+			'<!-- note -->\n<a></a>'
+		);
+	});
+
 	it('honours the exclusive InclusiveNamespaces prefix list', () => {
 		expect(c14n('<a xmlns:x="urn:x" xmlns:y="urn:y" b="1"/>', true)).toBe('<a b="1"></a>');
 		expect(

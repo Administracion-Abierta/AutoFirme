@@ -7,8 +7,8 @@
  * asked), namespace declarations first (default then by prefix), attributes sorted by
  * (namespace URI, local name), text escaped for `& < >` and CR, empty elements written `<a></a>`.
  *
- * Scope, deliberately: one subtree node-set (an element and its descendants) — the only node-set
- * the XMLDSig transforms of #7 produce.
+ * Scope: an element subtree, or a whole document node-set — processing instructions and comments
+ * outside the root included, as the `URI=""` enveloped reference of #7 requires.
  */
 
 import type { Bytes } from './asn1';
@@ -45,6 +45,16 @@ function escapeAttribute(value: string): string {
 		.replace(/\t/g, '&#x9;')
 		.replace(/\n/g, '&#xA;')
 		.replace(/\r/g, '&#xD;');
+}
+
+/** Canonical form of a processing instruction: `<?target data?>`. */
+function writePi(node: Node, out: string[]): void {
+	out.push(`<?${(node as ProcessingInstruction).target} ${(node.nodeValue ?? '').trim()}?>`);
+}
+
+/** Canonical form of a comment — dropped unless `withComments`. */
+function writeComment(node: Node, out: string[], options: C14nOptions): void {
+	if (options.withComments) out.push(`<!--${(node.nodeValue ?? '').replace(/\r/g, '&#xD;')}-->`);
 }
 
 /** Namespaces in scope at `element`, the document ancestors included (nearest declaration wins). */
@@ -149,10 +159,10 @@ function writeElement(
 				break;
 			}
 			case COMMENT:
-				if (options.withComments) out.push(`<!--${(child.nodeValue ?? '').replace(/\r/g, '&#xD;')}-->`);
+				writeComment(child, out, options);
 				break;
 			case PI:
-				out.push(`<?${(child as ProcessingInstruction).target} ${(child.nodeValue ?? '').trim()}?>`);
+				writePi(child, out);
 				break;
 		}
 	}
@@ -162,11 +172,22 @@ function writeElement(
 
 /** Canonicalize one element subtree (or a whole document), UTF-8 encoded. */
 export function canonicalize(node: Node, options: C14nOptions = {}): Bytes {
-	const root = node.nodeType === DOCUMENT ? (node as Document).documentElement : node;
-	if (root === null || root.nodeType !== ELEMENT) {
-		throw new Error('c14n: expected a document or element node');
-	}
 	const out: string[] = [];
-	writeElement(root as Element, out, options, new Map(), new Map());
+	if (node.nodeType === DOCUMENT) {
+		// Document-level nodes are separated by a newline — what xmllint, lxml and xmlsec1 emit.
+		const parts: string[] = [];
+		for (let child = node.firstChild; child !== null; child = child.nextSibling) {
+			const part: string[] = [];
+			if (child.nodeType === ELEMENT) writeElement(child as Element, part, options, new Map(), new Map());
+			else if (child.nodeType === PI) writePi(child, part);
+			else if (child.nodeType === COMMENT) writeComment(child, part, options);
+			else continue;
+			// A comment dropped by a without-comments c14n takes its separator with it.
+			if (part.length > 0) parts.push(part.join(''));
+		}
+		return new TextEncoder().encode(parts.join('\n'));
+	}
+	if (node.nodeType !== ELEMENT) throw new Error('c14n: expected a document or element node');
+	writeElement(node as Element, out, options, new Map(), new Map());
 	return new TextEncoder().encode(out.join(''));
 }

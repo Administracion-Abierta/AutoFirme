@@ -112,6 +112,24 @@ describe('signXades', () => {
 		expect(() => xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toThrow(/REFERENCE/);
 	});
 
+	it('keeps document-level PIs and comments and xmlsec1 still verifies', async () => {
+		const withMisc = SAMPLE.replace(
+			'<fe:Facturae',
+			'<?xml-stylesheet type="text/xsl" href="facturae.xsl"?>\n<!-- reviewed -->\n<fe:Facturae'
+		);
+		const miscSigned = await signXades({
+			xml: withMisc,
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW
+		});
+		expect(miscSigned).toContain('<?xml-stylesheet type="text/xsl" href="facturae.xsl"?>');
+		expect(miscSigned).toContain('<!-- reviewed -->');
+		const path = writeFixtureFile(fixtures.dir, 'facturae-misc.xsig', encoder.encode(miscSigned));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toMatch(/status: OK/);
+	});
+
 	it('carries a WebCrypto signature over the canonical SignedInfo', () => {
 		const signedInfo = canonicalize(elements(root, DS, 'SignedInfo')[0], { exclusive: true });
 		const signature = Buffer.from(elements(root, DS, 'SignatureValue')[0].textContent!, 'base64');

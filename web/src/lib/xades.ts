@@ -174,9 +174,9 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 	const doc = parseXml(options.xml);
 	if (doc.querySelector('Signature')) throw new Error('XAdES: the document is already signed');
 
-	// Reference #1 — the document itself. The enveloped-signature transform removes the ds:Signature
-	// we are about to insert, so the digest is over the document as it is now.
-	const documentDigest = await digest(algorithm.hash, canonicalize(doc.documentElement, { exclusive: true }));
+	// Reference #1 — the document itself: PIs/comments above the root included, the ds:Signature
+	// not yet inserted (the enveloped-signature transform would remove it anyway).
+	const documentDigest = await digest(algorithm.hash, canonicalize(doc, { exclusive: true }));
 	const certificateDigests = await Promise.all(chain.map((certificate) => digest('SHA-256', certificate.der)));
 	const signingTime = (options.now ?? new Date()).toISOString().replace(/\.\d{3}Z$/, 'Z');
 	const mimeType = options.dataObject?.mimeType ?? 'application/xml';
@@ -239,5 +239,7 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 	const signatureValue = await signBytes(signer, canonicalize(signedInfo, { exclusive: true }));
 	byId(doc, ids.signatureValue).textContent = toBase64(signatureValue);
 
-	return `<?xml version="1.0" encoding="UTF-8"?>\n${new XMLSerializer().serializeToString(doc.documentElement)}`;
+	// Serialize every document child — top-level PIs/comments must survive signing.
+	const body = [...doc.childNodes].map((child) => new XMLSerializer().serializeToString(child)).join('');
+	return `<?xml version="1.0" encoding="UTF-8"?>\n${body}`;
 }
