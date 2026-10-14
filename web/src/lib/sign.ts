@@ -22,6 +22,8 @@ export interface SelectedFile {
 	name: string;
 	size: number;
 	type: string;
+	/** The picked file itself — signing reads its bytes. */
+	source: File;
 }
 
 /** WebCrypto parameters used for both importing and signing with a certificate's private key. */
@@ -71,7 +73,7 @@ export async function signBytes(cert: SignerCert, data: Bytes): Promise<Bytes> {
 }
 
 export function toSelectedFile(file: File): SelectedFile {
-	return { name: file.name, size: file.size, type: file.type };
+	return { name: file.name, size: file.size, type: file.type, source: file };
 }
 
 export function formatBytes(bytes: number): string {

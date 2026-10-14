@@ -5,8 +5,11 @@
 		toSelectedFile,
 		type SelectedFile,
 		type SignFormat,
-		type SignerCert
+		type SignerCert,
+		type SignResult
 	} from '#lib/sign';
+	import { signCadesDetached } from '#lib/cms';
+	import type { Bytes } from '#lib/asn1';
 	import FileDrop from '#lib/components/FileDrop.svelte';
 	import FileCard from '#lib/components/FileCard.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
@@ -20,14 +23,51 @@
 	let format = $state<SignFormat>('cades');
 	// Only the certificate that owns the container's private key can sign.
 	let cert = $state<SignerCert | null>(null);
+	let result = $state<SignResult | null>(null);
+	let signing = $state(false);
 
-	const canSign = $derived(file !== null && cert?.key != null);
+	const cades = SIGN_FORMATS.find((option) => option.id === 'cades')!;
+	const canSign = $derived(file !== null && cert?.key != null && format === 'cades' && !signing);
 	const signHint = $derived(
-		file === null ? t.signNeedsFile : cert === null ? t.signNeedsCert : ''
+		file === null
+			? t.signNeedsFile
+			: cert === null
+				? t.signNeedsCert
+				: format !== 'cades'
+					? t.signPendingFormat
+					: ''
 	);
 
 	function clearFile() {
 		file = null;
+	}
+
+	function download(name: string, bytes: Bytes) {
+		const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+		const anchor = document.createElement('a');
+		anchor.href = url;
+		anchor.download = name;
+		anchor.click();
+		URL.revokeObjectURL(url);
+	}
+
+	/** Sign the picked document and hand the `.csig` over to the browser. Keys stay in the page. */
+	async function sign() {
+		if (!file || !cert) return;
+		signing = true;
+		result = null;
+		try {
+			const content = new Uint8Array(await file.source.arrayBuffer());
+			download(`${file.name}${cades.extension}`, await signCadesDetached(cert, content));
+			result = { ok: true, message: t.signDone };
+		} catch (error) {
+			result = {
+				ok: false,
+				message: `${t.signFailed} ${error instanceof Error ? error.message : ''}`.trim()
+			};
+		} finally {
+			signing = false;
+		}
 	}
 </script>
 
@@ -95,9 +135,14 @@
 					{/each}
 				</fieldset>
 
-				<SignButton label={t.signButton} disabled={!canSign} hint={signHint} />
+				<SignButton
+					label={t.signButton}
+					disabled={!canSign}
+					hint={signHint}
+					onsign={sign}
+				/>
 
-				<ResultCard copy={t} result={null} />
+				<ResultCard copy={t} {result} />
 			</section>
 		{/if}
 	</main>

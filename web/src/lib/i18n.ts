@@ -36,6 +36,9 @@ export interface Copy {
 	signButton: string;
 	signNeedsFile: string;
 	signNeedsCert: string;
+	signPendingFormat: string;
+	signDone: string;
+	signFailed: string;
 	resultTitle: string;
 	resultEmpty: string;
 }
@@ -83,6 +86,9 @@ export const copy: Record<Lang, Copy> = {
 		signButton: 'Firmar',
 		signNeedsFile: 'Selecciona primero un documento.',
 		signNeedsCert: 'Selecciona un certificado para habilitar la firma.',
+		signPendingFormat: 'Este formato llegará en otra entrega.',
+		signDone: 'Firma CAdES-BES creada. Se ha descargado el fichero .csig.',
+		signFailed: 'No se ha podido firmar el documento.',
 		resultTitle: 'Resultado',
 		resultEmpty: 'Todavía no se ha firmado ningún documento.'
 	},
@@ -128,6 +134,9 @@ export const copy: Record<Lang, Copy> = {
 		signButton: 'Sign',
 		signNeedsFile: 'Choose a document first.',
 		signNeedsCert: 'Choose a certificate to enable signing.',
+		signPendingFormat: 'This format ships in a later delivery.',
+		signDone: 'CAdES-BES signature created. The .csig file has been downloaded.',
+		signFailed: 'The document could not be signed.',
 		resultTitle: 'Result',
 		resultEmpty: 'No document has been signed yet.'
 	}

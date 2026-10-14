@@ -1,10 +1,13 @@
 import { rmSync } from 'node:fs';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import App from './App.svelte';
 import { createPkcs12Fixtures, FIXTURE_PIN, LEAF_COMMON_NAME, type Pkcs12Fixtures } from '../test/fixtures';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+});
 
 let fixtures: Pkcs12Fixtures;
 
@@ -118,5 +121,27 @@ describe('App (sign workflow shell)', () => {
 
 		expect(container.querySelector<HTMLInputElement>('#cert-picker')?.value).toBe('');
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+	});
+
+	it('signs the picked document and hands the .csig to the browser', async () => {
+		const downloaded: string[] = [];
+		vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+			this: HTMLAnchorElement
+		) {
+			downloaded.push(this.download);
+		});
+		// jsdom has no blob URLs; only their creation matters here.
+		Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:signature', configurable: true });
+		Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, configurable: true });
+
+		const { container } = render(App);
+		await pickDocumentAndKey(container);
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
+
+		await waitFor(() => expect(container.textContent).toContain('Firma CAdES-BES creada'));
+		expect(downloaded).toEqual(['contrato.pdf.csig']);
 	});
 });
