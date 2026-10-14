@@ -1,0 +1,3 @@
+# CRLF in the signed test documents is deliberate (generate.sh: openssl cms -verify
+# cross-check needs byte-stable line endings); do not flag it as trailing whitespace.
+*.txt whitespace=cr-at-eol

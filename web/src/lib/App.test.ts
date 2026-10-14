@@ -1,5 +1,5 @@
-import { rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import App from './App.svelte';
@@ -215,5 +215,40 @@ describe('App (sign workflow shell)', () => {
 
 		expect(downloads.names).toEqual(['contrato.pdf.csig']);
 		expect((await downloads.blobs[0].arrayBuffer()).byteLength).toBeGreaterThan(500);
+	});
+});
+
+describe('verify mode', () => {
+	it('renders a per-check validity report for a dropped artifact', async () => {
+		const { container } = render(App);
+		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
+
+		expect(container.textContent).toContain('Arrastra aquí el fichero firmado');
+
+		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/cades-tampered.csig'));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File([bytes], 'firma.csig')] }
+		});
+
+		await screen.findByText(/no supera todas las comprobaciones/);
+		expect(container.querySelector('[data-check="contentDigest"]')?.getAttribute('data-status')).toBe('fail');
+		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
+		expect(container.textContent).toContain('Firmante');
+	});
+
+	it('labels the trust-chain check as failed when the root is not bundled, keeping the rest green', async () => {
+		const { container } = render(App);
+		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
+
+		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/xades-valid.xsig'));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File([bytes], 'firma.xsig')] }
+		});
+
+		await screen.findByText(/no supera todas las comprobaciones/);
+		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
+		expect(container.querySelector('[data-check="reference"]')?.getAttribute('data-status')).toBe('pass');
+		expect(container.querySelector('[data-check="certChain"]')?.getAttribute('data-status')).toBe('fail');
+		expect(container.textContent).toContain('XAdES');
 	});
 });
