@@ -97,7 +97,7 @@ export function octets(node: Der): Bytes {
 	if (node.tag === TAG.BIT_STRING) {
 		const unused = node.content[0];
 		if (unused > 7) throw new DerError('BIT STRING declares more than 7 unused bits');
-		return node.content.subarray(1, node.content.length - (unused === 0 ? 0 : 1));
+		return node.content.subarray(1);
 	}
 	if (node.tag !== TAG.OCTET_STRING) throw new DerError(`expected OCTET/BIT STRING, got 0x${node.tag.toString(16)}`);
 	return node.content;

@@ -9,38 +9,51 @@ export type { Bytes, Check, CheckId, CheckStatus, Signer, VerificationReport, Ar
 export { detectFormat } from './detect';
 
 export async function verifyArtifact(bytes: Bytes, options: VerifyOptions = {}): Promise<VerificationReport> {
-	switch (detectFormat(bytes)) {
-		case 'cades':
-			return verifyCades(bytes, options);
-		case 'xades':
-			return verifyXades(bytes, options);
-		case 'pdf':
-			return {
-				format: 'pdf',
-				ok: false,
-				signer: null,
-				signingTime: null,
-				checks: [
-					{
-						id: 'unsupported',
-						status: 'info',
-						detail: 'PDF/PAdES signatures are not verified yet — tracked by issue #11'
-					}
-				]
-			};
-		default:
-			return {
-				format: 'unknown',
-				ok: false,
-				signer: null,
-				signingTime: null,
-				checks: [
-					{
-						id: 'structure',
-						status: 'fail',
-						detail: 'not a recognised signed artifact (CMS SignedData, XMLDSig or PDF expected)'
-					}
-				]
-			};
+	const format = detectFormat(bytes);
+	try {
+		switch (format) {
+			case 'cades':
+				return await verifyCades(bytes, options);
+			case 'xades':
+				return await verifyXades(bytes, options);
+			case 'pdf':
+				return {
+					format,
+					ok: false,
+					signer: null,
+					signingTime: null,
+					checks: [
+						{
+							id: 'unsupported',
+							status: 'info',
+							detail: 'PDF/PAdES signatures are not verified yet — tracked by issue #11'
+						}
+					]
+				};
+			default:
+				return {
+					format,
+					ok: false,
+					signer: null,
+					signingTime: null,
+					checks: [
+						{
+							id: 'structure',
+							status: 'fail',
+							detail: 'not a recognised signed artifact (CMS SignedData, XMLDSig or PDF expected)'
+						}
+					]
+				};
+		}
+	} catch (error) {
+		// Malformed input (e.g. invalid base64 in an XMLDSig element) must surface as a
+		// red structure card with the reason, never as an unhandled rejection.
+		return {
+			format,
+			ok: false,
+			signer: null,
+			signingTime: null,
+			checks: [{ id: 'structure', status: 'fail', detail: `verification aborted: ${(error as Error).message}` }]
+		};
 	}
 }

@@ -147,6 +147,20 @@ describe('XAdES verification', () => {
 		expect(report.ok).toBe(false);
 	});
 
+	it('turns a malformed SignatureValue base64 into a failed structure check, not a crash', async () => {
+		const xml = new TextDecoder().decode(read('xades-valid.xsig'));
+		const corrupt = xml.replace(
+			/<ds:SignatureValue>[^<]*<\/ds:SignatureValue>/,
+			'<ds:SignatureValue>@@not-base64@@</ds:SignatureValue>'
+		);
+		expect(corrupt).not.toBe(xml);
+
+		const report = await verifyArtifact(new TextEncoder().encode(corrupt));
+
+		expect(report.ok).toBe(false);
+		expect(status(report, 'structure')).toBe('fail');
+	});
+
 	it('fails the chain check when the signing root is not a trust anchor', async () => {
 		const report = await verifyArtifact(read('xades-valid.xsig'));
 
