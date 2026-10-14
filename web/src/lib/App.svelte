@@ -2,7 +2,7 @@
 	import { copy, type Copy, type Lang } from '#lib/i18n';
 	import {
 		SIGN_FORMATS,
-		downloadText,
+		download,
 		toSelectedFile,
 		type SelectedFile,
 		type SignFormat,
@@ -10,6 +10,7 @@
 		type SignerCert
 	} from '#lib/sign';
 	import { signXades } from '#lib/xades';
+	import { signCadesDetached } from '#lib/cms';
 	import FileDrop from '#lib/components/FileDrop.svelte';
 	import FileCard from '#lib/components/FileCard.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
@@ -28,9 +29,16 @@
 	let result = $state<SignResult | null>(null);
 	let signing = $state(false);
 
-	const canSign = $derived(file !== null && cert?.key != null);
+	const selected = $derived(SIGN_FORMATS.find((option) => option.id === format)!);
+	const canSign = $derived(file !== null && cert?.key != null && selected.implemented && !signing);
 	const signHint = $derived(
-		file === null ? t.signNeedsFile : cert === null ? t.signNeedsCert : ''
+		file === null
+			? t.signNeedsFile
+			: cert === null
+				? t.signNeedsCert
+				: selected.implemented
+					? ''
+					: t.signUnsupported
 	);
 
 	function clearFile() {
@@ -38,27 +46,38 @@
 		result = null;
 	}
 
+	/** Sign the picked document with the chosen format; keys never leave the page. */
 	async function sign() {
-		const selected = file;
-		if (!selected || !cert) return;
+		if (!file || !cert) return;
 		result = null;
-		if (format !== 'xades') {
+		if (!selected.implemented) {
 			result = { ok: false, message: t.signUnsupported };
 			return;
 		}
 		signing = true;
 		try {
-			const xsig = await signXades({
-				xml: new Uint8Array(await selected.file.arrayBuffer()),
-				certificates: chain,
-				signer: cert,
-				dataObject: { mimeType: selected.file.type || 'application/xml' }
-			});
-			const extension = SIGN_FORMATS.find((option) => option.id === format)!.extension;
-			downloadText(`${selected.name}${extension}`, xsig, 'application/xml');
+			const bytes = new Uint8Array(await file.source.arrayBuffer());
+			if (format === 'xades') {
+				const xsig = await signXades({
+					xml: bytes,
+					certificates: chain,
+					signer: cert,
+					dataObject: { mimeType: file.source.type || 'application/xml' }
+				});
+				download(`${file.name}${selected.extension}`, xsig, 'application/xml');
+			} else {
+				download(
+					`${file.name}${selected.extension}`,
+					await signCadesDetached(cert, bytes),
+					'application/octet-stream'
+				);
+			}
 			result = { ok: true, message: t.signDone };
 		} catch (reason) {
-			result = { ok: false, message: `${t.signFailed} ${reason instanceof Error ? reason.message : ''}`.trim() };
+			result = {
+				ok: false,
+				message: `${t.signFailed} ${reason instanceof Error ? reason.message : ''}`.trim()
+			};
 		} finally {
 			signing = false;
 		}
@@ -140,8 +159,8 @@
 				</fieldset>
 
 				<SignButton
-					label={signing ? t.certLoading : t.signButton}
-					disabled={!canSign || signing}
+					label={t.signButton}
+					disabled={!canSign}
 					hint={signHint}
 					onsign={sign}
 				/>

@@ -15,7 +15,7 @@ export interface SignFormatOption {
 }
 
 export const SIGN_FORMATS: readonly SignFormatOption[] = [
-	{ id: 'cades', label: 'CAdES-BES', extension: '.csig', issue: 6, implemented: false },
+	{ id: 'cades', label: 'CAdES-BES', extension: '.csig', issue: 6, implemented: true },
 	{ id: 'xades', label: 'XAdES-EPES', extension: '.xsig', issue: 7, implemented: true },
 	{ id: 'pades', label: 'PAdES-B-B', extension: '.pdf', issue: 11, implemented: false }
 ];
@@ -24,8 +24,8 @@ export interface SelectedFile {
 	name: string;
 	size: number;
 	type: string;
-	/** The picked file, kept so the sign flow can read the bytes. */
-	file: File;
+	/** The picked file itself — signing reads its bytes. */
+	source: File;
 }
 
 /** WebCrypto parameters used for both importing and signing with a certificate's private key. */
@@ -75,12 +75,12 @@ export async function signBytes(cert: SignerCert, data: Bytes): Promise<Bytes> {
 }
 
 export function toSelectedFile(file: File): SelectedFile {
-	return { name: file.name, size: file.size, type: file.type, file };
+	return { name: file.name, size: file.size, type: file.type, source: file };
 }
 
 /** Signed output for the format, as a download — nothing leaves the page. */
-export function downloadText(name: string, text: string, type: string): void {
-	const url = URL.createObjectURL(new Blob([text], { type }));
+export function download(name: string, data: string | Bytes, type: string): void {
+	const url = URL.createObjectURL(new Blob([data], { type }));
 	const link = document.createElement('a');
 	link.href = url;
 	link.download = name;

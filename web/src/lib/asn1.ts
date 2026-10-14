@@ -123,3 +123,109 @@ export function string(node: Der): string {
 			throw new Error(`unsupported DER string tag ${node.tag}`);
 	}
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * Writer — the mirror of the reader above, only what CMS/CAdES needs (RFC 5652, RFC 5035).
+ * ------------------------------------------------------------------------------------------- */
+
+function lengthBytes(length: number): Bytes {
+	if (length < 0x80) return new Uint8Array([length]);
+	const octets: number[] = [];
+	for (let value = length; value > 0; value = Math.floor(value / 256)) octets.unshift(value & 0xff);
+	return new Uint8Array([0x80 | octets.length, ...octets]);
+}
+
+/** Concatenate byte strings into one `Bytes`. */
+export function concatBytes(parts: Bytes[]): Bytes {
+	const out = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+	let offset = 0;
+	for (const part of parts) {
+		out.set(part, offset);
+		offset += part.length;
+	}
+	return out;
+}
+
+export function tlv(tag: number, content: Bytes): Bytes {
+	return concatBytes([new Uint8Array([tag]), lengthBytes(content.length), content]);
+}
+
+/** Content octets of a TLV, header skipped. */
+export function derContent(value: Bytes): Bytes {
+	const length = value[1];
+	const header = (length & 0x80) === 0 ? 2 : 2 + (length & 0x7f);
+	return value.subarray(header);
+}
+
+export function seq(...parts: Bytes[]): Bytes {
+	return tlv(0x30, concatBytes(parts));
+}
+
+function compareBytes(a: Bytes, b: Bytes): number {
+	const shared = Math.min(a.length, b.length);
+	for (let i = 0; i < shared; i++) if (a[i] !== b[i]) return a[i] - b[i];
+	return a.length - b.length;
+}
+
+/** `SET OF` — der-sorted, as DER requires. */
+export function setOf(...parts: Bytes[]): Bytes {
+	return tlv(0x31, concatBytes([...parts].sort(compareBytes)));
+}
+
+/** Only what RFC 5652/RFC 5280 OIDs need: two arcs plus base-128 continuation. */
+export function objectId(dotted: string): Bytes {
+	const arcs = dotted.split('.').map(Number);
+	const octets = [arcs[0] * 40 + arcs[1]];
+	for (const arc of arcs.slice(2)) {
+		const group: number[] = [];
+		let value = arc;
+		do {
+			group.unshift(value & 0x7f);
+			value = Math.floor(value / 128);
+		} while (value > 0);
+		for (let i = 0; i < group.length - 1; i++) group[i] |= 0x80;
+		octets.push(...group);
+	}
+	return tlv(0x06, new Uint8Array(octets));
+}
+
+/** Minimal two's-complement INTEGER (0x00 prefixed when the top bit is set). */
+export function derInteger(value: number | Bytes): Bytes {
+	if (typeof value === 'number') {
+		const octets: number[] = [];
+		let rest = value;
+		do {
+			octets.unshift(rest & 0xff);
+			rest = Math.floor(rest / 256);
+		} while (rest > 0);
+		if (octets[0] & 0x80) octets.unshift(0);
+		return tlv(0x02, new Uint8Array(octets));
+	}
+	let start = 0;
+	while (start < value.length - 1 && value[start] === 0) start++;
+	const body = value.subarray(start);
+	return tlv(0x02, (body[0] & 0x80) !== 0 ? concatBytes([new Uint8Array([0]), body]) : body);
+}
+
+export function octetString(value: Bytes): Bytes {
+	return tlv(0x04, value);
+}
+
+/** DER `UTCTime`, `YYMMDDHHMMSSZ` — valid until 2049. */
+export function utcTime(date: Date): Bytes {
+	const pad = (value: number) => String(value).padStart(2, '0');
+	const text =
+		`${pad(date.getUTCFullYear() % 100)}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}` +
+		`${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())}Z`;
+	return tlv(0x17, new TextEncoder().encode(text));
+}
+
+/** `[n] IMPLICIT` — the value's own tag is replaced by the context tag. */
+export function implicitTagged(n: number, value: Bytes): Bytes {
+	return tlv(0xa0 | n, derContent(value));
+}
+
+/** `[n] EXPLICIT` — the value keeps its tag inside the context wrapper. */
+export function explicitTagged(n: number, value: Bytes): Bytes {
+	return tlv(0xa0 | n, value);
+}

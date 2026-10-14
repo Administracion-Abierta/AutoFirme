@@ -12,7 +12,10 @@ import {
 	type Pkcs12Fixtures
 } from '../test/fixtures';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+});
 
 let fixtures: Pkcs12Fixtures;
 
@@ -40,6 +43,33 @@ function fileInput(container: HTMLElement): HTMLInputElement {
 	const input = container.querySelector<HTMLInputElement>('input[type="file"]');
 	if (!input) throw new Error('file input not rendered');
 	return input;
+}
+
+/** jsdom has no `URL.createObjectURL`: capture the Blobs and the download names instead. */
+function captureDownloads() {
+	const blobs: Blob[] = [];
+	const names: string[] = [];
+	const createObjectURL = URL.createObjectURL;
+	const revokeObjectURL = URL.revokeObjectURL;
+	URL.createObjectURL = (blob: Blob) => {
+		blobs.push(blob);
+		return 'blob:test';
+	};
+	URL.revokeObjectURL = () => {};
+	const click = vi
+		.spyOn(HTMLAnchorElement.prototype, 'click')
+		.mockImplementation(function (this: HTMLAnchorElement) {
+			names.push(this.download);
+		});
+	return {
+		blobs,
+		names,
+		restore: () => {
+			URL.createObjectURL = createObjectURL;
+			URL.revokeObjectURL = revokeObjectURL;
+			click.mockRestore();
+		}
+	};
 }
 
 describe('App (sign workflow shell)', () => {
@@ -148,38 +178,42 @@ describe('App (sign workflow shell)', () => {
 		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
 		await fireEvent.click(screen.getByRole('radio', { name: /XAdES-EPES/ }));
 
-		// jsdom has no `URL.createObjectURL`: capture the Blob the download is built from instead.
-		const blobs: Blob[] = [];
-		const names: string[] = [];
-		const createObjectURL = URL.createObjectURL;
-		const revokeObjectURL = URL.revokeObjectURL;
-		URL.createObjectURL = (blob: Blob) => {
-			blobs.push(blob);
-			return 'blob:test';
-		};
-		URL.revokeObjectURL = () => {};
-		const click = vi
-			.spyOn(HTMLAnchorElement.prototype, 'click')
-			.mockImplementation(function (this: HTMLAnchorElement) {
-				names.push(this.download);
-			});
+		const downloads = captureDownloads();
 		try {
 			await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
 			await waitFor(() =>
 				expect(container.textContent).toContain('Documento firmado: se ha descargado el fichero.')
 			);
 		} finally {
-			URL.createObjectURL = createObjectURL;
-			URL.revokeObjectURL = revokeObjectURL;
-			click.mockRestore();
+			downloads.restore();
 		}
 
-		expect(names).toEqual(['facturae.xml.xsig']);
-		expect(blobs).toHaveLength(1);
-		const xsig = await blobs[0].text();
+		expect(downloads.names).toEqual(['facturae.xml.xsig']);
+		expect(downloads.blobs).toHaveLength(1);
+		const xsig = await downloads.blobs[0].text();
 		expect(xsig).toContain('<ds:Signature');
 		// The leaf fixture is self-signed, so it is its own trust anchor.
 		const path = writeFixtureFile(fixtures.dir, 'ui.xsig', new TextEncoder().encode(xsig));
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toMatch(/status: OK/);
+	});
+
+	it('signs the picked document as CAdES-BES and hands the .csig to the browser', async () => {
+		const { container } = render(App);
+		await pickDocumentAndKey(container);
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+
+		const downloads = captureDownloads();
+		try {
+			await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
+			await waitFor(() =>
+				expect(container.textContent).toContain('Documento firmado: se ha descargado el fichero.')
+			);
+		} finally {
+			downloads.restore();
+		}
+
+		expect(downloads.names).toEqual(['contrato.pdf.csig']);
+		expect((await downloads.blobs[0].arrayBuffer()).byteLength).toBeGreaterThan(500);
 	});
 });
