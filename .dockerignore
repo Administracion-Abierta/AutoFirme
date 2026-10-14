@@ -1,0 +1,12 @@
+# Build context is the repo root; keep the image context tiny.
+.git
+.bullet
+original
+extracted
+work
+decompiled
+decompiled-configurador
+docs
+**/node_modules
+web/.svelte-kit
+web/build

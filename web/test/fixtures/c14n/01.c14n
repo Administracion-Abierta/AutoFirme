@@ -1,0 +1,1 @@
+<doc xmlns:ns="urn:af:ns" a="1" b="2" c="4" ns:c="3"><child y="8" z="9"></child>tail</doc>
