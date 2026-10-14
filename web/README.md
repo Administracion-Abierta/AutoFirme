@@ -31,7 +31,8 @@ pnpm dev          # vite dev server
 pnpm build        # static output in build/
 pnpm preview      # serve build/ locally
 pnpm test         # vitest: App smoke test + OOXML signing round-trip
-                  #   (`openssl` and `xmllint`, when installed, cross-check the signature and c14n)
+                  #   (`openssl` and `xmllint`, when installed, cross-check the signature and c14n;
+                  #    `soffice`, when installed, converts the signed docx to PDF — package smoke)
 pnpm check        # svelte-check + tsc
 ```
 

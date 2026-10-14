@@ -5,9 +5,10 @@
  * canonical form).
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { webcrypto } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { unzipSync, zipSync } from 'fflate';
@@ -35,6 +36,7 @@ function has(binary: string): boolean {
 
 const hasOpenssl = has('openssl');
 const hasXmllint = has('xmllint');
+const hasSoffice = has('soffice');
 
 let signingKey: CryptoKey;
 let publicKey: CryptoKey;
@@ -327,6 +329,33 @@ describe('signOoxmlPackage', () => {
 		expect(canonicalize(signed.document)).toBe(execFileSync('xmllint', ['--c14n', path], { encoding: 'utf8' }));
 		expect(canonicalize(signed.document, true)).toBe(execFileSync('xmllint', ['--exc-c14n', path], { encoding: 'utf8' }));
 	});
+
+	it.runIf(hasSoffice)('stays a readable package: LibreOffice converts the signed docx', async () => {
+		const { bytes } = await sign('docx');
+		const docx = join(artifacts, 'smoke.docx');
+		const out = join(artifacts, 'soffice-out');
+		mkdirSync(out, { recursive: true });
+		writeFileSync(docx, bytes);
+
+		execFileSync(
+			'soffice',
+			[
+				'--headless',
+				'--norestore',
+				`-env:UserInstallation=${pathToFileURL(join(artifacts, 'soffice-profile')).href}`,
+				'--convert-to',
+				'pdf',
+				docx,
+				'--outdir',
+				out
+			],
+			{ timeout: 120_000 }
+		);
+
+		const pdf = readFileSync(join(out, 'smoke.pdf'));
+		expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+		expect(pdf.byteLength).toBeGreaterThan(1000);
+	}, 180_000);
 
 	it('refuses a package without content types', async () => {
 		await expect(signOoxmlPackage(zipSync({ 'word/document.xml': ENCODER.encode('<w/>') }), { key: signingKey, certificates })).rejects.toThrow();
