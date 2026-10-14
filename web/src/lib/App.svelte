@@ -28,6 +28,7 @@
 
 	function clearFile() {
 		file = null;
+		cert = null;
 	}
 </script>
 

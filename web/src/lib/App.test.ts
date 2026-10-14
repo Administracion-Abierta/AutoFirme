@@ -145,4 +145,24 @@ describe('App (sign workflow shell)', () => {
 		expect(container.textContent).not.toContain(LEAF_COMMON_NAME);
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
 	});
+
+	it('disables signing when the document is removed after a certificate was loaded', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'otro.pdf', { type: 'application/pdf' })] }
+		});
+
+		// The picker starts over empty, so the stale signer must not keep signing alive.
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+		expect(container.querySelector<HTMLSelectElement>('#cert-picker')?.value).toBe('');
+		expect(container.textContent).not.toContain('Emitido por');
+	});
+
 });
