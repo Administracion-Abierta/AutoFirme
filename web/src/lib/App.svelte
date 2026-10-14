@@ -1,34 +1,39 @@
 <script lang="ts">
 	import { copy, type Copy, type Lang } from '#lib/i18n';
+	import { createBatchQueue, type BatchSigner } from '#lib/batch';
 	import {
 		SIGN_FORMATS,
 		toSelectedFile,
-		type SelectedFile,
 		type SignFormat,
 		type SignerCert
 	} from '#lib/sign';
-	import FileDrop from '#lib/components/FileDrop.svelte';
-	import FileCard from '#lib/components/FileCard.svelte';
+	import BatchQueue from '#lib/components/BatchQueue.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
-	import SignButton from '#lib/components/SignButton.svelte';
-	import ResultCard from '#lib/components/ResultCard.svelte';
+	import FileCard from '#lib/components/FileCard.svelte';
+	import FileDrop from '#lib/components/FileDrop.svelte';
 
 	let lang = $state<Lang>('es');
 	const t = $derived<Copy>(copy[lang]);
 
-	let file = $state<SelectedFile | null>(null);
+	let files = $state<File[]>([]);
 	let format = $state<SignFormat>('cades');
 	// Certificate selection lands in #5; the shell therefore never enables signing.
 	let cert = $state<SignerCert | null>(null);
+	// The signature engines (#6 CAdES, #7 XAdES, #11 PAdES) plug in here; the queue is engine-agnostic.
+	const signer: BatchSigner | null = null;
 
-	const canSign = $derived(file !== null && cert !== null);
+	const queue = createBatchQueue();
+	$effect(() => queue.set(files, format));
+
 	const signHint = $derived(
-		file === null ? t.signNeedsFile : cert === null ? t.signNeedsCert : ''
+		files.length === 0
+			? t.signNeedsFile
+			: cert === null
+				? t.signNeedsCert
+				: signer === null
+					? t.queueNeedsEngine
+					: ''
 	);
-
-	function clearFile() {
-		file = null;
-	}
 </script>
 
 <div class="mx-auto flex min-h-dvh max-w-3xl flex-col gap-8 px-5 py-10">
@@ -57,19 +62,23 @@
 	<main class="flex flex-col gap-8">
 		<section class="flex flex-col gap-3">
 			<h2 class="text-lg font-semibold">{t.step1Title}</h2>
-			{#if file === null}
-				<FileDrop
-					copy={t}
-					onselect={(picked) => {
-						file = toSelectedFile(picked);
-					}}
-				/>
-			{:else}
-				<FileCard copy={t} {file} onremove={clearFile} />
+			<FileDrop copy={t} onselect={(picked) => (files = [...files, ...picked])} />
+			{#if files.length > 0}
+				<ul class="flex flex-col gap-2">
+					{#each files as file, index (index)}
+						<li>
+							<FileCard
+								copy={t}
+								file={toSelectedFile(file)}
+								onremove={() => (files = files.filter((_, position) => position !== index))}
+							/>
+						</li>
+					{/each}
+				</ul>
 			{/if}
 		</section>
 
-		{#if file !== null}
+		{#if files.length > 0}
 			<section class="flex flex-col gap-5">
 				<h2 class="text-lg font-semibold">{t.step2Title}</h2>
 
@@ -95,9 +104,7 @@
 					{/each}
 				</fieldset>
 
-				<SignButton label={t.signButton} disabled={!canSign} hint={signHint} />
-
-				<ResultCard copy={t} result={null} />
+				<BatchQueue copy={t} {queue} {signer} hint={signHint} />
 			</section>
 		{/if}
 	</main>

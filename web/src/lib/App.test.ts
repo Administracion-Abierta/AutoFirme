@@ -15,7 +15,7 @@ describe('App (sign workflow shell)', () => {
 		const { container } = render(App);
 
 		expect(container.textContent).toContain('AutoFirma Web');
-		expect(container.textContent).toContain('Arrastra aquí el fichero que quieres firmar');
+		expect(container.textContent).toContain('Arrastra aquí los ficheros que quieres firmar');
 		expect(fileInput(container)).toBeInstanceOf(HTMLInputElement);
 		// Step 2 is unreachable before a document is loaded.
 		expect(screen.queryByRole('button', { name: 'Firmar' })).toBeNull();
@@ -37,7 +37,8 @@ describe('App (sign workflow shell)', () => {
 
 		expect(screen.getByRole('combobox')).toHaveProperty('disabled', true);
 		expect(container.textContent).toContain('CAdES-BES');
-		expect(container.textContent).toContain('Todavía no se ha firmado ningún documento');
+		// The queue is listed with every document still pending.
+		expect(container.querySelector('[data-status="pending"]')?.textContent).toContain('contrato.pdf');
 
 		// Removing the document returns to the drop step.
 		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
@@ -49,7 +50,7 @@ describe('App (sign workflow shell)', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'EN' }));
 
-		expect(container.textContent).toContain('Drag the file you want to sign here');
-		expect(container.textContent).toContain('Choose file');
+		expect(container.textContent).toContain('Drag the files you want to sign here');
+		expect(container.textContent).toContain('Choose files');
 	});
 });
