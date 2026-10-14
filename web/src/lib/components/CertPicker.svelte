@@ -3,6 +3,7 @@
 	import { loadSignerSession } from '#lib/keystore';
 	import { Pkcs12Error } from '#lib/pkcs12';
 	import type { SignerCert } from '#lib/sign';
+	import { onDestroy } from 'svelte';
 
 	interface Props {
 		copy: Copy;
@@ -20,6 +21,11 @@
 	let loading = $state(false);
 	/** Bumped whenever the picked file changes; a load holding an older id is discarded. */
 	let loadId = 0;
+	// Unmounted (the document was removed) invalidates an in-flight load, so it cannot
+	// push the old container's signer back into the app after clearFile().
+	onDestroy(() => {
+		loadId += 1;
+	});
 
 	const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 

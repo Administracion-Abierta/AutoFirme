@@ -166,4 +166,33 @@ describe('App (sign workflow shell)', () => {
 		expect(container.textContent).not.toContain('Emitido por');
 	});
 
+	it('does not resurrect the signer when the document is removed while a load runs', async () => {
+		const original = keystore.loadSignerSession;
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		vi.spyOn(keystore, 'loadSignerSession').mockImplementation(async (bytes, pin, options) => {
+			await gate;
+			return original(bytes, pin, options);
+		});
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await vi.waitFor(() => expect(vi.mocked(keystore.loadSignerSession)).toHaveBeenCalledOnce());
+
+		// The document is removed while the keystore is still being parsed.
+		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
+		release();
+		await vi.mocked(keystore.loadSignerSession).mock.results[0].value;
+		await tick();
+
+		// A new document arrives: nothing was loaded for it, so signing must stay off.
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'otro.pdf', { type: 'application/pdf' })] }
+		});
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+		expect(container.querySelector<HTMLSelectElement>('#cert-picker')?.value).toBe('');
+		expect(container.textContent).not.toContain('Emitido por');
+	});
+
 });
