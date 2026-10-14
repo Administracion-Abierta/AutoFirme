@@ -8,7 +8,7 @@
 		copy: Copy;
 		/** Selected certificate, or null while nothing is loaded. */
 		cert: SignerCert | null;
-		onpick: (cert: SignerCert | null) => void;
+		onpick: (cert: SignerCert | null, chain: readonly SignerCert[]) => void;
 	}
 
 	let { copy, cert, onpick }: Props = $props();
@@ -26,13 +26,13 @@
 		error = '';
 		loading = true;
 		certs = [];
-		onpick(null);
+		onpick(null, []);
 		try {
 			const session = await loadSignerSession(new Uint8Array(await file.arrayBuffer()), pin);
 			certs = session.certificates;
 			// The container's own key decides the default; other certificates stay selectable but
 			// cannot sign (no key), so they are disabled in the list.
-			onpick(session.signer);
+			onpick(session.signer, session.certificates);
 			pin = ''; // the key is imported now; the PIN is no longer needed in memory
 		} catch (reason) {
 			error = copy.certErrors[reason instanceof Pkcs12Error ? reason.code : 'unknown'];
@@ -56,7 +56,7 @@
 			file = event.currentTarget.files?.[0] ?? null;
 			certs = [];
 			error = '';
-			onpick(null);
+			onpick(null, []);
 		}}
 	/>
 
@@ -91,7 +91,7 @@
 			disabled={certs.length === 0}
 			value={cert?.id ?? ''}
 			onchange={(event) =>
-				onpick(certs.find((option) => option.id === event.currentTarget.value) ?? null)}
+				onpick(certs.find((option) => option.id === event.currentTarget.value) ?? null, certs)}
 		>
 			{#if certs.length === 0}
 				<option value="">{copy.certPlaceholder}</option>

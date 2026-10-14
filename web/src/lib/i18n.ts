@@ -36,6 +36,9 @@ export interface Copy {
 	signButton: string;
 	signNeedsFile: string;
 	signNeedsCert: string;
+	signUnsupported: string;
+	signDone: string;
+	signFailed: string;
 	resultTitle: string;
 	resultEmpty: string;
 }
@@ -83,6 +86,9 @@ export const copy: Record<Lang, Copy> = {
 		signButton: 'Firmar',
 		signNeedsFile: 'Selecciona primero un documento.',
 		signNeedsCert: 'Selecciona un certificado para habilitar la firma.',
+		signUnsupported: 'Ese formato todavía no está disponible.',
+		signDone: 'Documento firmado: se ha descargado el fichero.',
+		signFailed: 'No se ha podido firmar el documento.',
 		resultTitle: 'Resultado',
 		resultEmpty: 'Todavía no se ha firmado ningún documento.'
 	},
@@ -128,6 +134,9 @@ export const copy: Record<Lang, Copy> = {
 		signButton: 'Sign',
 		signNeedsFile: 'Choose a document first.',
 		signNeedsCert: 'Choose a certificate to enable signing.',
+		signUnsupported: 'That format is not available yet.',
+		signDone: 'Document signed: the file has been downloaded.',
+		signFailed: 'The document could not be signed.',
 		resultTitle: 'Result',
 		resultEmpty: 'No document has been signed yet.'
 	}

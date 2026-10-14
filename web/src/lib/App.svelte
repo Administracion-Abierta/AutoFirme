@@ -2,11 +2,14 @@
 	import { copy, type Copy, type Lang } from '#lib/i18n';
 	import {
 		SIGN_FORMATS,
+		downloadText,
 		toSelectedFile,
 		type SelectedFile,
 		type SignFormat,
+		type SignResult,
 		type SignerCert
 	} from '#lib/sign';
+	import { signXades } from '#lib/xades';
 	import FileDrop from '#lib/components/FileDrop.svelte';
 	import FileCard from '#lib/components/FileCard.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
@@ -20,6 +23,10 @@
 	let format = $state<SignFormat>('cades');
 	// Only the certificate that owns the container's private key can sign.
 	let cert = $state<SignerCert | null>(null);
+	// Full container chain of the loaded PKCS#12 (#5) — the KeyInfo of the signature embeds it.
+	let chain = $state<readonly SignerCert[]>([]);
+	let result = $state<SignResult | null>(null);
+	let signing = $state(false);
 
 	const canSign = $derived(file !== null && cert?.key != null);
 	const signHint = $derived(
@@ -28,6 +35,33 @@
 
 	function clearFile() {
 		file = null;
+		result = null;
+	}
+
+	async function sign() {
+		const selected = file;
+		if (!selected || !cert) return;
+		result = null;
+		if (format !== 'xades') {
+			result = { ok: false, message: t.signUnsupported };
+			return;
+		}
+		signing = true;
+		try {
+			const xsig = await signXades({
+				xml: new Uint8Array(await selected.file.arrayBuffer()),
+				certificates: chain,
+				signer: cert,
+				dataObject: { mimeType: selected.file.type || 'application/xml' }
+			});
+			const extension = SIGN_FORMATS.find((option) => option.id === format)!.extension;
+			downloadText(`${selected.name}${extension}`, xsig, 'application/xml');
+			result = { ok: true, message: t.signDone };
+		} catch (reason) {
+			result = { ok: false, message: `${t.signFailed} ${reason instanceof Error ? reason.message : ''}`.trim() };
+		} finally {
+			signing = false;
+		}
 	}
 </script>
 
@@ -73,7 +107,15 @@
 			<section class="flex flex-col gap-5">
 				<h2 class="text-lg font-semibold">{t.step2Title}</h2>
 
-				<CertPicker copy={t} {cert} onpick={(picked) => (cert = picked)} />
+				<CertPicker
+			copy={t}
+			{cert}
+			onpick={(picked, certificates) => {
+				cert = picked;
+				chain = certificates;
+				result = null;
+			}}
+		/>
 
 				<fieldset class="flex flex-col gap-2">
 					<legend class="text-sm font-medium">{t.formatTitle}</legend>
@@ -88,16 +130,23 @@
 							/>
 							<span class="font-medium">{option.label}</span>
 							<span class="text-sm opacity-70">{option.extension}</span>
-							<span class="ml-auto rounded-full bg-ink-100 px-2 py-0.5 text-xs dark:bg-ink-700">
-								{t.pendingIssue} #{option.issue}
-							</span>
+							{#if !option.implemented}
+								<span class="ml-auto rounded-full bg-ink-100 px-2 py-0.5 text-xs dark:bg-ink-700">
+									{t.pendingIssue} #{option.issue}
+								</span>
+							{/if}
 						</label>
 					{/each}
 				</fieldset>
 
-				<SignButton label={t.signButton} disabled={!canSign} hint={signHint} />
+				<SignButton
+					label={signing ? t.certLoading : t.signButton}
+					disabled={!canSign || signing}
+					hint={signHint}
+					onsign={sign}
+				/>
 
-				<ResultCard copy={t} result={null} />
+				<ResultCard copy={t} {result} />
 			</section>
 		{/if}
 	</main>
