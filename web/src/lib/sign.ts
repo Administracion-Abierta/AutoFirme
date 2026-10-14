@@ -10,12 +10,14 @@ export interface SignFormatOption {
 	extension: string;
 	/** Issue that implements the format. */
 	issue: number;
+	/** Not signed yet: the format is offered but refuses to sign. */
+	pending: boolean;
 }
 
 export const SIGN_FORMATS: readonly SignFormatOption[] = [
-	{ id: 'cades', label: 'CAdES-BES', extension: '.csig', issue: 6 },
-	{ id: 'xades', label: 'XAdES-EPES', extension: '.xsig', issue: 7 },
-	{ id: 'pades', label: 'PAdES-B-B', extension: '.pdf', issue: 11 }
+	{ id: 'cades', label: 'CAdES-BES', extension: '.csig', issue: 6, pending: false },
+	{ id: 'xades', label: 'XAdES-EPES', extension: '.xsig', issue: 7, pending: true },
+	{ id: 'pades', label: 'PAdES-B-B', extension: '.pdf', issue: 11, pending: true }
 ];
 
 export interface SelectedFile {

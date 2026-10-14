@@ -26,14 +26,14 @@
 	let result = $state<SignResult | null>(null);
 	let signing = $state(false);
 
-	const cades = SIGN_FORMATS.find((option) => option.id === 'cades')!;
-	const canSign = $derived(file !== null && cert?.key != null && format === 'cades' && !signing);
+	const selected = $derived(SIGN_FORMATS.find((option) => option.id === format)!);
+	const canSign = $derived(file !== null && cert?.key != null && !selected.pending && !signing);
 	const signHint = $derived(
 		file === null
 			? t.signNeedsFile
 			: cert === null
 				? t.signNeedsCert
-				: format !== 'cades'
+				: selected.pending
 					? t.signPendingFormat
 					: ''
 	);
@@ -58,7 +58,7 @@
 		result = null;
 		try {
 			const content = new Uint8Array(await file.source.arrayBuffer());
-			download(`${file.name}${cades.extension}`, await signCadesDetached(cert, content));
+			download(`${file.name}${selected.extension}`, await signCadesDetached(cert, content));
 			result = { ok: true, message: t.signDone };
 		} catch (error) {
 			result = {
@@ -128,9 +128,11 @@
 							/>
 							<span class="font-medium">{option.label}</span>
 							<span class="text-sm opacity-70">{option.extension}</span>
-							<span class="ml-auto rounded-full bg-ink-100 px-2 py-0.5 text-xs dark:bg-ink-700">
-								{t.pendingIssue} #{option.issue}
-							</span>
+							{#if option.pending}
+								<span class="ml-auto rounded-full bg-ink-100 px-2 py-0.5 text-xs dark:bg-ink-700">
+									{t.pendingIssue} #{option.issue}
+								</span>
+							{/if}
 						</label>
 					{/each}
 				</fieldset>
