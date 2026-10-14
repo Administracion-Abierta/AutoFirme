@@ -1,0 +1,227 @@
+/**
+ * XAdES-EPES end-to-end: a Facturae-shaped document is signed with a certificate loaded from a
+ * PKCS#12 container (#5), and the `.xsig` is verified by `xmlsec1` — an independent XMLDSig
+ * implementation, so it doubles as the check that our canonicalization matches a real one.
+ *
+ * Requires the `openssl` (fixtures, #5) and `xmlsec1` binaries on `PATH`; neither is a dependency
+ * of the app.
+ */
+
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { join } from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { FIXTURE_PIN, createPkcs12Fixtures, writeFixtureFile, type Pkcs12Fixtures } from '../test/fixtures';
+import { canonicalize } from './c14n';
+import { loadSignerSession } from './keystore';
+import { type SignerSession } from './sign';
+import { signXades, type XadesIds } from './xades';
+
+const DS = 'http://www.w3.org/2000/09/xmldsig#';
+const XADES = 'http://uri.etsi.org/01903/v1.3.2#';
+
+const IDS: Partial<XadesIds> = {
+	signature: 'Signature-Test',
+	signedInfo: 'SignedInfo-Test',
+	signatureValue: 'SignatureValue-Test',
+	keyInfo: 'KeyInfo-Test',
+	signedProperties: 'SignedProperties-Test',
+	documentReference: 'Reference-Document',
+	propertiesReference: 'Reference-Properties'
+};
+
+/** Facturae-shaped, with the `ds` prefix already in scope: a realistic prefix-collision hazard. */
+const SAMPLE = `<?xml version="1.0" encoding="UTF-8"?>
+<fe:Facturae xmlns:fe="http://www.facturae.es/Facturae/2014/v3.2.1/Facturae" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+	<FileHeader>
+		<SchemaVersion>3.2.1</SchemaVersion>
+		<Modality>I</Modality>
+	</FileHeader>
+	<Parties>
+		<SellerParty>
+			<TaxIdentification>
+				<PersonTypeCode>J</PersonTypeCode>
+				<ResidenceTypeCode>R</ResidenceTypeCode>
+				<TaxIdentificationNumber>B12345678</TaxIdentificationNumber>
+			</TaxIdentification>
+			<LegalEntity>
+				<CorporateName>AutoFirme Prueba S.L.</CorporateName>
+			</LegalEntity>
+		</SellerParty>
+	</Parties>
+	<Invoices>
+		<Invoice>
+			<InvoiceHeader>
+				<InvoiceNumber>2026-0001</InvoiceNumber>
+			</InvoiceHeader>
+			<InvoiceTotals>
+				<TotalGrossAmount>100.00</TotalGrossAmount>
+			</InvoiceTotals>
+		</Invoice>
+	</Invoices>
+</fe:Facturae>
+`;
+
+const NOW = new Date('2026-10-14T10:00:00Z');
+const encoder = new TextEncoder();
+
+function parse(xml: string): Document {
+	return new DOMParser().parseFromString(xml, 'application/xml');
+}
+
+function elements(root: ParentNode, namespace: string, localName: string): Element[] {
+	return [...root.getElementsByTagNameNS(namespace, localName)];
+}
+
+function xmlsec1Verify(path: string, trustedPem: string): string {
+	const { status, stdout, stderr } = spawnSync('xmlsec1', [
+		'--verify',
+		'--enabled-key-data',
+		'x509',
+		'--trusted-pem',
+		trustedPem,
+		path
+	], { encoding: 'utf8' });
+	const output = `${stdout}${stderr}`;
+	if (status !== 0) throw new Error(`xmlsec1 exit ${status}: ${output.trim()}`);
+	return output;
+}
+
+describe('signXades', () => {
+	let fixtures: Pkcs12Fixtures;
+	let session: SignerSession;
+	let signed: string;
+	let root: Element;
+
+	beforeAll(async () => {
+		fixtures = createPkcs12Fixtures();
+		session = await loadSignerSession(fixtures.modern, FIXTURE_PIN);
+		signed = await signXades({
+			xml: SAMPLE,
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW
+		});
+		root = parse(signed).documentElement;
+	});
+
+	it('is verified by xmlsec1', () => {
+		// #5's leaf fixture is self-signed (the container also carries an unrelated CA cert), so the
+		// leaf is its own trust anchor.
+		const path = writeFixtureFile(fixtures.dir, 'facturae.xsig', encoder.encode(signed));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toMatch(/status: OK/);
+	});
+
+	it('fails xmlsec1 verification once the signed document is modified', () => {
+		const tampered = signed.replace('B12345678', 'B00000000');
+		expect(tampered).not.toBe(signed);
+		const path = writeFixtureFile(fixtures.dir, 'tampered.xsig', encoder.encode(tampered));
+		expect(() => xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toThrow(/REFERENCE/);
+	});
+
+	it('carries a WebCrypto signature over the canonical SignedInfo', () => {
+		const signedInfo = canonicalize(elements(root, DS, 'SignedInfo')[0], { exclusive: true });
+		const signature = Buffer.from(elements(root, DS, 'SignatureValue')[0].textContent!, 'base64');
+		const signedInfoPath = writeFixtureFile(fixtures.dir, 'signedinfo.bin', new Uint8Array(signedInfo));
+		const signaturePath = writeFixtureFile(fixtures.dir, 'signature.bin', new Uint8Array(signature));
+		const output = execFileSync(
+			'openssl',
+			['dgst', '-sha256', '-verify', join(fixtures.dir, 'leaf.pub.pem'), '-signature', signaturePath, signedInfoPath],
+			{ encoding: 'utf8' }
+		);
+		expect(output).toMatch(/Verified OK/);
+	});
+
+	it('envelopes the signature at the document root, XAdES structure in schema order', () => {
+		expect(root.lastElementChild!.tagName).toBe('ds:Signature');
+		const signature = root.lastElementChild!;
+		expect([...signature.children].map((child) => child.tagName)).toEqual([
+			'ds:SignedInfo',
+			'ds:SignatureValue',
+			'ds:KeyInfo',
+			'ds:Object'
+		]);
+		const signatureId = signature.getAttribute('Id');
+		expect(signatureId).toBe(IDS.signature);
+		expect(elements(root, XADES, 'QualifyingProperties')[0].getAttribute('Target')).toBe(`#${signatureId}`);
+		expect(elements(root, XADES, 'SignedProperties')[0].getAttribute('Id')).toBe(IDS.signedProperties);
+		expect(elements(root, XADES, 'SignedSignatureProperties')[0].children).toHaveLength(3);
+		expect(elements(root, XADES, 'SigningTime')[0].textContent).toBe('2026-10-14T10:00:00Z');
+		expect(elements(root, XADES, 'SigningCertificate')).toHaveLength(1);
+		expect(elements(root, XADES, 'SignaturePolicyImplied')).toHaveLength(1);
+		expect(elements(root, XADES, 'DataObjectFormat')[0].getAttribute('ObjectReference')).toBe(
+			`#${IDS.documentReference}`
+		);
+		expect(elements(root, XADES, 'MimeType')[0].textContent).toBe('application/xml');
+	});
+
+	it('references the document (enveloped) and the signed properties', () => {
+		const signatureMethod = elements(root, DS, 'SignatureMethod')[0].getAttribute('Algorithm');
+		expect(signatureMethod).toBe('http://www.w3.org/2001/04/xmldsig-more#rsa-sha256');
+		expect(elements(root, DS, 'CanonicalizationMethod')[0].getAttribute('Algorithm')).toBe(
+			'http://www.w3.org/2001/10/xml-exc-c14n#'
+		);
+		const references = elements(root, DS, 'Reference');
+		expect(references[0].getAttribute('URI')).toBe('');
+		expect(elements(references[0], DS, 'Transform').map((transform) => transform.getAttribute('Algorithm'))).toEqual([
+			'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+			'http://www.w3.org/2001/10/xml-exc-c14n#'
+		]);
+		expect(references[1].getAttribute('URI')).toBe(`#${IDS.signedProperties}`);
+		expect(references[1].getAttribute('Type')).toBe('http://uri.etsi.org/01903#SignedProperties');
+		expect(elements(references[1], DS, 'DigestMethod')[0].getAttribute('Algorithm')).toBe(
+			'http://www.w3.org/2001/04/xmlenc#sha256'
+		);
+		// The two references plus the two SigningCertificate cert digests.
+		expect(
+			elements(root, DS, 'DigestMethod').map((method) => method.getAttribute('Algorithm'))
+		).toEqual(Array(4).fill('http://www.w3.org/2001/04/xmlenc#sha256'));
+	});
+
+	it('embeds the whole certificate chain from the container in the KeyInfo', () => {
+		const embedded = elements(root, DS, 'X509Certificate').map((certificate) => certificate.textContent);
+		expect(embedded).toHaveLength(session.certificates.length);
+		expect(embedded).toEqual(
+			session.certificates.map((certificate) => Buffer.from(certificate.der).toString('base64'))
+		);
+	});
+
+	it('digests the container certificates and names their issuers in SigningCertificate', () => {
+		const certs = elements(root, XADES, 'Cert');
+		expect(certs).toHaveLength(session.certificates.length);
+		session.certificates.forEach((certificate, index) => {
+			const digest = elements(certs[index], DS, 'DigestValue')[0].textContent;
+			expect(digest).toBe(createHash('sha256').update(certificate.der).digest('base64'));
+			expect(elements(certs[index], DS, 'X509IssuerName')[0].textContent).toBe(
+				certificate.issuer.replace(/, /g, ',')
+			);
+			expect(elements(certs[index], DS, 'X509SerialNumber')[0].textContent).toBe(
+				BigInt(`0x${certificate.serial}`).toString()
+			);
+		});
+	});
+
+	it('signs with an EC key too, and xmlsec1 verifies it', async () => {
+		const ec = await loadSignerSession(fixtures.ec, FIXTURE_PIN);
+		const ecSigned = await signXades({
+			xml: SAMPLE,
+			certificates: ec.certificates,
+			signer: ec.signer,
+			ids: IDS,
+			now: NOW
+		});
+		expect(elements(parse(ecSigned).documentElement, DS, 'SignatureMethod')[0].getAttribute('Algorithm')).toBe(
+			'http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256'
+		);
+		const path = writeFixtureFile(fixtures.dir, 'facturae-ec.xsig', encoder.encode(ecSigned));
+		// The EC container is self-signed, so the leaf is its own trust anchor.
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'ec.pem'))).toMatch(/status: OK/);
+	});
+
+	it('refuses to sign a document that already carries a signature', async () => {
+		await expect(
+			signXades({ xml: signed, certificates: session.certificates, signer: session.signer })
+		).rejects.toThrow(/already signed/);
+	});
+});

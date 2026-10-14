@@ -64,9 +64,10 @@ function inScope(element: Element): Map<string, string> {
 }
 
 /**
- * `ancestorScope` are the namespaces in scope at the parent (all of them when the parent is in the
- * node-set), `rendered` the declarations already written — C14N 1.0 compares against the ancestor's
- * namespace nodes, Exclusive C14N against the output so far.
+ * `ancestorScope` are the namespaces in scope at the parent — C14N 1.0 compares a declaration
+ * against them. `rendered` are the declarations the ancestors *in the node-set* have emitted —
+ * Exclusive C14N compares against those, which is why a sibling re-declares a prefix its uncle
+ * already declared.
  */
 function writeElement(
 	element: Element,
@@ -107,7 +108,9 @@ function writeElement(
 		(scope.get('') ?? '') === '' && (above('') ?? '') !== '' && (!options.exclusive || !element.prefix);
 	if (defaultNamespaceLeft) declarations.push(['', '']);
 	declarations.sort((a, b) => (a[0] === '' || b[0] === '' ? (a[0] === b[0] ? 0 : a[0] === '' ? -1 : 1) : a[0] < b[0] ? -1 : 1));
-	for (const [prefix, uri] of declarations) rendered.set(prefix, uri);
+	// Only the descendants of this element inherit its declarations, never its siblings.
+	const emitted = new Map(rendered);
+	for (const [prefix, uri] of declarations) emitted.set(prefix, uri);
 
 	const attributes = [...element.attributes]
 		.filter((attribute) => !(attribute.name === 'xmlns' || attribute.prefix === 'xmlns'))
@@ -131,7 +134,7 @@ function writeElement(
 		const child = children[i];
 		switch (child.nodeType) {
 			case ELEMENT:
-				writeElement(child as Element, out, options, scope, rendered);
+				writeElement(child as Element, out, options, scope, emitted);
 				break;
 			case TEXT:
 			case CDATA: {
