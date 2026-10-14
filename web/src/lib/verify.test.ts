@@ -89,6 +89,18 @@ describe('CAdES verification', () => {
 		expect(report.ok).toBe(false);
 	});
 
+	it('fails the signature check when the signature bytes themselves are tampered with', async () => {
+		const bytes = read('cades-valid.csig');
+		const flipped = bytes.slice();
+		flipped[flipped.length - 5] ^= 0x01;
+		const report = await verifyArtifact(flipped, { trustedRoots: [testRoot] });
+
+		expect(status(report, 'signature')).toBe('fail');
+		// The content is intact, so only the cryptographic check may complain.
+		expect(status(report, 'contentDigest')).toBe('pass');
+		expect(report.ok).toBe(false);
+	});
+
 	it('reports an unreadable CMS structure as a failed check, not a crash', async () => {
 		const truncated = read('cades-valid.csig').subarray(0, 40);
 		const report = await verifyArtifact(new Uint8Array(truncated));
@@ -119,6 +131,19 @@ describe('XAdES verification', () => {
 		expect(references.length).toBeGreaterThan(1);
 		expect(references.some((entry) => entry.status === 'fail')).toBe(true);
 		expect(report.checks.filter((entry) => entry.id === 'signature').every((entry) => entry.status === 'pass')).toBe(true);
+		expect(report.ok).toBe(false);
+	});
+
+	it('fails the signature check when the SignatureValue is tampered with', async () => {
+		const xml = new TextDecoder().decode(read('xades-valid.xsig'));
+		// First base64 character of the SignatureValue; length preserved, so parsing still succeeds.
+		const tampered = xml.replace(/<ds:SignatureValue>([A-Za-z0-9+/=])/, (_, c: string) => `<ds:SignatureValue>${c === 'A' ? 'B' : 'A'}`);
+		expect(tampered).not.toBe(xml);
+
+		const report = await verifyArtifact(new TextEncoder().encode(tampered), { trustedRoots: [testRoot] });
+
+		expect(status(report, 'signature')).toBe('fail');
+		expect(report.checks.filter((entry) => entry.id === 'reference').every((entry) => entry.status === 'pass')).toBe(true);
 		expect(report.ok).toBe(false);
 	});
 
