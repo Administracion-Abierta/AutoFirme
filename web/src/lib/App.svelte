@@ -18,10 +18,10 @@
 
 	let file = $state<SelectedFile | null>(null);
 	let format = $state<SignFormat>('cades');
-	// Certificate selection lands in #5; the shell therefore never enables signing.
+	// Only the certificate that owns the container's private key can sign.
 	let cert = $state<SignerCert | null>(null);
 
-	const canSign = $derived(file !== null && cert !== null);
+	const canSign = $derived(file !== null && cert?.key != null);
 	const signHint = $derived(
 		file === null ? t.signNeedsFile : cert === null ? t.signNeedsCert : ''
 	);
@@ -73,7 +73,7 @@
 			<section class="flex flex-col gap-5">
 				<h2 class="text-lg font-semibold">{t.step2Title}</h2>
 
-				<CertPicker copy={t} cert={cert} />
+				<CertPicker copy={t} {cert} onpick={(picked) => (cert = picked)} />
 
 				<fieldset class="flex flex-col gap-2">
 					<legend class="text-sm font-medium">{t.formatTitle}</legend>
