@@ -1,4 +1,4 @@
-/** Domain types for the sign flow. Signature engines land in #5–#11; this file is the seam. */
+/** Domain types for the sign flow. Signature engines land in #6–#11; this file is the seam. */
 
 export type SignFormat = 'cades' | 'xades' | 'pades';
 
@@ -22,16 +22,50 @@ export interface SelectedFile {
 	type: string;
 }
 
-/** Filled in by #5 (PKCS#12 / certificate selection). */
+/** WebCrypto parameters used for both importing and signing with a certificate's private key. */
+export interface SigningAlgorithm {
+	name: 'RSASSA-PKCS1-v1_5' | 'ECDSA';
+	hash: 'SHA-256' | 'SHA-384' | 'SHA-512';
+	/** ECDSA only. */
+	namedCurve?: 'P-256' | 'P-384' | 'P-521';
+}
+
+/** One certificate of a PKCS#12 container, ready for the picker and for the sign flow. */
 export interface SignerCert {
+	/** Certificate serial number, hex — stable identifier inside the container. */
+	id: string;
+	commonName: string;
 	subject: string;
 	issuer: string;
-	notAfter: string;
+	serial: string;
+	notBefore: Date;
+	notAfter: Date;
+	expired: boolean;
+	notYetValid: boolean;
+	/** X.509 DER, to be embedded in the signature. */
+	der: Uint8Array;
+	/** Non-extractable signing key; null for the certificates of the chain that are not the signer. */
+	key: CryptoKey | null;
+	algorithm: SigningAlgorithm | null;
+}
+
+export interface SignerSession {
+	certificates: SignerCert[];
+	/** The certificate owning the private key — the one the user must select to sign. */
+	signer: SignerCert;
 }
 
 export interface SignResult {
 	ok: boolean;
 	message: string;
+}
+
+/** Sign raw bytes with the selected certificate's key. Format wrapping happens in #6–#11. */
+export async function signBytes(cert: SignerCert, data: Uint8Array): Promise<Uint8Array> {
+	if (!cert.key || !cert.algorithm) {
+		throw new Error(`certificate ${cert.commonName} has no private key`);
+	}
+	return new Uint8Array(await crypto.subtle.sign(cert.algorithm, cert.key, data));
 }
 
 export function toSelectedFile(file: File): SelectedFile {

@@ -1,0 +1,119 @@
+/**
+ * PKCS#12 fixtures for tests — generated on the fly with the `openssl` CLI into a temp directory,
+ * so nothing binary is committed. Returns the bytes, the password and openssl's own view of the
+ * leaf certificate, to cross-check what our parser reads.
+ */
+
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+export const FIXTURE_PIN = '1234';
+export const LEAF_COMMON_NAME = 'Ñandú Prueba';
+
+export interface Pkcs12Fixtures {
+	dir: string;
+	/** Leaf key + its CA cert, AES-256-CBC/PBKDF2-SHA256 (what OpenSSL 3+ and Java 9+ write). */
+	modern: Uint8Array;
+	/** Leaf public key in PEM (for openssl signature checks). */
+	leafPem: string;
+	leafPublicKeyPem: string;
+	/** openssl's `notBefore`/`notAfter` for the leaf, as ISO strings. */
+	notBefore: string;
+	notAfter: string;
+	/** Same container written with legacy PBES1 (3DES/RC2) encryption. */
+	legacy: Uint8Array;
+	/** Self-signed EC P-256 container. */
+	ec: Uint8Array;
+}
+
+function openssl(args: string[], cwd: string): string {
+	return execFileSync('openssl', args, { cwd, stdio: 'pipe' }).toString();
+}
+
+/** `-dateopt iso_8601` prints `notAfter=2027-10-14 07:15:06Z`. */
+function readDates(cwd: string): { notBefore: string; notAfter: string } {
+	const lines = openssl(['x509', '-in', 'leaf.pem', '-noout', '-dates', '-dateopt', 'iso_8601'], cwd)
+		.trim()
+		.split('\n');
+	const iso = (line: string) => new Date(line.slice(line.indexOf('=') + 1).replace(' ', 'T')).toISOString();
+	return { notBefore: iso(lines[0]), notAfter: iso(lines[1]) };
+}
+
+export function createPkcs12Fixtures(): Pkcs12Fixtures {
+	const dir = mkdtempSync(join(tmpdir(), 'autofirme-p12-'));
+	const exportArgs = (name: string, key: string, cert: string) => [
+		'pkcs12',
+		'-export',
+		'-inkey',
+		key,
+		'-in',
+		cert,
+		'-out',
+		name,
+		'-passout',
+		`pass:${FIXTURE_PIN}`
+	];
+
+	openssl(
+		[
+			'req', '-x509', '-newkey', 'rsa:2048', '-keyout', 'leaf.key', '-out', 'leaf.pem',
+			'-days', '365', '-nodes', '-sha256', '-utf8', '-subj', `/C=ES/O=AutoFirme/CN=${LEAF_COMMON_NAME}`
+		],
+		dir
+	);
+	openssl(
+		[
+			'req', '-x509', '-newkey', 'rsa:2048', '-keyout', 'ca.key', '-out', 'ca.pem',
+			'-days', '365', '-nodes', '-sha256', '-subj', '/C=ES/O=AutoFirme/CN=AutoFirme Test CA'
+		],
+		dir
+	);
+	openssl(
+		[
+			...exportArgs('modern.p12', 'leaf.key', 'leaf.pem'),
+			'-certfile', 'ca.pem', '-keypbe', 'AES-256-CBC', '-certpbe', 'AES-256-CBC',
+			'-macalg', 'sha256', '-iter', '2048'
+		],
+		dir
+	);
+	openssl(
+		[...exportArgs('legacy.p12', 'leaf.key', 'leaf.pem'), '-legacy', '-macalg', 'sha1'],
+		dir
+	);
+
+	openssl(['ecparam', '-genkey', '-name', 'prime256v1', '-noout', '-out', 'ec.key'], dir);
+	openssl(
+		[
+			'req', '-x509', '-key', 'ec.key', '-out', 'ec.pem', '-days', '365', '-sha256',
+			'-subj', '/C=ES/O=AutoFirme/CN=EC Prueba'
+		],
+		dir
+	);
+	openssl(
+		[
+			...exportArgs('ec.p12', 'ec.key', 'ec.pem'),
+			'-keypbe', 'AES-256-CBC', '-certpbe', 'AES-256-CBC', '-macalg', 'sha256'
+		],
+		dir
+	);
+
+	openssl(['x509', '-in', 'leaf.pem', '-pubkey', '-noout', '-out', 'leaf.pub.pem'], dir);
+
+	return {
+		dir,
+		modern: readFileSync(join(dir, 'modern.p12')),
+		legacy: readFileSync(join(dir, 'legacy.p12')),
+		ec: readFileSync(join(dir, 'ec.p12')),
+		leafPublicKeyPem: readFileSync(join(dir, 'leaf.pub.pem'), 'utf8'),
+		...readDates(dir)
+	};
+}
+
+/** Feed bytes from a test into openssl (signature verification, for instance). */
+export function writeFixtureFile(dir: string, name: string, bytes: Uint8Array): string {
+	const path = join(dir, name);
+	writeFileSync(path, bytes);
+	return path;
+}
