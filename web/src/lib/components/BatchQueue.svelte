@@ -15,7 +15,8 @@
 	let { copy, queue, signer, hint }: Props = $props();
 
 	let state = $state<BatchState>(EMPTY_BATCH_STATE);
-	// The run loop writes to the store from async code, so the component mirrors it.
+	// The run loop writes to the store from async code, so the component mirrors it. Returning the
+	// store's unsubscribe keeps the subscriber list clean when the queue is unmounted.
 	$effect(() => queue.subscribe((value) => (state = value)));
 
 	const signed = $derived(state.documents.filter((document) => document.status === 'signed').length);
