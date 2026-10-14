@@ -51,7 +51,13 @@
 		type="file"
 		accept=".p12,.pfx,application/x-pkcs12"
 		class="rounded-lg border bg-white/60 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-500 file:px-3 file:py-1 file:text-white dark:bg-ink-900/40"
-		onchange={(event) => (file = event.currentTarget.files?.[0] ?? null)}
+		onchange={(event) => {
+			// A different file invalidates whatever was loaded from the previous one.
+			file = event.currentTarget.files?.[0] ?? null;
+			certs = [];
+			error = '';
+			onpick(null);
+		}}
 	/>
 
 	<label class="text-sm font-medium" for="pkcs12-pin">{copy.certPinLabel}</label>

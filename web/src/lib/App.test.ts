@@ -103,4 +103,20 @@ describe('App (sign workflow shell)', () => {
 		expect(container.textContent).toContain('PIN incorrecto.');
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
 	});
+
+	it('clears the loaded certificates when another keystore file is picked', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+
+		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
+			target: { files: [new File([fixtures.ec], 'other.p12')] }
+		});
+
+		expect(container.querySelector<HTMLInputElement>('#cert-picker')?.value).toBe('');
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+	});
 });
