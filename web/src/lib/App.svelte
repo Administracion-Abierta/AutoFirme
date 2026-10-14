@@ -108,9 +108,11 @@
 							/>
 							<span class="font-medium">{option.label}</span>
 							<span class="text-sm opacity-70">{option.extension}</span>
-							<span class="ml-auto rounded-full bg-ink-100 px-2 py-0.5 text-xs dark:bg-ink-700">
-								{t.pendingIssue} #{option.issue}
-							</span>
+							{#if !option.implemented}
+								<span class="ml-auto rounded-full bg-ink-100 px-2 py-0.5 text-xs dark:bg-ink-700">
+									{t.pendingIssue} #{option.issue}
+								</span>
+							{/if}
 						</label>
 					{/each}
 				</fieldset>
