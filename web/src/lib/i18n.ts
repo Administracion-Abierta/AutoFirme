@@ -1,5 +1,7 @@
 /** ES/EN copy. The app ships both; Spanish is the default (AutoFirma's audience). */
 
+import type { CheckId } from '#lib/verify';
+
 export type Lang = 'es' | 'en';
 
 export interface Copy {
@@ -26,6 +28,23 @@ export interface Copy {
 	signNeedsCert: string;
 	resultTitle: string;
 	resultEmpty: string;
+	modesLabel: string;
+	modeSign: string;
+	modeVerify: string;
+	verifyStepTitle: string;
+	verifyDropTitle: string;
+	verifyDropHint: string;
+	verifyRunning: string;
+	verifyReportTitle: string;
+	verifyOk: string;
+	verifyFail: string;
+	verifySigner: string;
+	verifySigningTime: string;
+	verifyNoSigner: string;
+	verifyAddDocument: string;
+	verifyAddDocumentHint: string;
+	verifyDocumentLabel: string;
+	checkLabels: Record<CheckId, string>;
 }
 
 export const copy: Record<Lang, Copy> = {
@@ -52,7 +71,34 @@ export const copy: Record<Lang, Copy> = {
 		signNeedsFile: 'Selecciona primero un documento.',
 		signNeedsCert: 'Selecciona un certificado para habilitar la firma.',
 		resultTitle: 'Resultado',
-		resultEmpty: 'Todavía no se ha firmado ningún documento.'
+		resultEmpty: 'Todavía no se ha firmado ningún documento.',
+		modesLabel: 'Modo',
+		modeSign: 'Firmar',
+		modeVerify: 'Verificar',
+		verifyStepTitle: 'Comprueba una firma',
+		verifyDropTitle: 'Arrastra aquí el fichero firmado (.csig, .xsig o PDF)',
+		verifyDropHint: 'se analiza en tu equipo, sin subir nada',
+		verifyRunning: 'Comprobando la firma…',
+		verifyReportTitle: 'Informe de validación',
+		verifyOk: 'Firma verificada: todas las comprobaciones han pasado.',
+		verifyFail: 'La firma no supera todas las comprobaciones.',
+		verifySigner: 'Firmante',
+		verifySigningTime: 'Fecha de firma',
+		verifyNoSigner: 'No se ha encontrado el certificado del firmante.',
+		verifyAddDocument: 'Añade el documento original',
+		verifyAddDocumentHint: 'la firma es separada (detached): sin el documento no se puede comprobar el contenido',
+		verifyDocumentLabel: 'Documento original',
+		checkLabels: {
+			structure: 'Estructura de la firma',
+			contentDigest: 'Integridad del contenido',
+			signature: 'Firma criptográfica',
+			reference: 'Referencia firmada',
+			signerCert: 'Certificado del firmante',
+			certValidity: 'Vigencia del certificado',
+			certChain: 'Cadena de confianza',
+			signingTime: 'Fecha de firma',
+			unsupported: 'Formato'
+		}
 	},
 	en: {
 		langLabel: 'Language',
@@ -77,6 +123,33 @@ export const copy: Record<Lang, Copy> = {
 		signNeedsFile: 'Choose a document first.',
 		signNeedsCert: 'Choose a certificate to enable signing.',
 		resultTitle: 'Result',
-		resultEmpty: 'No document has been signed yet.'
+		resultEmpty: 'No document has been signed yet.',
+		modesLabel: 'Mode',
+		modeSign: 'Sign',
+		modeVerify: 'Verify',
+		verifyStepTitle: 'Check a signature',
+		verifyDropTitle: 'Drop the signed file here (.csig, .xsig or PDF)',
+		verifyDropHint: 'it is analysed on your machine, nothing is uploaded',
+		verifyRunning: 'Checking the signature…',
+		verifyReportTitle: 'Validity report',
+		verifyOk: 'Signature verified: every check passed.',
+		verifyFail: 'The signature does not pass every check.',
+		verifySigner: 'Signer',
+		verifySigningTime: 'Signing time',
+		verifyNoSigner: 'No signer certificate was found.',
+		verifyAddDocument: 'Add the original document',
+		verifyAddDocumentHint: 'this is a detached signature: without the document the content cannot be checked',
+		verifyDocumentLabel: 'Original document',
+		checkLabels: {
+			structure: 'Signature structure',
+			contentDigest: 'Content integrity',
+			signature: 'Cryptographic signature',
+			reference: 'Signed reference',
+			signerCert: 'Signer certificate',
+			certValidity: 'Certificate validity',
+			certChain: 'Trust chain',
+			signingTime: 'Signing time',
+			unsupported: 'Format'
+		}
 	}
 };

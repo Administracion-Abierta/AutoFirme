@@ -5,9 +5,12 @@
 		copy: Copy;
 		/** Receives the first dropped or picked file. */
 		onselect: (file: File) => void;
+		/** Overrides the drop-step wording (the verify flow reuses this component). */
+		title?: string;
+		hint?: string;
 	}
 
-	let { copy, onselect }: Props = $props();
+	let { copy, onselect, title, hint }: Props = $props();
 	let dragging = $state(false);
 	let input = $state<HTMLInputElement | null>(null);
 
@@ -18,7 +21,7 @@
 </script>
 
 <section
-	aria-label={copy.dropTitle}
+	aria-label={title ?? copy.dropTitle}
 	data-dragging={dragging}
 	class="dropzone rounded-2xl border-2 border-dashed px-6 py-10 text-center transition"
 	ondragover={(event) => {
@@ -44,8 +47,8 @@
 			<path d="M12 16V4m0 0L8 8m4-4 4 4" stroke-linecap="round" stroke-linejoin="round" />
 			<path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke-linecap="round" />
 		</svg>
-		<p class="text-lg font-medium">{dragging ? copy.dragging : copy.dropTitle}</p>
-		<p class="text-sm opacity-70">{copy.dropHint}</p>
+		<p class="text-lg font-medium">{dragging ? copy.dragging : (title ?? copy.dropTitle)}</p>
+		<p class="text-sm opacity-70">{hint ?? copy.dropHint}</p>
 		<input
 			bind:this={input}
 			class="sr-only"
