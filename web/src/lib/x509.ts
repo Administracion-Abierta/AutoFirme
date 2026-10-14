@@ -15,6 +15,10 @@ export interface Certificate {
 	subject: string;
 	issuer: string;
 	serial: string;
+	/** Issuer `Name` and serial number as they appear in the certificate — the
+	 * `IssuerAndSerialNumber` of a CMS `SignerInfo` and of `ESSCertIDv2`. */
+	issuerDer: Bytes;
+	serialDer: Bytes;
 	notBefore: Date;
 	notAfter: Date;
 	publicKey: PublicKey;
@@ -122,6 +126,8 @@ export function parseCertificate(der: Bytes): Certificate {
 		subject: subjectName,
 		issuer: formatName(issuer),
 		serial: [...integerBytes(serial)].map((byte) => byte.toString(16).padStart(2, '0')).join(''),
+		issuerDer: issuer.raw,
+		serialDer: serial.raw,
 		notBefore: parseTime(validity.children[0]),
 		notAfter: parseTime(validity.children[1]),
 		publicKey,
