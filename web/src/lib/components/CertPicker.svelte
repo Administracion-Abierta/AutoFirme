@@ -115,6 +115,9 @@
 			<p class="text-sm opacity-70">{cert.subject}</p>
 			<p class="text-sm opacity-70">{copy.certIssuer}: {cert.issuer}</p>
 			<p class="text-sm opacity-70">
+				{copy.certValidFrom}: {dateFormat.format(cert.notBefore)}
+			</p>
+			<p class="text-sm opacity-70">
 				{copy.certValidity}: {dateFormat.format(cert.notAfter)}
 			</p>
 		{/if}

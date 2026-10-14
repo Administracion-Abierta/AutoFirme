@@ -89,6 +89,7 @@ describe('App (sign workflow shell)', () => {
 
 		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
 		expect(container.textContent).toContain(`CN=${LEAF_COMMON_NAME}, O=AutoFirme, C=ES`);
+		expect(container.textContent).toContain('Válido desde');
 		// The chain certificate of the file is listed but cannot sign.
 		expect(container.textContent).toContain('AutoFirme Test CA (sin clave privada)');
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
