@@ -13,8 +13,8 @@ browser. No backend, no key material leaving the client.
 | Path | Contents |
 |---|---|
 | `src/routes/` | Pages — `/` is the sign flow |
-| `src/lib/App.svelte` | Sign workflow shell (steps 1–2) |
-| `src/lib/components/` | `FileDrop`, `FileCard`, `CertPicker`, `SignButton`, `ResultCard` |
+| `src/lib/App.svelte` | Sign workflow shell (steps 1–2) and verify workflow |
+| `src/lib/components/` | `FileDrop`, `FileCard`, `CertPicker`, `SignButton`, `ResultCard`, `VerifyReport` |
 | `src/lib/asn1.ts` | DER reader and writer (PKCS#12 / X.509 / CMS) |
 | `src/lib/pkcs12.ts` | PKCS#12 container: PBES2 decryption, certificate bags |
 | `src/lib/x509.ts` | Certificate summary (subject, issuer, validity, public key) |
@@ -23,6 +23,9 @@ browser. No backend, no key material leaving the client.
 | `src/lib/sign.ts` | Format list and sign-flow types (the seam for #6–#11) |
 | `src/lib/c14n.ts` | Canonical XML: C14N 1.0 + Exclusive C14N |
 | `src/lib/xades.ts` | XAdES-EPES enveloped signature over an XML document |
+| `src/lib/verify/` | Verification engine: DER/X.509/CMS, canonicalization, XMLDSig/XAdES |
+| `scripts/fetch-roots.sh` | Refreshes the bundled FNMT trust anchor from fnmt.es (checks subject + fingerprint) |
+| `test/fixtures/` | Valid/tampered CAdES + XAdES samples, their generator and cross-check script |
 | `src/lib/i18n.ts` | ES/EN copy |
 | `Caddyfile` | Static hosting with SPA fallback (used by the root `Containerfile`) |
 
@@ -38,6 +41,33 @@ pnpm preview      # serve build/ locally
 pnpm test         # vitest smoke test (mounts App)
 pnpm check        # svelte-check + tsc
 ```
+
+## Verify flow (issue #8)
+
+`Verificar` mode drops a `/.csig` (CAdES), `/.xsig` (XAdES) or PDF and reports one card per check,
+green/red with the technical reason:
+
+| Check | What it proves |
+|---|---|
+| Structure | the artifact parses as CMS `SignedData` / `ds:Signature` (PDF/PAdES is flagged as #11) |
+| Content integrity | `messageDigest` signed attribute vs the digest of the embedded content (1) |
+| Cryptographic signature | the signature over the DER re-encoded `signedAttrs` / over `c14n(ds:SignedInfo)` |
+| Signed references | every `ds:Reference` transform chain (`enveloped-signature`, inclusive/exclusive C14N) reproduces its `DigestValue` |
+| Signer certificate | the signer cert of the `SignerInfo`/`KeyInfo` |
+| Certificate validity | the signer cert is inside its validity window |
+| Trust chain | issuer links verify by signature up to a bundled root (FNMT AC RAIZ FNMT-RCM) |
+| Signing time | `signingTime` attribute / `xades:SigningTime` |
+
+(1) detached CAdES cannot be checked alone: drop the original document when the report asks for it.
+
+All crypto runs in the browser through `crypto.subtle` — certificates are parsed from DER by hand
+(no new dependency), the trust store is the PEM under `src/lib/verify/roots/`, and unsupported
+algorithms or transforms are reported as a red check with a reason instead of a silent pass.
+Revocation (OCSP/CRL), timestamps (TSA) and certificate policies are out of scope.
+
+Fixtures: `bash test/fixtures/generate.sh` rebuilds them (throwaway test PKI, keys gitignored),
+`bash test/fixtures/verify-fixtures.sh` cross-checks them with `openssl cms -verify` and an
+independent python digest recomputation. `pnpm test` runs that cross-check as part of the suite.
 
 ## Container
 
