@@ -24,6 +24,7 @@ const SIGNATURE_CONTENT_TYPE = 'application/vnd.openxmlformats-package.digital-s
 const ORIGIN_CONTENT_TYPE = 'application/vnd.openxmlformats-package.digital-signature-origin';
 const PACKAGE_RELATIONSHIPS_CONTENT_TYPE = 'application/vnd.openxmlformats-package.relationships+xml';
 const XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n';
+const RELATIONSHIP_TRANSFORM = 'http://schemas.openxmlformats.org/package/2006/RelationshipTransform';
 const SIGNATURE_PART_DIR = '_xmlsignatures/';
 
 /** Relationships never covered by the manifest (ECMA-376 §10.1.2.2 volatile properties). */
@@ -229,7 +230,7 @@ function manifestReferences(entries: Record<string, Uint8Array>, types: (partNam
 		if (!name.endsWith('.rels') || name.startsWith(SIGNATURE_PART_DIR)) continue;
 		references.push(
 			`<ds:Reference URI="/${name}?ContentType=${PACKAGE_RELATIONSHIPS_CONTENT_TYPE}"><ds:Transforms>` +
-				`<ds:Transform Algorithm="${MDSSI_NS}/RelationshipTransform">` +
+				`<ds:Transform Algorithm="${RELATIONSHIP_TRANSFORM}">` +
 				signedRelationshipIds(entries[name])
 					.map((id) => `<mdssi:RelationshipReference xmlns:mdssi="${MDSSI_NS}" SourceId="${id}"/>`)
 					.join('') +

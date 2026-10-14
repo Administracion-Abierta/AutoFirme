@@ -147,7 +147,7 @@ async function manifestFailures(signed: Signed): Promise<string[]> {
 		const name = uri.slice(1).split('?')[0];
 		const transform = reference.getElementsByTagNameNS(DS_NS, 'Transform')[0]?.getAttribute('Algorithm');
 		const octets =
-			transform === `${MDSSI_NS}/RelationshipTransform`
+			transform === 'http://schemas.openxmlformats.org/package/2006/RelationshipTransform'
 				? ENCODER.encode(
 						relationshipTransformOctets(
 							signed.entries[name],
