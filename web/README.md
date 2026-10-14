@@ -16,6 +16,8 @@ browser. No backend, no key material leaving the client.
 | `src/lib/App.svelte` | Sign workflow shell (steps 1–2) |
 | `src/lib/components/` | `FileDrop`, `FileCard`, `CertPicker`, `SignButton`, `ResultCard` |
 | `src/lib/sign.ts` | Format list and sign-flow types (the seam for #5–#11) |
+| `src/lib/c14n.ts` | XML Canonicalization 1.0 (inclusive + exclusive), used by the signature engines |
+| `src/lib/ooxml.ts` | OOXML (docx/xlsx/pptx) signing: XAdES v1.3.2 signature part, zip surgery via `fflate` |
 | `src/lib/i18n.ts` | ES/EN copy |
 | `Caddyfile` | Static hosting with SPA fallback (used by the root `Containerfile`) |
 
@@ -28,7 +30,8 @@ pnpm install
 pnpm dev          # vite dev server
 pnpm build        # static output in build/
 pnpm preview      # serve build/ locally
-pnpm test         # vitest smoke test (mounts App)
+pnpm test         # vitest: App smoke test + OOXML signing round-trip
+                  #   (`openssl` and `xmllint`, when installed, cross-check the signature and c14n)
 pnpm check        # svelte-check + tsc
 ```
 
@@ -48,3 +51,8 @@ fallback (`try_files {path} {path}/ /404.html`).
 
 Shell only: document selection works, the certificate picker is a placeholder and signing is
 disabled until #5 (PKCS#12) lands. Signing engines follow in #6 (CAdES), #7 (XAdES), #11 (PAdES).
+
+OOXML signing (#10) exists as a library (`src/lib/ooxml.ts`): it adds
+`_xmlsignatures/sig-<uuid>.xml` (XAdES v1.3.2 EPES with MDSSI `SignatureTime`), the
+`origin.sigs` origin part and its relationships, and leaves every other part byte-identical.
+The UI does not call it yet — that wiring needs the certificate flow from #5.
