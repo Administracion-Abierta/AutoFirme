@@ -117,3 +117,62 @@ export function writeFixtureFile(dir: string, name: string, bytes: Bytes): strin
 	writeFileSync(path, bytes);
 	return path;
 }
+
+export interface CadesFixtures {
+	dir: string;
+	/** CA-signed leaf (RSA) plus its CA, for `loadSignerSession` — the #5 flow. */
+	p12: Bytes;
+	/** Same, with an EC P-256 leaf. */
+	ecP12: Bytes;
+	/** Path to the CA certificate in PEM: the `-CAfile` for `openssl cms -verify`. */
+	caPath: string;
+	/** Path to the leaf certificate in PEM. */
+	leafPath: string;
+	/** Path to the document to sign, and its bytes. */
+	contentPath: string;
+	content: Bytes;
+}
+
+/** A CA, a CA-signed RSA leaf and a CA-signed EC leaf, all inside PKCS#12 containers. */
+export function createCadesFixtures(content = 'documento de prueba\n'): CadesFixtures {
+	const dir = mkdtempSync(join(tmpdir(), 'autofirme-cades-'));
+	const exportArgs = (name: string, key: string, cert: string) => [
+		'pkcs12', '-export', '-inkey', key, '-in', cert, '-certfile', 'ca.pem', '-out', name,
+		'-passout', `pass:${FIXTURE_PIN}`, '-keypbe', 'AES-256-CBC', '-certpbe', 'AES-256-CBC',
+		'-macalg', 'sha256'
+	];
+
+	openssl(
+		[
+			'req', '-x509', '-newkey', 'rsa:2048', '-keyout', 'ca.key', '-out', 'ca.pem',
+			'-days', '3650', '-nodes', '-sha256', '-subj', '/C=ES/O=AutoFirme/CN=AutoFirme CAdES CA'
+		],
+		dir
+	);
+	for (const [name, subject] of [
+		['rsa', '/C=ES/O=AutoFirme/CN=Firma CAdES'],
+		['ec', '/C=ES/O=AutoFirme/CN=Firma CAdES EC']
+	]) {
+		const keyType =
+			name === 'rsa'
+				? ['-newkey', 'rsa:2048']
+				: ['-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1'];
+		openssl(['req', ...keyType, '-keyout', `${name}.key`, '-out', `${name}.csr`, '-nodes', '-sha256', '-subj', subject], dir);
+		openssl(
+			['x509', '-req', '-in', `${name}.csr`, '-CA', 'ca.pem', '-CAkey', 'ca.key', '-CAcreateserial', '-out', `${name}.pem`, '-days', '365', '-sha256'],
+			dir
+		);
+		openssl(exportArgs(`${name}.p12`, `${name}.key`, `${name}.pem`), dir);
+	}
+
+	const contentPath = writeFixtureFile(dir, 'content.bin', new TextEncoder().encode(content));
+	return {
+		dir,
+		p12: new Uint8Array(readFileSync(join(dir, 'rsa.p12'))),
+		ecP12: new Uint8Array(readFileSync(join(dir, 'ec.p12'))),
+		caPath: join(dir, 'ca.pem'),
+		leafPath: join(dir, 'rsa.pem'),
+		contentPath,
+		content: new Uint8Array(readFileSync(contentPath))
+	};
+}
