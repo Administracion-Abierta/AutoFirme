@@ -39,8 +39,7 @@
 	<header class="flex flex-wrap items-baseline justify-between gap-2">
 		<h3 class="font-semibold">{copy.queueTitle}</h3>
 		<p class="text-sm opacity-70" aria-live="polite">
-			{state.phase === 'running' ? copy.queueRunning : copy.queueProgress}:
-			{signed}/{state.documents.length}
+			{`${state.phase === 'running' ? copy.queueRunning : copy.queueProgress}: ${signed}/${state.documents.length}`}
 		</p>
 	</header>
 

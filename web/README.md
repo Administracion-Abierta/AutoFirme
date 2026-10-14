@@ -14,8 +14,10 @@ browser. No backend, no key material leaving the client.
 |---|---|
 | `src/routes/` | Pages — `/` is the sign flow |
 | `src/lib/App.svelte` | Sign workflow shell (steps 1–2) |
-| `src/lib/components/` | `FileDrop`, `FileCard`, `CertPicker`, `SignButton`, `ResultCard` |
+| `src/lib/components/` | `FileDrop`, `FileCard`, `CertPicker`, `BatchQueue`, `ResultCard` |
 | `src/lib/sign.ts` | Format list and sign-flow types (the seam for #5–#11) |
+| `src/lib/batch.ts` | Batch queue state machine, manifest and ZIP assembly (engine-agnostic) |
+| `src/lib/zip.ts` | ZIP writer (STORE entries, CRC-32) — no dependency, verified by `unzip -t` |
 | `src/lib/i18n.ts` | ES/EN copy |
 | `Caddyfile` | Static hosting with SPA fallback (used by the root `Containerfile`) |
 
@@ -30,6 +32,7 @@ pnpm build        # static output in build/
 pnpm preview      # serve build/ locally
 pnpm test         # vitest smoke test (mounts App)
 pnpm check        # svelte-check + tsc
+pnpm verify:zip   # cross-check a batch ZIP with unzip -t and sha256sum
 ```
 
 ## Container
@@ -48,3 +51,7 @@ fallback (`try_files {path} {path}/ /404.html`).
 
 Shell only: document selection works, the certificate picker is a placeholder and signing is
 disabled until #5 (PKCS#12) lands. Signing engines follow in #6 (CAdES), #7 (XAdES), #11 (PAdES).
+
+The batch layer is in place: N dropped files become a queue signed sequentially with per-document
+status and a ZIP + `manifest.json` download. It takes the signature engine as a parameter, so it
+runs as soon as #6 hands it one — until then the run button stays disabled and says so.

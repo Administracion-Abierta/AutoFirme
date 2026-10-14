@@ -45,7 +45,7 @@ export interface BatchDocument {
 	/** Signature algorithm reported by the engine, empty until it is signed. */
 	algorithm: string;
 	/** Signed bytes, kept so the ZIP can be built (and rebuilt) without re-signing. */
-	bytes: Uint8Array | null;
+	bytes: Uint8Array<ArrayBuffer> | null;
 }
 
 export interface BatchState {
@@ -58,7 +58,7 @@ export interface BatchState {
 
 /** What a signature engine returns for one document. */
 export interface SignedDocument {
-	bytes: Uint8Array;
+	bytes: Uint8Array<ArrayBuffer>;
 	/** Signature algorithm, e.g. `SHA256withRSA` — engines (#6–#11) are the only ones that know it. */
 	algorithm?: string;
 }
@@ -69,7 +69,7 @@ export interface SignedDocument {
  */
 export type BatchSigner = (
 	file: File,
-	bytes: Uint8Array,
+	bytes: Uint8Array<ArrayBuffer>,
 	format: SignFormat
 ) => Promise<SignedDocument>;
 
@@ -84,8 +84,8 @@ export interface BatchQueue extends Readable<BatchState> {
 	clear(): void;
 }
 
-export function sha256Hex(bytes: Uint8Array): Promise<string> {
-	const digest = crypto.subtle.digest('SHA-256', bytes as unknown as BufferSource);
+export function sha256Hex(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+	const digest = crypto.subtle.digest('SHA-256', bytes);
 	return digest.then((value) =>
 		[...new Uint8Array(value)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 	);
@@ -140,6 +140,11 @@ export function createBatchQueue(): BatchQueue {
 			if (start.documents.length === 0) return start;
 			const format = start.format;
 			const extension = SIGN_FORMATS.find((option) => option.id === format)?.extension ?? '';
+			const taken = new Set(
+				start.documents
+					.filter((document) => document.status === 'signed')
+					.map((document) => document.output)
+			);
 
 			store.update((state) => ({ ...state, phase: 'running', current: null }));
 
@@ -159,7 +164,7 @@ export function createBatchQueue(): BatchQueue {
 						result: 'DONE_AND_SAVED',
 						sha256: digest,
 						bytes: signed.bytes,
-						output: `${document.file.name}${extension}`,
+						output: signedOutputName(document.file.name, extension, taken),
 						timestamp: new Date().toISOString(),
 						algorithm: signed.algorithm ?? ''
 					});
@@ -220,17 +225,16 @@ export function buildManifest(state: BatchState): BatchManifest {
 	};
 }
 
-/** Unique `name` inside the archive: `dup.txt` becomes `dup-2.txt`, `dup-3.txt`, … */
-function unique(name: string, taken: Set<string>): string {
-	if (!taken.has(name)) {
-		taken.add(name);
-		return name;
-	}
-	const dot = name.lastIndexOf('.');
-	const stem = dot > 0 ? name.slice(0, dot) : name;
-	const extension = dot > 0 ? name.slice(dot) : '';
-	for (let index = 2; ; index += 1) {
-		const candidate = `${stem}-${index}${extension}`;
+/**
+ * Name of the signed file: the document name plus the format extension, numbered when two documents
+ * share a name (`dup.txt` → `dup-2.txt.csig`). `taken` holds every output name already in use.
+ */
+function signedOutputName(fileName: string, extension: string, taken: Set<string>): string {
+	const dot = fileName.lastIndexOf('.');
+	const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
+	const suffix = dot > 0 ? fileName.slice(dot) : '';
+	for (let index = 1; ; index += 1) {
+		const candidate = `${index === 1 ? stem : `${stem}-${index}`}${suffix}${extension}`;
 		if (!taken.has(candidate)) {
 			taken.add(candidate);
 			return candidate;
@@ -242,13 +246,10 @@ export const MANIFEST_NAME = 'manifest.json';
 
 /** Signed documents plus the manifest, as one ZIP archive. Output names are de-duplicated. */
 export function buildZip(state: BatchState): Uint8Array<ArrayBuffer> {
-	const taken = new Set<string>([MANIFEST_NAME]);
+	// Output names are already unique (the run assigns them), so only the manifest is appended.
 	const entries = state.documents
 		.filter((document) => document.status === 'signed' && document.bytes !== null)
-		.map((document) => ({
-			name: unique(document.output, taken),
-			data: document.bytes as Uint8Array
-		}));
+		.map((document) => ({ name: document.output, data: document.bytes as Uint8Array<ArrayBuffer> }));
 	entries.push({
 		name: MANIFEST_NAME,
 		data: new TextEncoder().encode(`${JSON.stringify(buildManifest(state), null, 2)}\n`)
