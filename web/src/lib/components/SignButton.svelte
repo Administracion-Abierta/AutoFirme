@@ -4,7 +4,7 @@
 		disabled: boolean;
 		/** Why the button is disabled — announced with the button. */
 		hint: string;
-		onsign?: () => void;
+		onsign: () => void;
 	}
 
 	let { label, disabled, hint, onsign }: Props = $props();

@@ -15,10 +15,11 @@ browser. No backend, no key material leaving the client.
 | `src/routes/` | Pages — `/` is the sign flow |
 | `src/lib/App.svelte` | Sign workflow shell (steps 1–2) |
 | `src/lib/components/` | `FileDrop`, `FileCard`, `CertPicker`, `SignButton`, `ResultCard` |
-| `src/lib/asn1.ts` | DER reader (PKCS#12 / X.509) |
+| `src/lib/asn1.ts` | DER reader and writer (PKCS#12 / X.509 / CMS) |
 | `src/lib/pkcs12.ts` | PKCS#12 container: PBES2 decryption, certificate bags |
 | `src/lib/x509.ts` | Certificate summary (subject, issuer, validity, public key) |
 | `src/lib/keystore.ts` | PIN + container → non-extractable `CryptoKey` + certificate list |
+| `src/lib/cms.ts` | CAdES-BES detached `SignedData` (WebCrypto digest + hand-built DER) |
 | `src/lib/sign.ts` | Format list and sign-flow types (the seam for #6–#11) |
 | `src/lib/c14n.ts` | Canonical XML: C14N 1.0 + Exclusive C14N |
 | `src/lib/xades.ts` | XAdES-EPES enveloped signature over an XML document |
@@ -64,6 +65,30 @@ The container is parsed in the browser — no library, no server:
 - **The PKCS#12 MAC is not verified** (the RFC 7292 B.2 KDF is not implemented). A wrong PIN is
   still detected, by the failure to decrypt the key bag. Follow-up issue material.
 
+## CAdES-BES signatures — #6
+
+`src/lib/cms.ts` builds a **detached CAdES-BES** (`SignedData`, RFC 5652) whose four signed
+attributes match the reference implementation: `contentType`, `messageDigest`, `signingTime` and
+`signingCertificateV2` (ESS, RFC 5035). SHA-256 only; RSA (`rsaEncryption`) and EC
+(`ecdsa-with-SHA256`, with WebCrypto's raw `r || s` re-encoded as a DER `SEQUENCE`) keys. The
+document is **never** embedded — the `.csig` carries its digest, so the original file must be
+kept next to it. The signature covers the whole `SET OF` signed attributes, and the digest and
+signature come from `crypto.subtle`.
+
+Cross-check (the oracle is OpenSSL, not our own code):
+
+```bash
+openssl cms -verify -inform DER -in contrato.pdf.csig -content contrato.pdf \
+  -CAfile ca.pem -purpose any -binary
+```
+
+`-binary` matters: without it `openssl cms` applies S/MIME line-ending canonicalisation and
+every signature of a file containing a newline would be reported as a content failure.
+`src/lib/cms.test.ts` runs that command (plus `-cades` to force the ESS check) over freshly
+generated RSA and EC containers, and compares the attribute set with the committed vector in
+`src/test/fixtures/cades/` — a `.csig` generated once by `openssl cms -sign -cades -md sha256
+-binary` (its signing key is not committed).
+
 ## XAdES support (no dependencies) — #7
 
 XML documents are signed with an **enveloped XAdES-EPES** signature, entirely in the browser
@@ -94,6 +119,6 @@ and long-term validation (XAdES-T/XL).
 
 ## Status
 
-Document selection, PKCS#12 certificate loading (#5) and XAdES-EPES XML signing (#7) work.
-Signing engines follow in #6 (CAdES) and #11 (PAdES); CAdES and PAdES buttons are marked
-"pendiente" and report that the format is unavailable.
+Document selection, PKCS#12 certificate loading (#5), CAdES-BES signing (#6) and XAdES-EPES XML
+signing (#7) work. PAdES follows in #11 and its button is marked "pendiente"; the `.csig` embeds
+only the signer certificate, not its chain.
