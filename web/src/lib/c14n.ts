@@ -1,0 +1,169 @@
+/**
+ * Canonical XML — C14N 1.0 (`http://www.w3.org/TR/2001/REC-xml-c14n-20010315`) and Exclusive C14N
+ * (`http://www.w3.org/2001/10/xml-exc-c14n#`), over DOM nodes.
+ *
+ * This is what AutoFirma delegates to Apache Santuario; #7 needs it in the browser, so it is
+ * written here from the W3C spec: UTF-8, no XML declaration/doctype, comments dropped (unless
+ * asked), namespace declarations first (default then by prefix), attributes sorted by
+ * (namespace URI, local name), text escaped for `& < >` and CR, empty elements written `<a></a>`.
+ *
+ * Scope, deliberately: one subtree node-set (an element and its descendants) — the only node-set
+ * the XMLDSig transforms of #7 produce.
+ */
+
+import type { Bytes } from './asn1';
+
+export const C14N_1_0 = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
+export const EXC_C14N = 'http://www.w3.org/2001/10/xml-exc-c14n#';
+export const ENVELOPED_SIGNATURE = 'http://www.w3.org/2000/09/xmldsig#enveloped-signature';
+
+export interface C14nOptions {
+	/** Exclusive C14N instead of inclusive C14N 1.0 (default). */
+	exclusive?: boolean;
+	/** Exclusive C14N `InclusiveNamespaces` PrefixList; `#default` means the default namespace. */
+	inclusivePrefixes?: readonly string[];
+	/** Keep comments — XMLDSig digests drop them, so this defaults to false. */
+	withComments?: boolean;
+}
+
+const ELEMENT = 1;
+const TEXT = 3;
+const CDATA = 4;
+const PI = 7;
+const COMMENT = 8;
+const DOCUMENT = 9;
+
+function escapeText(value: string): string {
+	return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\r/g, '&#xD;');
+}
+
+function escapeAttribute(value: string): string {
+	return value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/"/g, '&quot;')
+		.replace(/\t/g, '&#x9;')
+		.replace(/\n/g, '&#xA;')
+		.replace(/\r/g, '&#xD;');
+}
+
+/** Namespaces in scope at `element`, the document ancestors included (nearest declaration wins). */
+function inScope(element: Element): Map<string, string> {
+	const ancestors: Element[] = [];
+	for (let node: Node | null = element; node !== null && node.nodeType === ELEMENT; node = node.parentNode) {
+		ancestors.push(node as Element);
+	}
+	const scope = new Map<string, string>();
+	for (let i = ancestors.length - 1; i >= 0; i--) {
+		for (const attribute of ancestors[i].attributes) {
+			if (attribute.name === 'xmlns') scope.set('', attribute.value);
+			else if (attribute.prefix === 'xmlns') scope.set(attribute.localName, attribute.value);
+		}
+	}
+	return scope;
+}
+
+/**
+ * `ancestorScope` are the namespaces in scope at the parent (all of them when the parent is in the
+ * node-set), `rendered` the declarations already written — C14N 1.0 compares against the ancestor's
+ * namespace nodes, Exclusive C14N against the output so far.
+ */
+function writeElement(
+	element: Element,
+	out: string[],
+	options: C14nOptions,
+	ancestorScope: Map<string, string>,
+	rendered: Map<string, string>
+): void {
+	const scope = inScope(element);
+	const name = element.tagName;
+	const above = (prefix: string) =>
+		options.exclusive ? rendered.get(prefix) : ancestorScope.get(prefix);
+
+	// Which prefixes this element has to declare: every namespace in scope (inclusive) or only the
+	// visibly utilized ones (exclusive: the element's own prefix + its attributes' prefixes).
+	const wanted = new Set<string>(options.exclusive ? (options.inclusivePrefixes ?? []) : scope.keys());
+	if (options.exclusive) {
+		const own = element.prefix ?? '';
+		if (own === '' ? (scope.get('') ?? '') !== '' : scope.has(own)) wanted.add(own);
+		for (const attribute of element.attributes) {
+			if (attribute.name === 'xmlns' || attribute.prefix === 'xmlns') continue;
+			if (attribute.prefix) wanted.add(attribute.prefix);
+			else if ((scope.get('') ?? '') !== '') wanted.add('');
+		}
+	}
+
+	const declarations: Array<[string, string]> = [];
+	for (const prefix of wanted) {
+		const wantedPrefix = prefix === '#default' ? '' : prefix;
+		const uri = scope.get(wantedPrefix) ?? '';
+		// An empty URI is "no namespace": nothing to declare, only to undo (below).
+		if (uri === '' || above(wantedPrefix) === uri) continue;
+		declarations.push([wantedPrefix, uri]);
+	}
+	// This element left the default namespace: it has to say so. Exclusive C14N only for unprefixed
+	// elements (a prefixed one is in a namespace of its own).
+	const defaultNamespaceLeft =
+		(scope.get('') ?? '') === '' && (above('') ?? '') !== '' && (!options.exclusive || !element.prefix);
+	if (defaultNamespaceLeft) declarations.push(['', '']);
+	declarations.sort((a, b) => (a[0] === '' || b[0] === '' ? (a[0] === b[0] ? 0 : a[0] === '' ? -1 : 1) : a[0] < b[0] ? -1 : 1));
+	for (const [prefix, uri] of declarations) rendered.set(prefix, uri);
+
+	const attributes = [...element.attributes]
+		.filter((attribute) => !(attribute.name === 'xmlns' || attribute.prefix === 'xmlns'))
+		.map((attribute) => ({
+			uri: attribute.namespaceURI ?? '',
+			local: attribute.localName,
+			name: attribute.prefix ? `${attribute.prefix}:${attribute.localName}` : attribute.localName,
+			value: attribute.value
+		}))
+		.sort((a, b) => (a.uri === b.uri ? (a.local < b.local ? -1 : a.local > b.local ? 1 : 0) : a.uri < b.uri ? -1 : 1));
+
+	out.push(`<${name}`);
+	for (const [prefix, uri] of declarations) {
+		out.push(prefix === '' ? ` xmlns="${escapeAttribute(uri)}"` : ` xmlns:${prefix}="${escapeAttribute(uri)}"`);
+	}
+	for (const attribute of attributes) out.push(` ${attribute.name}="${escapeAttribute(attribute.value)}"`);
+	out.push('>');
+
+	const children = element.childNodes;
+	for (let i = 0; i < children.length; i++) {
+		const child = children[i];
+		switch (child.nodeType) {
+			case ELEMENT:
+				writeElement(child as Element, out, options, scope, rendered);
+				break;
+			case TEXT:
+			case CDATA: {
+				// Adjacent text and CDATA nodes are one text node in the canonical form.
+				let text = '';
+				while (i < children.length && (children[i].nodeType === TEXT || children[i].nodeType === CDATA)) {
+					text += children[i].nodeValue ?? '';
+					i++;
+				}
+				i--;
+				out.push(escapeText(text));
+				break;
+			}
+			case COMMENT:
+				if (options.withComments) out.push(`<!--${(child.nodeValue ?? '').replace(/\r/g, '&#xD;')}-->`);
+				break;
+			case PI:
+				out.push(`<?${(child as ProcessingInstruction).target} ${(child.nodeValue ?? '').trim()}?>`);
+				break;
+		}
+	}
+
+	out.push(`</${name}>`);
+}
+
+/** Canonicalize one element subtree (or a whole document), UTF-8 encoded. */
+export function canonicalize(node: Node, options: C14nOptions = {}): Bytes {
+	const root = node.nodeType === DOCUMENT ? (node as Document).documentElement : node;
+	if (root === null || root.nodeType !== ELEMENT) {
+		throw new Error('c14n: expected a document or element node');
+	}
+	const out: string[] = [];
+	writeElement(root as Element, out, options, new Map(), new Map());
+	return new TextEncoder().encode(out.join(''));
+}

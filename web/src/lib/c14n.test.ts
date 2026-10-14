@@ -1,0 +1,89 @@
+/**
+ * Canonicalization golden vectors.
+ *
+ * The expected strings were produced by `lxml` (`method="c14n"`, `exclusive=True`,
+ * `with_comments=False`) — an implementation independent of this one. The cross-check against a
+ * real XMLDSig implementation (`xmlsec1`) lives in `xades.test.ts`, where the canonicalization is
+ * verified through the digests it recomputes.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { canonicalize } from './c14n';
+
+function parse(xml: string): Document {
+	const doc = new DOMParser().parseFromString(xml, 'application/xml');
+	if (doc.getElementsByTagName('parsererror').length !== 0) throw new Error(`bad fixture: ${xml}`);
+	return doc;
+}
+
+function c14n(xml: string, exclusive = false): string {
+	return new TextDecoder().decode(canonicalize(parse(xml), { exclusive }));
+}
+
+const VECTORS: Array<{ name: string; xml: string; inclusive: string; exclusive: string }> = [
+	{
+		name: 'namespace first, attributes sorted by name',
+		xml: '<a xmlns:x="urn:x" b="2" a="1"><x:c/>t</a>',
+		inclusive: '<a xmlns:x="urn:x" a="1" b="2"><x:c></x:c>t</a>',
+		exclusive: '<a a="1" b="2"><x:c xmlns:x="urn:x"></x:c>t</a>'
+	},
+	{
+		name: 'unused prefixes dropped by exclusive c14n, processing instruction kept',
+		xml: '<a xmlns="urn:d" xmlns:p="urn:p"><p:b><c/></p:b><!-- c --><?pi hi?></a>',
+		inclusive: '<a xmlns="urn:d" xmlns:p="urn:p"><p:b><c></c></p:b><?pi hi?></a>',
+		exclusive: '<a xmlns="urn:d"><p:b xmlns:p="urn:p"><c></c></p:b><?pi hi?></a>'
+	},
+	{
+		name: 'default namespace declared, undone and re-declared on a descendant',
+		xml: '<r:r xmlns:r="urn:r" xmlns="urn:d"><e xmlns=""><f/></e><g>a&amp;b&lt;c&gt;d</g></r:r>',
+		inclusive:
+			'<r:r xmlns="urn:d" xmlns:r="urn:r"><e xmlns=""><f></f></e><g>a&amp;b&lt;c&gt;d</g></r:r>',
+		exclusive: '<r:r xmlns:r="urn:r"><e><f></f></e><g xmlns="urn:d">a&amp;b&lt;c&gt;d</g></r:r>'
+	},
+	{
+		name: 'attribute and text escaping, CR as a character reference',
+		xml: '<a xmlns:x="urn:x" xmlns:y="urn:y" z="&#9;&#10;&#13;&quot;&apos;&amp;">x&#13;y</a>',
+		inclusive: '<a xmlns:x="urn:x" xmlns:y="urn:y" z="&#x9;&#xA;&#xD;&quot;\'&amp;">x&#xD;y</a>',
+		exclusive: '<a z="&#x9;&#xA;&#xD;&quot;\'&amp;">x&#xD;y</a>'
+	}
+];
+
+describe('canonicalize', () => {
+	for (const vector of VECTORS) {
+		it(`matches lxml — ${vector.name}`, () => {
+			expect(c14n(vector.xml)).toBe(vector.inclusive);
+			expect(c14n(vector.xml, true)).toBe(vector.exclusive);
+		});
+	}
+
+	it('renders the namespaces in scope of a subtree apex (inclusive) and only the used ones (exclusive)', () => {
+		const doc = parse('<r xmlns="urn:d" xmlns:p="urn:p"><x><p:y/></x></r>');
+		const apex = doc.documentElement.firstElementChild!;
+		expect(new TextDecoder().decode(canonicalize(apex))).toBe(
+			'<x xmlns="urn:d" xmlns:p="urn:p"><p:y></p:y></x>'
+		);
+		expect(new TextDecoder().decode(canonicalize(apex, { exclusive: true }))).toBe(
+			'<x xmlns="urn:d"><p:y xmlns:p="urn:p"></p:y></x>'
+		);
+	});
+
+	it('keeps comments only when asked, and canonicalizes a whole Document', () => {
+		const doc = parse('<a><!-- note --><b/></a>');
+		expect(new TextDecoder().decode(canonicalize(doc))).toBe('<a><b></b></a>');
+		expect(new TextDecoder().decode(canonicalize(doc, { withComments: true }))).toBe(
+			'<a><!-- note --><b></b></a>'
+		);
+	});
+
+	it('honours the exclusive InclusiveNamespaces prefix list', () => {
+		expect(c14n('<a xmlns:x="urn:x" xmlns:y="urn:y" b="1"/>', true)).toBe('<a b="1"></a>');
+		expect(
+			new TextDecoder().decode(
+				canonicalize(parse('<a xmlns:x="urn:x" xmlns:y="urn:y" b="1"/>'), {
+					exclusive: true,
+					inclusivePrefixes: ['x', '#default']
+				})
+			)
+		).toBe('<a xmlns:x="urn:x" b="1"></a>');
+	});
+});
