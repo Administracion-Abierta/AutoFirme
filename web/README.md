@@ -68,6 +68,15 @@ produced PDF and verifies them with **openssl**, i.e. not with the signing code:
 pnpm test        # golden fixture + RSA/ECDSA/visible signature, verified by `openssl cms -verify`
 ```
 
+The signed output is also accepted by third-party tools (run against the committed fixture and
+against freshly signed RSA, ECDSA P-256/P-384 and visible variants):
+
+```bash
+pdfsig -nocert test/fixtures/pades-b-b-signed.pdf   # "Total document signed" + "Signature is Valid."
+qpdf --check test/fixtures/pades-b-b-signed.pdf     # exit 0, "No syntax or stream encoding errors"
+pdftoppm -r 108 -png test/fixtures/pades-b-b-signed.pdf page   # page content still renders
+```
+
 `test/fixtures/` holds a one-page source PDF, a self-signed **test-only** RSA and EC key pair, and
 the committed signed golden PDF. Regenerate the golden file after an intentional format change with
 `PADES_WRITE_FIXTURE=1 pnpm test` (RSA PKCS#1 v1.5 plus a fixed signing time make the output
