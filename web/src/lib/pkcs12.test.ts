@@ -133,4 +133,12 @@ describe('PKCS#12 loading', () => {
 		const signature = await signBytes(session.signer, new TextEncoder().encode('EC'));
 		expect(signature.length).toBe(64); // raw r||s, IEEE P1363
 	});
+
+	it('gives every certificate a unique id, even when serials collide', async () => {
+		const session = await loadSignerSession(fixtures.dupSerial, FIXTURE_PIN);
+		expect(session.certificates).toHaveLength(2);
+		// Serials are only unique per issuer (RFC 5280). The picker's keyed list throws on
+		// duplicate keys, so the certificate id must not be the serial alone.
+		expect(new Set(session.certificates.map((certificate) => certificate.id)).size).toBe(2);
+	});
 });

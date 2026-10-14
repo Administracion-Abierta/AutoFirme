@@ -38,7 +38,7 @@ export interface SigningAlgorithm {
 
 /** One certificate of a PKCS#12 container, ready for the picker and for the sign flow. */
 export interface SignerCert {
-	/** Certificate serial number, hex — stable identifier inside the container. */
+	/** Unique inside the container (position + serial hex) — the picker's list key. */
 	id: string;
 	commonName: string;
 	subject: string;

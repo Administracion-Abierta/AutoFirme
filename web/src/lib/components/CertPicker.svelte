@@ -3,6 +3,7 @@
 	import { loadSignerSession } from '#lib/keystore';
 	import { Pkcs12Error } from '#lib/pkcs12';
 	import type { SignerCert } from '#lib/sign';
+	import { onDestroy } from 'svelte';
 
 	interface Props {
 		copy: Copy;
@@ -18,26 +19,37 @@
 	let certs = $state<SignerCert[]>([]);
 	let error = $state('');
 	let loading = $state(false);
+	/** Bumped whenever the picked file changes; a load holding an older id is discarded. */
+	let loadId = 0;
+	// Unmounting (the last document was removed, or the mode changed) invalidates an in-flight
+	// load, so it cannot push the old container's signer back into the app after the selection was dropped.
+	onDestroy(() => {
+		loadId += 1;
+	});
 
 	const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
 	async function load() {
-		if (!file) return;
+		const picked = file;
+		if (!picked) return;
+		const id = loadId;
 		error = '';
 		loading = true;
 		certs = [];
 		onpick(null, []);
 		try {
-			const session = await loadSignerSession(new Uint8Array(await file.arrayBuffer()), pin);
+			const session = await loadSignerSession(new Uint8Array(await picked.arrayBuffer()), pin);
+			if (id !== loadId) return; // another file was picked while this load ran
 			certs = session.certificates;
 			// The container's own key decides the default; other certificates stay selectable but
 			// cannot sign (no key), so they are disabled in the list.
 			onpick(session.signer, session.certificates);
 			pin = ''; // the key is imported now; the PIN is no longer needed in memory
 		} catch (reason) {
+			if (id !== loadId) return;
 			error = copy.certErrors[reason instanceof Pkcs12Error ? reason.code : 'unknown'];
 		} finally {
-			loading = false;
+			if (id === loadId) loading = false;
 		}
 	}
 </script>
@@ -54,6 +66,8 @@
 		onchange={(event) => {
 			// A different file invalidates whatever was loaded from the previous one.
 			file = event.currentTarget.files?.[0] ?? null;
+			loadId += 1;
+			loading = false;
 			certs = [];
 			error = '';
 			onpick(null, []);
@@ -106,6 +120,9 @@
 		{#if cert}
 			<p class="text-sm opacity-70">{cert.subject}</p>
 			<p class="text-sm opacity-70">{copy.certIssuer}: {cert.issuer}</p>
+			<p class="text-sm opacity-70">
+				{copy.certValidFrom}: {dateFormat.format(cert.notBefore)}
+			</p>
 			<p class="text-sm opacity-70">
 				{copy.certValidity}: {dateFormat.format(cert.notAfter)}
 			</p>

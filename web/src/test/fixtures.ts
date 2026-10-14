@@ -26,6 +26,8 @@ export interface Pkcs12Fixtures {
 	legacy: Bytes;
 	/** Self-signed EC P-256 container. */
 	ec: Bytes;
+	/** Two self-signed certificates that share one serial number. */
+	dupSerial: Bytes;
 }
 
 function openssl(args: string[], cwd: string): string {
@@ -98,6 +100,30 @@ export function createPkcs12Fixtures(): Pkcs12Fixtures {
 		],
 		dir
 	);
+	// Two self-signed certificates sharing one serial number (RFC 5280 only requires serials
+	// to be unique per issuer) — the picker's keyed list must not crash on them.
+	openssl(
+		[
+			'req', '-x509', '-key', 'leaf.key', '-out', 'dupa.pem', '-days', '365', '-sha256',
+			'-set_serial', '0x01', '-subj', '/C=ES/O=AutoFirme/CN=Dup Serial Uno'
+		],
+		dir
+	);
+	openssl(
+		[
+			'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', 'dupb.key', '-out', 'dupb.pem',
+			'-days', '365', '-sha256', '-set_serial', '0x01', '-subj', '/C=ES/O=AutoFirme/CN=Dup Serial Dos'
+		],
+		dir
+	);
+	openssl(
+		[
+			...exportArgs('dup.p12', 'leaf.key', 'dupa.pem'),
+			'-certfile', 'dupb.pem', '-keypbe', 'AES-256-CBC', '-certpbe', 'AES-256-CBC',
+			'-macalg', 'sha256'
+		],
+		dir
+	);
 
 	openssl(['x509', '-in', 'leaf.pem', '-pubkey', '-noout', '-out', 'leaf.pub.pem'], dir);
 
@@ -105,6 +131,7 @@ export function createPkcs12Fixtures(): Pkcs12Fixtures {
 		dir,
 		modern: new Uint8Array(readFileSync(join(dir, 'modern.p12'))),
 		legacy: new Uint8Array(readFileSync(join(dir, 'legacy.p12'))),
+		dupSerial: new Uint8Array(readFileSync(join(dir, 'dup.p12'))),
 		ec: new Uint8Array(readFileSync(join(dir, 'ec.p12'))),
 		leafPublicKeyPem: readFileSync(join(dir, 'leaf.pub.pem'), 'utf8'),
 		...readDates(dir)

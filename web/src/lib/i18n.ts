@@ -31,6 +31,7 @@ export interface Copy {
 	certNotYetValid: string;
 	certIssuer: string;
 	certValidity: string;
+	certValidFrom: string;
 	certErrors: Record<Pkcs12ErrorCode | 'unknown', string>;
 	formatTitle: string;
 	pendingIssue: string;
@@ -91,6 +92,7 @@ export const copy: Record<Lang, Copy> = {
 		certNotYetValid: 'Este certificado aún no es válido.',
 		certIssuer: 'Emitido por',
 		certValidity: 'Válido hasta',
+		certValidFrom: 'Válido desde',
 		certErrors: {
 			'wrong-pin': 'PIN incorrecto.',
 			'not-pkcs12': 'El fichero no es un PKCS#12 válido.',
@@ -174,6 +176,7 @@ export const copy: Record<Lang, Copy> = {
 		certNotYetValid: 'This certificate is not valid yet.',
 		certIssuer: 'Issued by',
 		certValidity: 'Valid until',
+		certValidFrom: 'Valid from',
 		certErrors: {
 			'wrong-pin': 'Wrong PIN.',
 			'not-pkcs12': 'The file is not a valid PKCS#12 container.',

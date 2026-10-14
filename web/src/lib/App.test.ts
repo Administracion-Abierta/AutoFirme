@@ -3,7 +3,9 @@ import { readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import App from './App.svelte';
+import * as keystore from '#lib/keystore';
 import {
 	createPkcs12Fixtures,
 	writeFixtureFile,
@@ -133,6 +135,7 @@ describe('App (sign workflow shell)', () => {
 
 		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
 		expect(container.textContent).toContain(`CN=${LEAF_COMMON_NAME}, O=AutoFirme, C=ES`);
+		expect(container.textContent).toContain('Válido desde');
 		// The chain certificate of the file is listed but cannot sign.
 		expect(container.textContent).toContain('AutoFirme Test CA (sin clave privada)');
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
@@ -242,6 +245,76 @@ describe('App (sign workflow shell)', () => {
 		// The leaf fixture is self-signed, so it is its own trust anchor.
 		const path = writeFixtureFile(fixtures.dir, 'ui.xsig', new Uint8Array(xsig));
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toMatch(/status: OK/);
+	});
+
+	it('discards a load that finishes after another keystore file is picked', async () => {
+		const loadSpy = vi.spyOn(keystore, 'loadSignerSession');
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+
+		// Start the load without awaiting it, then supersede the file while it is in flight.
+		fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
+			target: { files: [new File([fixtures.ec], 'other.p12')] }
+		});
+
+		// Await the superseded load itself and the render it triggers, so the assertions cannot race it.
+		await vi.waitFor(() => expect(loadSpy).toHaveBeenCalledOnce());
+		await loadSpy.mock.results[0].value;
+		await tick();
+
+		expect(container.querySelector<HTMLSelectElement>('#cert-picker')?.value).toBe('');
+		expect(container.textContent).not.toContain(LEAF_COMMON_NAME);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+	});
+
+	it('disables signing when the document is removed after a certificate was loaded', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'otro.pdf', { type: 'application/pdf' })] }
+		});
+
+		// The picker starts over empty, so the stale signer must not keep signing alive.
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+		expect(container.querySelector<HTMLSelectElement>('#cert-picker')?.value).toBe('');
+		expect(container.textContent).not.toContain('Emitido por');
+	});
+
+	it('does not resurrect the signer when the document is removed while a load runs', async () => {
+		const original = keystore.loadSignerSession;
+		let release!: () => void;
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		vi.spyOn(keystore, 'loadSignerSession').mockImplementation(async (bytes, pin, options) => {
+			await gate;
+			return original(bytes, pin, options);
+		});
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await vi.waitFor(() => expect(vi.mocked(keystore.loadSignerSession)).toHaveBeenCalledOnce());
+
+		// The document is removed while the keystore is still being parsed.
+		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
+		release();
+		await vi.mocked(keystore.loadSignerSession).mock.results[0].value;
+		await tick();
+
+		// A new document arrives: nothing was loaded for it, so signing must stay off.
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'otro.pdf', { type: 'application/pdf' })] }
+		});
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+		expect(container.querySelector<HTMLSelectElement>('#cert-picker')?.value).toBe('');
+		expect(container.textContent).not.toContain('Emitido por');
 	});
 });
 

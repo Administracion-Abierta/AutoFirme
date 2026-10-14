@@ -184,7 +184,15 @@
 								<FileCard
 									copy={t}
 									file={toSelectedFile(file)}
-									onremove={() => (files = files.filter((_, position) => position !== index))}
+									onremove={() => {
+										files = files.filter((_, position) => position !== index);
+										// Dropping the last document unmounts the picker (#5): the selection goes
+										// with it, so a later document cannot be signed by the removed batch's key.
+										if (files.length === 0) {
+											cert = null;
+											chain = [];
+										}
+									}}
 								/>
 							</li>
 						{/each}
