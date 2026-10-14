@@ -1,0 +1,5 @@
+FACTURA AUTOFIRME WEB DE PRUEBA
+Numero: FA-2026-0042
+Fecha: 2026-01-15
+Importe: 9234.56 EUR
+Emisor: AutoFirma Web, S.A.
