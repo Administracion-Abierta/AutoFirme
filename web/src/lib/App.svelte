@@ -1,47 +1,72 @@
 <script lang="ts">
 	import { copy, type Copy, type Lang } from '#lib/i18n';
+	import { createBatchQueue, type BatchSigner } from '#lib/batch';
+	import { signCadesDetached } from '#lib/cms';
 	import {
 		SIGN_FORMATS,
-		download,
+		signingAlgorithmName,
 		toSelectedFile,
 		type SelectedFile,
 		type SignFormat,
-		type SignResult,
 		type SignerCert
 	} from '#lib/sign';
 	import { signXades } from '#lib/xades';
-	import { signCadesDetached } from '#lib/cms';
 	import { verifyArtifact, type Bytes, type VerificationReport } from '#lib/verify';
-	import FileDrop from '#lib/components/FileDrop.svelte';
-	import FileCard from '#lib/components/FileCard.svelte';
+	import BatchQueue from '#lib/components/BatchQueue.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
-	import SignButton from '#lib/components/SignButton.svelte';
-	import ResultCard from '#lib/components/ResultCard.svelte';
+	import FileCard from '#lib/components/FileCard.svelte';
+	import FileDrop from '#lib/components/FileDrop.svelte';
 	import VerifyReport from '#lib/components/VerifyReport.svelte';
 
 	let lang = $state<Lang>('es');
 	const t = $derived<Copy>(copy[lang]);
 	let mode = $state<'sign' | 'verify'>('sign');
 
-	let file = $state<SelectedFile | null>(null);
+	let files = $state<File[]>([]);
 	let format = $state<SignFormat>('cades');
 	// Only the certificate that owns the container's private key can sign.
 	let cert = $state<SignerCert | null>(null);
 	// Full container chain of the loaded PKCS#12 (#5) — the KeyInfo of the signature embeds it.
 	let chain = $state<readonly SignerCert[]>([]);
-	let result = $state<SignResult | null>(null);
-	let signing = $state(false);
 
-	const selected = $derived(SIGN_FORMATS.find((option) => option.id === format)!);
-	const canSign = $derived(file !== null && cert?.key != null && selected.implemented && !signing);
+	const queue = createBatchQueue();
+	$effect(() => queue.set(files, format));
+
+	/** Format engines (#6 CAdES, #7 XAdES, #11 PAdES) plug in here; the queue never looks inside. */
+	function makeSigner(certificate: SignerCert | null, kind: SignFormat): BatchSigner | null {
+		if (!certificate?.key || !certificate.algorithm) return null;
+		const algorithm = signingAlgorithmName(certificate);
+		if (kind === 'cades') {
+			return async (_file, bytes) => ({
+				bytes: await signCadesDetached(certificate, bytes),
+				algorithm
+			});
+		}
+		if (kind === 'xades') {
+			return async (file, bytes) => ({
+				bytes: new TextEncoder().encode(
+					await signXades({
+						xml: bytes,
+						certificates: chain,
+						signer: certificate,
+						dataObject: { mimeType: file.type || 'application/xml' }
+					})
+				),
+				algorithm
+			});
+		}
+		return null;
+	}
+
+	const signer = $derived(makeSigner(cert, format));
 	const signHint = $derived(
-		file === null
+		files.length === 0
 			? t.signNeedsFile
 			: cert === null
 				? t.signNeedsCert
-				: selected.implemented
-					? ''
-					: t.signUnsupported
+				: signer === null
+					? t.signPendingFormat
+					: ''
 	);
 
 	let verifyFile = $state<SelectedFile | null>(null);
@@ -65,61 +90,23 @@
 		}
 	}
 
-	async function pickSignature(picked: File) {
-		verifyBytes = new Uint8Array(await picked.arrayBuffer());
-		verifyFile = toSelectedFile(picked);
+	async function pickSignature(picked: File[]) {
+		const file = picked[0];
+		if (!file) return;
+		verifyBytes = new Uint8Array(await file.arrayBuffer());
+		verifyFile = toSelectedFile(file);
 		detachedFile = null;
 		detachedBytes = null;
 		report = null;
 		await runVerify();
 	}
 
-	async function pickDocument(picked: File) {
-		detachedBytes = new Uint8Array(await picked.arrayBuffer());
-		detachedFile = toSelectedFile(picked);
+	async function pickDocument(picked: File[]) {
+		const file = picked[0];
+		if (!file) return;
+		detachedBytes = new Uint8Array(await file.arrayBuffer());
+		detachedFile = toSelectedFile(file);
 		await runVerify();
-	}
-
-	function clearFile() {
-		file = null;
-		result = null;
-	}
-
-	/** Sign the picked document with the chosen format; keys never leave the page. */
-	async function sign() {
-		if (!file || !cert) return;
-		result = null;
-		if (!selected.implemented) {
-			result = { ok: false, message: t.signUnsupported };
-			return;
-		}
-		signing = true;
-		try {
-			const bytes = new Uint8Array(await file.source.arrayBuffer());
-			if (format === 'xades') {
-				const xsig = await signXades({
-					xml: bytes,
-					certificates: chain,
-					signer: cert,
-					dataObject: { mimeType: file.source.type || 'application/xml' }
-				});
-				download(`${file.name}${selected.extension}`, xsig, 'application/xml');
-			} else {
-				download(
-					`${file.name}${selected.extension}`,
-					await signCadesDetached(cert, bytes),
-					'application/octet-stream'
-				);
-			}
-			result = { ok: true, message: t.signDone };
-		} catch (reason) {
-			result = {
-				ok: false,
-				message: `${t.signFailed} ${reason instanceof Error ? reason.message : ''}`.trim()
-			};
-		} finally {
-			signing = false;
-		}
 	}
 
 	function clearVerification() {
@@ -189,19 +176,23 @@
 			<div id="panel-sign" role="tabpanel" aria-label={t.modeSign} class="flex flex-col gap-8">
 			<section class="flex flex-col gap-3">
 				<h2 class="text-lg font-semibold">{t.step1Title}</h2>
-				{#if file === null}
-					<FileDrop
-						copy={t}
-						onselect={(picked) => {
-							file = toSelectedFile(picked);
-						}}
-					/>
-				{:else}
-					<FileCard copy={t} {file} onremove={clearFile} />
+				<FileDrop copy={t} onselect={(picked) => (files = [...files, ...picked])} />
+				{#if files.length > 0}
+					<ul class="flex flex-col gap-2">
+						{#each files as file, index (index)}
+							<li>
+								<FileCard
+									copy={t}
+									file={toSelectedFile(file)}
+									onremove={() => (files = files.filter((_, position) => position !== index))}
+								/>
+							</li>
+						{/each}
+					</ul>
 				{/if}
 			</section>
 
-			{#if file !== null}
+			{#if files.length > 0}
 				<section class="flex flex-col gap-5">
 					<h2 class="text-lg font-semibold">{t.step2Title}</h2>
 
@@ -211,7 +202,6 @@
 						onpick={(picked, certificates) => {
 							cert = picked;
 							chain = certificates;
-							result = null;
 						}}
 					/>
 
@@ -237,14 +227,7 @@
 						{/each}
 					</fieldset>
 
-					<SignButton
-						label={t.signButton}
-						disabled={!canSign}
-						hint={signHint}
-						onsign={sign}
-					/>
-
-					<ResultCard copy={t} {result} />
+					<BatchQueue copy={t} {queue} {signer} hint={signHint} />
 				</section>
 			{/if}
 			</div>

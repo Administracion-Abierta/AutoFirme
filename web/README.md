@@ -14,7 +14,7 @@ browser. No backend, no key material leaving the client.
 |---|---|
 | `src/routes/` | Pages — `/` is the sign flow |
 | `src/lib/App.svelte` | Sign workflow shell (steps 1–2) and verify workflow |
-| `src/lib/components/` | `FileDrop`, `FileCard`, `CertPicker`, `SignButton`, `ResultCard`, `VerifyReport` |
+| `src/lib/components/` | `FileDrop`, `FileCard`, `CertPicker`, `BatchQueue`, `VerifyReport` |
 | `src/lib/asn1.ts` | DER reader and writer (PKCS#12 / X.509 / CMS) |
 | `src/lib/pkcs12.ts` | PKCS#12 container: PBES2 decryption, certificate bags |
 | `src/lib/x509.ts` | Certificate summary (subject, issuer, validity, public key) |
@@ -23,6 +23,8 @@ browser. No backend, no key material leaving the client.
 | `src/lib/sign.ts` | Format list and sign-flow types (the seam for #6–#11) |
 | `src/lib/c14n.ts` | Canonical XML: C14N 1.0 + Exclusive C14N |
 | `src/lib/xades.ts` | XAdES-EPES enveloped signature over an XML document |
+| `src/lib/batch.ts` | Batch queue state machine, manifest and ZIP assembly (engine-agnostic) |
+| `src/lib/zip.ts` | ZIP writer (STORE entries, CRC-32) — no dependency, verified by `unzip -t` |
 | `src/lib/verify/` | Verification engine: DER/X.509/CMS, canonicalization, XMLDSig/XAdES |
 | `scripts/fetch-roots.sh` | Refreshes the bundled FNMT trust anchor from fnmt.es (checks subject + fingerprint) |
 | `test/fixtures/` | Valid/tampered CAdES + XAdES samples, their generator and cross-check script |
@@ -41,6 +43,7 @@ pnpm build        # static output in build/
 pnpm preview      # serve build/ locally
 pnpm test         # vitest smoke test (mounts App)
 pnpm check        # svelte-check + tsc
+pnpm verify:zip   # cross-check a batch ZIP with unzip -t and sha256sum
 ```
 
 ## Verify flow (issue #8)
@@ -123,7 +126,8 @@ generated RSA and EC containers, and compares the attribute set with the committ
 ## XAdES support (no dependencies) — #7
 
 XML documents are signed with an **enveloped XAdES-EPES** signature, entirely in the browser
-(`src/lib/c14n.ts` + `src/lib/xades.ts`), and downloaded as a `<name>.xsig` file:
+(`src/lib/c14n.ts` + `src/lib/xades.ts`), and shipped as a `<name>.xsig` entry of the batch ZIP
+(#9):
 
 - **Canonicalization** is implemented here from the W3C specs: **C14N 1.0**
   (`REC-xml-c14n-20010315`) and **Exclusive C14N** (`xml-exc-c14n#`), which is what all the
@@ -148,11 +152,33 @@ Not in scope: browser-side *verification* of signatures, inclusive-c14n `Inclusi
 PrefixList on the transforms (supported by the canonicalizer, unused by the profile), timestamps
 and long-term validation (XAdES-T/XL).
 
+## Batch signing queue — #9
+
+N documents can be dropped at once; they become a queue (`src/lib/batch.ts`) signed **one at a
+time** with the chosen certificate, so the UI thread stays free between files and nothing is
+uploaded. Each document carries its own status (`pending` / `signing` / `signed` / `error`):
+
+- **Resumable**: a document that fails is recorded as `error` with the engine's message and the
+  run continues; the next run only retries what is not signed yet.
+- Replacing the document list mid-run abandons that run instead of writing results against the
+  new list.
+- A run ends in one ZIP (`src/lib/zip.ts`, STORE entries, hand-written CRC-32) with every signed
+  document plus `manifest.json`: `signbatch` (`format`, `suboperation`, `algorithm`) and one
+  `singlesigns` entry per document with `id`, `datareference`, `format`, `suboperation`, `result`
+  (`BatchDataResult.Result` names: `NOT_STARTED` / `DONE_AND_SAVED` / `ERROR_PRE`), `description`
+  on failure, plus `sha256`, `timestamp` and `output` as the issue asks.
+
+Cross-checks: `src/lib/batch.test.ts` verifies each queued `.csig` with `openssl cms -verify` and
+reads the archive back with an independent CRC-32 (`node:zlib`); `pnpm verify:zip` extracts a
+generated archive with Info-ZIP and re-hashes its documents.
+
 ## Status
 
 Document selection, PKCS#12 certificate loading (#5), CAdES-BES signing (#6) and XAdES-EPES XML
-signing (#7) work. PAdES follows in #11 and its button is marked "pendiente"; the `.csig` embeds
-only the signer certificate, not its chain.
+signing (#7) work, and both formats run through the batch queue (#9): drop N files, sign them
+sequentially and download one ZIP with the signed documents and `manifest.json`. PAdES follows in
+#11 and its format is marked "pendiente"; the `.csig` embeds only the signer certificate, not its
+chain.
 
 OOXML signing (#10) exists as a library (`src/lib/ooxml.ts`): it adds
 `_xmlsignatures/sig-<uuid>.xml` (XAdES v1.3.2 EPES with MDSSI `SignatureTime`), the

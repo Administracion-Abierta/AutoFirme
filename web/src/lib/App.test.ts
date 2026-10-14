@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -29,6 +30,11 @@ async function pickDocumentAndKey(container: HTMLElement) {
 	await fireEvent.change(fileInput(container), {
 		target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
 	});
+	await loadKey(container);
+}
+
+/** Fill the PKCS#12 picker with the fixture container and its PIN. */
+async function loadKey(container: HTMLElement) {
 	const keystore = container.querySelector<HTMLInputElement>('#pkcs12-file');
 	if (!keystore) throw new Error('keystore input not rendered');
 	await fireEvent.change(keystore, {
@@ -49,13 +55,20 @@ function fileInput(container: HTMLElement): HTMLInputElement {
 function captureDownloads() {
 	const blobs: Blob[] = [];
 	const names: string[] = [];
-	const createObjectURL = URL.createObjectURL;
-	const revokeObjectURL = URL.revokeObjectURL;
-	URL.createObjectURL = (blob: Blob) => {
-		blobs.push(blob);
-		return 'blob:test';
-	};
-	URL.revokeObjectURL = () => {};
+	// jsdom defines `URL.revokeObjectURL` as a read-only member, so it has to be redefined, not assigned.
+	Object.defineProperty(URL, 'createObjectURL', {
+		value: (blob: Blob) => {
+			blobs.push(blob);
+			return 'blob:test';
+		},
+		configurable: true,
+		writable: true
+	});
+	Object.defineProperty(URL, 'revokeObjectURL', {
+		value: () => {},
+		configurable: true,
+		writable: true
+	});
 	const click = vi
 		.spyOn(HTMLAnchorElement.prototype, 'click')
 		.mockImplementation(function (this: HTMLAnchorElement) {
@@ -64,11 +77,7 @@ function captureDownloads() {
 	return {
 		blobs,
 		names,
-		restore: () => {
-			URL.createObjectURL = createObjectURL;
-			URL.revokeObjectURL = revokeObjectURL;
-			click.mockRestore();
-		}
+		restore: () => click.mockRestore()
 	};
 }
 
@@ -77,7 +86,7 @@ describe('App (sign workflow shell)', () => {
 		const { container } = render(App);
 
 		expect(container.textContent).toContain('AutoFirma Web');
-		expect(container.textContent).toContain('Arrastra aquí el fichero que quieres firmar');
+		expect(container.textContent).toContain('Arrastra aquí los ficheros que quieres firmar');
 		expect(fileInput(container)).toBeInstanceOf(HTMLInputElement);
 		// Step 2 is unreachable before a document is loaded.
 		expect(screen.queryByRole('button', { name: 'Firmar' })).toBeNull();
@@ -99,7 +108,8 @@ describe('App (sign workflow shell)', () => {
 
 		expect(screen.getByRole('combobox')).toHaveProperty('disabled', true);
 		expect(container.textContent).toContain('CAdES-BES');
-		expect(container.textContent).toContain('Todavía no se ha firmado ningún documento');
+		// The queue is listed with every document still pending.
+		expect(container.querySelector('[data-status="pending"]')?.textContent).toContain('contrato.pdf');
 
 		// Removing the document returns to the drop step.
 		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
@@ -111,8 +121,8 @@ describe('App (sign workflow shell)', () => {
 
 		await fireEvent.click(screen.getByRole('button', { name: 'EN' }));
 
-		expect(container.textContent).toContain('Drag the file you want to sign here');
-		expect(container.textContent).toContain('Choose file');
+		expect(container.textContent).toContain('Drag the files you want to sign here');
+		expect(container.textContent).toContain('Choose files');
 	});
 
 	it('loads a PKCS#12 file and enables signing with the certificate it holds', async () => {
@@ -158,7 +168,45 @@ describe('App (sign workflow shell)', () => {
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
 	});
 
-	it('signs an XML document as XAdES-EPES and downloads a .xsig xmlsec1 verifies', async () => {
+	it('signs a 3-file batch with the loaded certificate and hands over one ZIP', async () => {
+		const downloaded: string[] = [];
+		vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+			this: HTMLAnchorElement
+		) {
+			downloaded.push(this.download);
+		});
+		// jsdom has no blob URLs; only their creation matters here.
+		Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:batch', configurable: true });
+		Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, configurable: true });
+
+		const { container } = render(App);
+		await fireEvent.change(fileInput(container), {
+			target: {
+				files: [
+					new File(['uno'], 'uno.txt', { type: 'text/plain' }),
+					new File(['dos'], 'dos.txt', { type: 'text/plain' }),
+					new File(['tres'], 'tres.txt', { type: 'text/plain' })
+				]
+			}
+		});
+		await loadKey(container);
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
+
+		// Every document ends signed, with its own SHA-256 shown, and the archive becomes available.
+		await waitFor(() => expect(container.textContent).toContain('Firmados: 3/3'));
+		expect(container.querySelectorAll('[data-status="signed"]')).toHaveLength(3);
+		expect(container.querySelector('[data-status="signed"]')?.textContent).toContain('uno.txt.csig');
+
+		const download = screen.getByRole('button', { name: 'Descargar ZIP' });
+		expect(download.hasAttribute('disabled')).toBe(false);
+		await fireEvent.click(download);
+		expect(downloaded).toEqual(['firmas-lote.zip']);
+	});
+
+	it('signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies', async () => {
 		const { container } = render(App);
 
 		await fireEvent.change(fileInput(container), {
@@ -168,12 +216,7 @@ describe('App (sign workflow shell)', () => {
 				})]
 			}
 		});
-		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
-			target: { files: [new File([fixtures.modern], 'keystore.p12')] }
-		});
-		await fireEvent.input(container.querySelector<HTMLInputElement>('#pkcs12-pin')!, {
-			target: { value: FIXTURE_PIN }
-		});
+		await loadKey(container);
 		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
 		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
 		await fireEvent.click(screen.getByRole('radio', { name: /XAdES-EPES/ }));
@@ -181,40 +224,24 @@ describe('App (sign workflow shell)', () => {
 		const downloads = captureDownloads();
 		try {
 			await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
-			await waitFor(() =>
-				expect(container.textContent).toContain('Documento firmado: se ha descargado el fichero.')
-			);
+			await waitFor(() => expect(container.textContent).toContain('Firmados: 1/1'));
+			await fireEvent.click(screen.getByRole('button', { name: 'Descargar ZIP' }));
 		} finally {
 			downloads.restore();
 		}
 
-		expect(downloads.names).toEqual(['facturae.xml.xsig']);
-		expect(downloads.blobs).toHaveLength(1);
-		const xsig = await downloads.blobs[0].text();
-		expect(xsig).toContain('<ds:Signature');
+		expect(downloads.names).toEqual(['firmas-lote.zip']);
+		const archive = writeFixtureFile(
+			fixtures.dir,
+			'lote.zip',
+			new Uint8Array(await downloads.blobs[0].arrayBuffer())
+		);
+		// Info-ZIP extracts the entry, so the queue's naming is checked by a tool that did not write it.
+		const xsig = execFileSync('unzip', ['-p', archive, 'facturae.xml.xsig']);
+		expect(xsig.toString()).toContain('<ds:Signature');
 		// The leaf fixture is self-signed, so it is its own trust anchor.
-		const path = writeFixtureFile(fixtures.dir, 'ui.xsig', new TextEncoder().encode(xsig));
+		const path = writeFixtureFile(fixtures.dir, 'ui.xsig', new Uint8Array(xsig));
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toMatch(/status: OK/);
-	});
-
-	it('signs the picked document as CAdES-BES and hands the .csig to the browser', async () => {
-		const { container } = render(App);
-		await pickDocumentAndKey(container);
-		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
-		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
-
-		const downloads = captureDownloads();
-		try {
-			await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
-			await waitFor(() =>
-				expect(container.textContent).toContain('Documento firmado: se ha descargado el fichero.')
-			);
-		} finally {
-			downloads.restore();
-		}
-
-		expect(downloads.names).toEqual(['contrato.pdf.csig']);
-		expect((await downloads.blobs[0].arrayBuffer()).byteLength).toBeGreaterThan(500);
 	});
 });
 
