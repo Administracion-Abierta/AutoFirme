@@ -1,8 +1,16 @@
 import { rmSync } from 'node:fs';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { join } from 'node:path';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import App from './App.svelte';
-import { createPkcs12Fixtures, FIXTURE_PIN, LEAF_COMMON_NAME, type Pkcs12Fixtures } from '../test/fixtures';
+import {
+	createPkcs12Fixtures,
+	writeFixtureFile,
+	xmlsec1Verify,
+	FIXTURE_PIN,
+	LEAF_COMMON_NAME,
+	type Pkcs12Fixtures
+} from '../test/fixtures';
 
 afterEach(cleanup);
 
@@ -118,5 +126,60 @@ describe('App (sign workflow shell)', () => {
 
 		expect(container.querySelector<HTMLInputElement>('#cert-picker')?.value).toBe('');
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+	});
+
+	it('signs an XML document as XAdES-EPES and downloads a .xsig xmlsec1 verifies', async () => {
+		const { container } = render(App);
+
+		await fireEvent.change(fileInput(container), {
+			target: {
+				files: [new File(['<fe:Facturae xmlns:fe="urn:fe"><N>2026-0001</N></fe:Facturae>'], 'facturae.xml', {
+					type: 'application/xml'
+				})]
+			}
+		});
+		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
+			target: { files: [new File([fixtures.modern], 'keystore.p12')] }
+		});
+		await fireEvent.input(container.querySelector<HTMLInputElement>('#pkcs12-pin')!, {
+			target: { value: FIXTURE_PIN }
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+		await fireEvent.click(screen.getByRole('radio', { name: /XAdES-EPES/ }));
+
+		// jsdom has no `URL.createObjectURL`: capture the Blob the download is built from instead.
+		const blobs: Blob[] = [];
+		const names: string[] = [];
+		const createObjectURL = URL.createObjectURL;
+		const revokeObjectURL = URL.revokeObjectURL;
+		URL.createObjectURL = (blob: Blob) => {
+			blobs.push(blob);
+			return 'blob:test';
+		};
+		URL.revokeObjectURL = () => {};
+		const click = vi
+			.spyOn(HTMLAnchorElement.prototype, 'click')
+			.mockImplementation(function (this: HTMLAnchorElement) {
+				names.push(this.download);
+			});
+		try {
+			await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
+			await waitFor(() =>
+				expect(container.textContent).toContain('Documento firmado: se ha descargado el fichero.')
+			);
+		} finally {
+			URL.createObjectURL = createObjectURL;
+			URL.revokeObjectURL = revokeObjectURL;
+			click.mockRestore();
+		}
+
+		expect(names).toEqual(['facturae.xml.xsig']);
+		expect(blobs).toHaveLength(1);
+		const xsig = await blobs[0].text();
+		expect(xsig).toContain('<ds:Signature');
+		// The leaf fixture is self-signed, so it is its own trust anchor.
+		const path = writeFixtureFile(fixtures.dir, 'ui.xsig', new TextEncoder().encode(xsig));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toMatch(/status: OK/);
 	});
 });

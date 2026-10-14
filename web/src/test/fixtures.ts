@@ -4,7 +4,7 @@
  * leaf certificate, to cross-check what our parser reads.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -116,4 +116,19 @@ export function writeFixtureFile(dir: string, name: string, bytes: Bytes): strin
 	const path = join(dir, name);
 	writeFileSync(path, bytes);
 	return path;
+}
+
+/**
+ * Verify a `.xsig` with `xmlsec1` — the independent XMLDSig oracle. `trustedPem` is the trust
+ * anchor (the fixture leaf is self-signed). Requires `xmlsec1` on `PATH`; not an app dependency.
+ */
+export function xmlsec1Verify(path: string, trustedPem: string): string {
+	const { status, stdout, stderr } = spawnSync(
+		'xmlsec1',
+		['--verify', '--enabled-key-data', 'x509', '--trusted-pem', trustedPem, path],
+		{ encoding: 'utf8' }
+	);
+	const output = `${stdout}${stderr}`;
+	if (status !== 0) throw new Error(`xmlsec1 exit ${status}: ${output.trim()}`);
+	return output;
 }

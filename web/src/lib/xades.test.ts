@@ -7,11 +7,17 @@
  * of the app.
  */
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { FIXTURE_PIN, createPkcs12Fixtures, writeFixtureFile, type Pkcs12Fixtures } from '../test/fixtures';
+import {
+	FIXTURE_PIN,
+	createPkcs12Fixtures,
+	writeFixtureFile,
+	xmlsec1Verify,
+	type Pkcs12Fixtures
+} from '../test/fixtures';
 import { canonicalize } from './c14n';
 import { loadSignerSession } from './keystore';
 import { type SignerSession } from './sign';
@@ -71,20 +77,6 @@ function parse(xml: string): Document {
 
 function elements(root: Element, namespace: string, localName: string): Element[] {
 	return [...root.getElementsByTagNameNS(namespace, localName)];
-}
-
-function xmlsec1Verify(path: string, trustedPem: string): string {
-	const { status, stdout, stderr } = spawnSync('xmlsec1', [
-		'--verify',
-		'--enabled-key-data',
-		'x509',
-		'--trusted-pem',
-		trustedPem,
-		path
-	], { encoding: 'utf8' });
-	const output = `${stdout}${stderr}`;
-	if (status !== 0) throw new Error(`xmlsec1 exit ${status}: ${output.trim()}`);
-	return output;
 }
 
 describe('signXades', () => {
