@@ -1,10 +1,14 @@
 import { rmSync } from 'node:fs';
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import App from './App.svelte';
+import * as keystore from '#lib/keystore';
 import { createPkcs12Fixtures, FIXTURE_PIN, LEAF_COMMON_NAME, type Pkcs12Fixtures } from '../test/fixtures';
 
 afterEach(cleanup);
+
+afterEach(() => vi.restoreAllMocks());
 
 let fixtures: Pkcs12Fixtures;
 
@@ -117,6 +121,28 @@ describe('App (sign workflow shell)', () => {
 		});
 
 		expect(container.querySelector<HTMLInputElement>('#cert-picker')?.value).toBe('');
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+	});
+
+	it('discards a load that finishes after another keystore file is picked', async () => {
+		const loadSpy = vi.spyOn(keystore, 'loadSignerSession');
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+
+		// Start the load without awaiting it, then supersede the file while it is in flight.
+		fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
+			target: { files: [new File([fixtures.ec], 'other.p12')] }
+		});
+
+		// Await the superseded load itself and the render it triggers, so the assertions cannot race it.
+		await vi.waitFor(() => expect(loadSpy).toHaveBeenCalledOnce());
+		await loadSpy.mock.results[0].value;
+		await tick();
+
+		expect(container.querySelector<HTMLSelectElement>('#cert-picker')?.value).toBe('');
+		expect(container.textContent).not.toContain(LEAF_COMMON_NAME);
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
 	});
 });
