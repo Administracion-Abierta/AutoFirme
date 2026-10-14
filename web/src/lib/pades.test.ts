@@ -214,12 +214,33 @@ describe('PAdES B-B signing', () => {
 	});
 
 	it('keeps accented signer text readable (UTF-16 dict strings, WinAnsi appearance)', async () => {
-		const signed = await signSource({ name: 'José García', reason: 'Conformidad', visible: { rect: [60, 60, 260, 120] } });
+		const signed = await signSource({
+			name: 'José García',
+			reason: 'Revisión: no conforme',
+			location: 'A Coruña',
+			visible: { rect: [60, 60, 260, 120] }
+		});
 		const extracted = await extractSignature(signed);
 
-		const name = extracted.signature.lookup(PDFName.of('Name'));
-		if (!(name instanceof PDFString || name instanceof PDFHexString)) throw new Error('/Name is not a string');
-		expect(name.decodeText()).toBe('José García');
+		for (const [key, expected] of [
+			['Name', 'José García'],
+			['Reason', 'Revisión: no conforme'],
+			['Location', 'A Coruña']
+		] as const) {
+			const value = extracted.signature.lookup(PDFName.of(key));
+			if (!(value instanceof PDFString || value instanceof PDFHexString)) {
+				throw new Error(`/${key} is not a string`);
+			}
+			expect(value.decodeText()).toBe(expected);
+		}
+
+		// The signature dictionary itself must stay pure ASCII: UTF-16BE+BOM hex, never raw UTF-8.
+		const raw = new TextDecoder('latin1').decode(signed);
+		const dictionary = raw.slice(raw.indexOf('/Type /Sig'), raw.indexOf('endobj', raw.indexOf('/Type /Sig')));
+		expect(dictionary).not.toMatch(/[\u0080-\uffff]/);
+		expect(dictionary).toMatch(/\/Name <feff004a006f007300e9/);
+		expect(dictionary).toMatch(/\/Reason <feff/);
+		expect(dictionary).toMatch(/\/Location <feff/);
 
 		const appearance = extracted.field.lookup(PDFName.of('AP'), PDFDict);
 		const form = extracted.document.context.lookup(appearance.lookup(PDFName.of('N')) as PDFRef, PDFStream);
