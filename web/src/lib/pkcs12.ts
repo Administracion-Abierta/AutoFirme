@@ -6,7 +6,7 @@
  * PBES1 needs DES/RC2, which WebCrypto does not have.
  */
 
-import { type Der, explicit, integer, oid, parseDer } from './asn1';
+import { type Bytes, type Der, explicit, integer, oid, parseDer } from './asn1';
 
 export type Pkcs12ErrorCode =
 	| 'not-pkcs12'
@@ -30,9 +30,9 @@ export class Pkcs12Error extends Error {
 
 export interface Pkcs12Contents {
 	/** X.509 DER of every certificate in the container. */
-	certificates: Uint8Array[];
+	certificates: Bytes[];
 	/** Decrypted PKCS#8 `PrivateKeyInfo` DER. */
-	privateKey: Uint8Array;
+	privateKey: Bytes;
 }
 
 export type HashName = 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512';
@@ -70,11 +70,11 @@ const OID_PBKDF2 = '1.2.840.113549.1.5.12';
 
 async function deriveKey(
 	password: string,
-	salt: Uint8Array,
+	salt: Bytes,
 	iterations: number,
 	length: number,
 	hash: HashName
-): Promise<Uint8Array> {
+): Promise<Bytes> {
 	const base = await crypto.subtle.importKey(
 		'raw',
 		new TextEncoder().encode(password),
@@ -90,7 +90,7 @@ async function deriveKey(
 	return new Uint8Array(bits);
 }
 
-async function decryptPbes2(params: Der, data: Uint8Array, password: string): Promise<Uint8Array> {
+async function decryptPbes2(params: Der, data: Bytes, password: string): Promise<Bytes> {
 	const kdf = params.children[0];
 	if (oid(kdf.children[0]) !== OID_PBKDF2) {
 		throw new Pkcs12Error('unsupported-pbe', 'PKCS#12 key derivation is not PBKDF2');
@@ -123,7 +123,7 @@ async function decryptPbes2(params: Der, data: Uint8Array, password: string): Pr
 	}
 }
 
-async function decrypt(algorithm: Der, data: Uint8Array, password: string): Promise<Uint8Array> {
+async function decrypt(algorithm: Der, data: Bytes, password: string): Promise<Bytes> {
 	const id = oid(algorithm.children[0]);
 	if (id === OID_PBES2) return decryptPbes2(algorithm.children[1], data, password);
 	const legacy = PBES1[id];
@@ -155,19 +155,19 @@ async function openSafeContents(contentInfo: Der, password: string): Promise<Der
 }
 
 /** SafeBag → X.509 DER, or null for bags we do not consume (CRLs, secrets, friendly names). */
-function readCertificateBag(bag: Der): Uint8Array | null {
+function readCertificateBag(bag: Der): Bytes | null {
 	const value = explicit(bag.children[1], 0xa0);
 	if (oid(value.children[0]) !== OID_X509_CERTIFICATE) return null;
 	return explicit(value.children[1], 0xa0).value;
 }
 
-async function readKeyBag(bag: Der, password: string): Promise<Uint8Array> {
+async function readKeyBag(bag: Der, password: string): Promise<Bytes> {
 	const value = explicit(bag.children[1], 0xa0);
 	if (oid(bag.children[0]) === OID_BAG_KEY) return value.raw;
 	return decrypt(value.children[0], value.children[1].value, password);
 }
 
-export async function parsePkcs12(bytes: Uint8Array, password: string): Promise<Pkcs12Contents> {
+export async function parsePkcs12(bytes: Bytes, password: string): Promise<Pkcs12Contents> {
 	let pfx: Der;
 	try {
 		pfx = parseDer(bytes);
@@ -184,8 +184,8 @@ export async function parsePkcs12(bytes: Uint8Array, password: string): Promise<
 	// implemented here, because getting it wrong would reject valid containers. A wrong PIN is
 	// still detected, by the failure to decrypt the key bag below. Tracked as a follow-up.
 
-	const certificates: Uint8Array[] = [];
-	let privateKey: Uint8Array | undefined;
+	const certificates: Bytes[] = [];
+	let privateKey: Bytes | undefined;
 	for (const contentInfo of parseDer(authSafe.value).children) {
 		const contents = await openSafeContents(contentInfo, password);
 		for (const bag of contents.children) {

@@ -1,3 +1,5 @@
+import type { Bytes } from './asn1';
+
 /** Domain types for the sign flow. Signature engines land in #6–#11; this file is the seam. */
 
 export type SignFormat = 'cades' | 'xades' | 'pades';
@@ -43,7 +45,7 @@ export interface SignerCert {
 	expired: boolean;
 	notYetValid: boolean;
 	/** X.509 DER, to be embedded in the signature. */
-	der: Uint8Array;
+	der: Bytes;
 	/** Non-extractable signing key; null for the certificates of the chain that are not the signer. */
 	key: CryptoKey | null;
 	algorithm: SigningAlgorithm | null;
@@ -61,7 +63,7 @@ export interface SignResult {
 }
 
 /** Sign raw bytes with the selected certificate's key. Format wrapping happens in #6–#11. */
-export async function signBytes(cert: SignerCert, data: Uint8Array): Promise<Uint8Array> {
+export async function signBytes(cert: SignerCert, data: Bytes): Promise<Bytes> {
 	if (!cert.key || !cert.algorithm) {
 		throw new Error(`certificate ${cert.commonName} has no private key`);
 	}

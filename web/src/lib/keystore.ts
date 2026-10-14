@@ -6,7 +6,7 @@
  * comparing public-key material. Nothing leaves the browser.
  */
 
-import { explicit, integerBytes, oid, parseDer } from './asn1';
+import { type Bytes, explicit, integerBytes, oid, parseDer } from './asn1';
 import { Pkcs12Error, parsePkcs12 } from './pkcs12';
 import type { SignerCert, SignerSession, SigningAlgorithm } from './sign';
 import { type Certificate, type PublicKey, parseCertificate, samePublicKey } from './x509';
@@ -28,7 +28,7 @@ interface PrivateKeyInfo {
 	publicKey: PublicKey;
 }
 
-function readPrivateKeyInfo(der: Uint8Array): PrivateKeyInfo {
+function readPrivateKeyInfo(der: Bytes): PrivateKeyInfo {
 	const info = parseDer(der);
 	const algorithmOid = oid(info.children[1].children[0]);
 	const key = info.children[2].value;
@@ -84,7 +84,7 @@ export interface LoadOptions {
 
 /** Parse a PKCS#12/PFX file and import its private key. Throws `Pkcs12Error` with a typed code. */
 export async function loadSignerSession(
-	bytes: Uint8Array,
+	bytes: Bytes,
 	pin: string,
 	options: LoadOptions = {}
 ): Promise<SignerSession> {

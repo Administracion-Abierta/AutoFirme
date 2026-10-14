@@ -1,15 +1,15 @@
 /** X.509 certificate summary for the picker, plus the public-key material used to pair a
  * certificate with the private key inside a PKCS#12 container. No dependencies. */
 
-import { type Der, integerBytes, oid, parseDer, string } from './asn1';
+import { type Bytes, type Der, integerBytes, oid, parseDer, string } from './asn1';
 
 export type PublicKey =
-	| { kind: 'rsa'; modulus: Uint8Array; exponent: Uint8Array }
-	| { kind: 'ec'; point: Uint8Array }
+	| { kind: 'rsa'; modulus: Bytes; exponent: Bytes }
+	| { kind: 'ec'; point: Bytes }
 	| { kind: 'other' };
 
 export interface Certificate {
-	der: Uint8Array;
+	der: Bytes;
 	/** Subject common name, or the full subject when the DN has no CN. */
 	commonName: string;
 	subject: string;
@@ -100,7 +100,7 @@ function parsePublicKey(spki: Der): { publicKey: PublicKey; algorithm: string } 
 	return { algorithm, publicKey: { kind: 'other' } };
 }
 
-export function parseCertificate(der: Uint8Array): Certificate {
+export function parseCertificate(der: Bytes): Certificate {
 	const certificate = parseDer(der);
 	const tbs = certificate.children[0];
 	let index = tbs.children[0].tag === 0xa0 ? 1 : 0; // [0] EXPLICIT version
@@ -129,7 +129,7 @@ export function parseCertificate(der: Uint8Array): Certificate {
 	};
 }
 
-function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+function sameBytes(a: Bytes, b: Bytes): boolean {
 	return a.length === b.length && a.every((byte, i) => byte === b[i]);
 }
 

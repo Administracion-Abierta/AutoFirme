@@ -5,20 +5,23 @@
  * Anything else raises instead of guessing.
  */
 
+/** Bytes backed by a real `ArrayBuffer` — what WebCrypto and `Blob` accept without a cast. */
+export type Bytes = Uint8Array<ArrayBuffer>;
+
 export interface Der {
 	/** Identifier octet: class | constructed | tag number. */
 	tag: number;
 	constructed: boolean;
 	/** Content octets (header excluded). */
-	value: Uint8Array;
+	value: Bytes;
 	/** The whole TLV, header included — needed to re-emit nested structures verbatim. */
-	raw: Uint8Array;
+	raw: Bytes;
 	children: Der[];
 }
 
 const UNSUPPORTED_LENGTH = 'unsupported DER length (indefinite or > 4 octets)';
 
-export function readTlv(bytes: Uint8Array, offset: number): [Der, number] {
+export function readTlv(bytes: Bytes, offset: number): [Der, number] {
 	if (offset + 2 > bytes.length) throw new Error('truncated DER value');
 	const tag = bytes[offset];
 	if ((tag & 0x1f) === 0x1f) throw new Error('high-tag-number DER values are not supported');
@@ -55,7 +58,7 @@ export function readTlv(bytes: Uint8Array, offset: number): [Der, number] {
 	return [node, end];
 }
 
-export function parseDer(bytes: Uint8Array): Der {
+export function parseDer(bytes: Bytes): Der {
 	const [node, end] = readTlv(bytes, 0);
 	if (end !== bytes.length) throw new Error('trailing bytes after DER value');
 	return node;
@@ -84,7 +87,7 @@ export function oid(node: Der): string {
 }
 
 /** Unsigned big-endian INTEGER/DEFAULT value as bytes (leading zero of the sign byte kept out). */
-export function integerBytes(node: Der): Uint8Array {
+export function integerBytes(node: Der): Bytes {
 	let value = node.value;
 	while (value.length > 1 && value[0] === 0) value = value.subarray(1);
 	return value;

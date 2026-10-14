@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Bytes } from '../lib/asn1';
 
 export const FIXTURE_PIN = '1234';
 export const LEAF_COMMON_NAME = 'Ñandú Prueba';
@@ -15,17 +16,16 @@ export const LEAF_COMMON_NAME = 'Ñandú Prueba';
 export interface Pkcs12Fixtures {
 	dir: string;
 	/** Leaf key + its CA cert, AES-256-CBC/PBKDF2-SHA256 (what OpenSSL 3+ and Java 9+ write). */
-	modern: Uint8Array;
+	modern: Bytes;
 	/** Leaf public key in PEM (for openssl signature checks). */
-	leafPem: string;
 	leafPublicKeyPem: string;
 	/** openssl's `notBefore`/`notAfter` for the leaf, as ISO strings. */
 	notBefore: string;
 	notAfter: string;
 	/** Same container written with legacy PBES1 (3DES/RC2) encryption. */
-	legacy: Uint8Array;
+	legacy: Bytes;
 	/** Self-signed EC P-256 container. */
-	ec: Uint8Array;
+	ec: Bytes;
 }
 
 function openssl(args: string[], cwd: string): string {
@@ -103,16 +103,16 @@ export function createPkcs12Fixtures(): Pkcs12Fixtures {
 
 	return {
 		dir,
-		modern: readFileSync(join(dir, 'modern.p12')),
-		legacy: readFileSync(join(dir, 'legacy.p12')),
-		ec: readFileSync(join(dir, 'ec.p12')),
+		modern: new Uint8Array(readFileSync(join(dir, 'modern.p12'))),
+		legacy: new Uint8Array(readFileSync(join(dir, 'legacy.p12'))),
+		ec: new Uint8Array(readFileSync(join(dir, 'ec.p12'))),
 		leafPublicKeyPem: readFileSync(join(dir, 'leaf.pub.pem'), 'utf8'),
 		...readDates(dir)
 	};
 }
 
 /** Feed bytes from a test into openssl (signature verification, for instance). */
-export function writeFixtureFile(dir: string, name: string, bytes: Uint8Array): string {
+export function writeFixtureFile(dir: string, name: string, bytes: Bytes): string {
 	const path = join(dir, name);
 	writeFileSync(path, bytes);
 	return path;
