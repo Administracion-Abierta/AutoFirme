@@ -21,7 +21,7 @@ whole contract (`core/signers/AOSigner.java:10`).
 
 Everything a signer needs is passed in: `data`, algorithm name, `java.security.PrivateKey`, cert
 chain, and a `Properties` bag of extra params. No signer ever touches a keystore — the keystore
-layer (§5) produces the `PrivateKey`, the signer consumes it. **That split is the migration seam.**
+layer (§4) produces the `PrivateKey`, the signer consumes it. **That split is the migration seam.**
 
 Dispatch is by format string through a class registry (`core/signers/AOSignerFactory.java:36`
 `getSigner(byte[])`, `:92` `getSigner(String)`, `:114` `getSupportedFormats()`):
@@ -72,7 +72,7 @@ Evidence: `GenCAdESEPESSignedData.generateSignedData` does exactly
 State between phases travels as a serialised `TriphaseData` (format + list of
 `TriSign{id, signatureId, dict}` entries, `core/signers/TriphaseData.java:22,27,141`), driven by
 `TriphaseDataSigner.doSign` (`:19`). `AOPkcs1TriPhaseSigner` (`core/signers/AOPkcs1TriPhaseSigner.java:22`)
-is the generic driver; its constants (`:26-36`) reveal the legacy deployment it was built for —
+is the generic driver; its constants (`:24-37`) reveal the legacy deployment it was built for —
 a **remote signing server**: `serverUrl`, `op=pre|post`, `cop=sign`, `doc`, `algo`, `format`,
 `cert`, `session`. `TriphaseUtil.prepareCertChainParam` (`TriphaseUtil.java:16`) serialises the
 chain for that hop.
@@ -91,7 +91,7 @@ Two format-level wrinkles the rewrite must keep:
   the signer certificate (`:44-52`), and maps provider failures onto app exceptions:
   `es.gob.jmulticard.{CancelledOperationException, jse.provider.SignatureAuthException}` →
   `AOCancelledSMOperationException` / `AuthenticationException` / `PinException` (`:60-71`) —
-  i.e. the on-card-signing provider (§5) plugs in *under* the same interface.
+  i.e. the on-card-signing provider (§4) plugs in *under* the same interface.
 
 **Rewrite note:** tri-phase is not legacy baggage to delete — it is the correct browser design.
 Phase 2 is `crypto.subtle.sign`; phases 1 and 3 are pure byte manipulation and belong in
