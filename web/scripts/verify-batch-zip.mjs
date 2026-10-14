@@ -4,6 +4,8 @@
  *
  *   node scripts/verify-batch-zip.mjs
  *
+ * The payloads here are synthetic — this script is about the archive and the digests; the real
+ * CAdES signatures that go into it are verified by `openssl cms -verify` in `src/lib/batch.test.ts`.
  * Exits non-zero if `unzip -t` rejects the archive or if an extracted document does not hash back
  * to the digest the manifest claims. Node strips the TypeScript types natively.
  */

@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { copy, type Copy, type Lang } from '#lib/i18n';
 	import { createBatchQueue, type BatchSigner } from '#lib/batch';
+	import { signCadesDetached } from '#lib/cms';
 	import {
 		SIGN_FORMATS,
+		signingAlgorithmName,
 		toSelectedFile,
 		type SignFormat,
 		type SignerCert
@@ -17,21 +19,30 @@
 
 	let files = $state<File[]>([]);
 	let format = $state<SignFormat>('cades');
-	// Certificate selection lands in #5; the shell therefore never enables signing.
+	// Only the certificate that owns the container's private key can sign.
 	let cert = $state<SignerCert | null>(null);
-	// The signature engines (#6 CAdES, #7 XAdES, #11 PAdES) plug in here; the queue is engine-agnostic.
-	const signer: BatchSigner | null = null;
 
 	const queue = createBatchQueue();
 	$effect(() => queue.set(files, format));
 
+	/** Format engines (#6 CAdES, #7 XAdES, #11 PAdES) plug in here; the queue never looks inside. */
+	function makeSigner(certificate: SignerCert | null, kind: SignFormat): BatchSigner | null {
+		if (!certificate?.key || !certificate.algorithm || kind !== 'cades') return null;
+		const algorithm = signingAlgorithmName(certificate);
+		return async (_file, bytes) => ({
+			bytes: await signCadesDetached(certificate, bytes),
+			algorithm
+		});
+	}
+
+	const signer = $derived(makeSigner(cert, format));
 	const signHint = $derived(
 		files.length === 0
 			? t.signNeedsFile
 			: cert === null
 				? t.signNeedsCert
 				: signer === null
-					? t.queueNeedsEngine
+					? t.signPendingFormat
 					: ''
 	);
 </script>
@@ -82,7 +93,7 @@
 			<section class="flex flex-col gap-5">
 				<h2 class="text-lg font-semibold">{t.step2Title}</h2>
 
-				<CertPicker copy={t} cert={cert} />
+				<CertPicker copy={t} {cert} onpick={(picked) => (cert = picked)} />
 
 				<fieldset class="flex flex-col gap-2">
 					<legend class="text-sm font-medium">{t.formatTitle}</legend>

@@ -1,8 +1,40 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { rmSync } from 'node:fs';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import App from './App.svelte';
+import { createPkcs12Fixtures, FIXTURE_PIN, LEAF_COMMON_NAME, type Pkcs12Fixtures } from '../test/fixtures';
 
-afterEach(cleanup);
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+});
+
+let fixtures: Pkcs12Fixtures;
+
+beforeAll(() => {
+	fixtures = createPkcs12Fixtures();
+}, 60_000);
+
+afterAll(() => rmSync(fixtures.dir, { recursive: true, force: true }));
+
+async function pickDocumentAndKey(container: HTMLElement) {
+	await fireEvent.change(fileInput(container), {
+		target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+	});
+	await loadKey(container);
+}
+
+/** Fill the PKCS#12 picker with the fixture container and its PIN. */
+async function loadKey(container: HTMLElement) {
+	const keystore = container.querySelector<HTMLInputElement>('#pkcs12-file');
+	if (!keystore) throw new Error('keystore input not rendered');
+	await fireEvent.change(keystore, {
+		target: { files: [new File([fixtures.modern], 'keystore.p12')] }
+	});
+	await fireEvent.input(container.querySelector<HTMLInputElement>('#pkcs12-pin')!, {
+		target: { value: FIXTURE_PIN }
+	});
+}
 
 function fileInput(container: HTMLElement): HTMLInputElement {
 	const input = container.querySelector<HTMLInputElement>('input[type="file"]');
@@ -52,5 +84,86 @@ describe('App (sign workflow shell)', () => {
 
 		expect(container.textContent).toContain('Drag the files you want to sign here');
 		expect(container.textContent).toContain('Choose files');
+	});
+
+	it('loads a PKCS#12 file and enables signing with the certificate it holds', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+		expect(container.textContent).toContain(`CN=${LEAF_COMMON_NAME}, O=AutoFirme, C=ES`);
+		// The chain certificate of the file is listed but cannot sign.
+		expect(container.textContent).toContain('AutoFirme Test CA (sin clave privada)');
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+	});
+
+	it('shows the wrong-PIN error and keeps signing disabled', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		await fireEvent.input(container.querySelector<HTMLInputElement>('#pkcs12-pin')!, {
+			target: { value: '0000' }
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+
+		await screen.findByRole('alert');
+		expect(container.textContent).toContain('PIN incorrecto.');
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+	});
+
+	it('clears the loaded certificates when another keystore file is picked', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+
+		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
+			target: { files: [new File([fixtures.ec], 'other.p12')] }
+		});
+
+		expect(container.querySelector<HTMLInputElement>('#cert-picker')?.value).toBe('');
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+	});
+
+	it('signs a 3-file batch with the loaded certificate and hands over one ZIP', async () => {
+		const downloaded: string[] = [];
+		vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+			this: HTMLAnchorElement
+		) {
+			downloaded.push(this.download);
+		});
+		// jsdom has no blob URLs; only their creation matters here.
+		Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:batch', configurable: true });
+		Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, configurable: true });
+
+		const { container } = render(App);
+		await fireEvent.change(fileInput(container), {
+			target: {
+				files: [
+					new File(['uno'], 'uno.txt', { type: 'text/plain' }),
+					new File(['dos'], 'dos.txt', { type: 'text/plain' }),
+					new File(['tres'], 'tres.txt', { type: 'text/plain' })
+				]
+			}
+		});
+		await loadKey(container);
+		await fireEvent.click(screen.getByRole('button', { name: 'Cargar certificados' }));
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME));
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
+
+		// Every document ends signed, with its own SHA-256 shown, and the archive becomes available.
+		await waitFor(() => expect(container.textContent).toContain('Firmados: 3/3'));
+		expect(container.querySelectorAll('[data-status="signed"]')).toHaveLength(3);
+		expect(container.querySelector('[data-status="signed"]')?.textContent).toContain('uno.txt.csig');
+
+		const download = screen.getByRole('button', { name: 'Descargar ZIP' });
+		expect(download.hasAttribute('disabled')).toBe(false);
+		await fireEvent.click(download);
+		expect(downloaded).toEqual(['firmas-lote.zip']);
 	});
 });

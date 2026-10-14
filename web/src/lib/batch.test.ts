@@ -1,35 +1,93 @@
+/**
+ * Batch queue behaviour, driven by the **real** signing engine (#5 PKCS#12 + #6 CAdES-BES): the
+ * queue, the digest, the manifest and the ZIP are exercised with genuine signatures, and every
+ * output is cross-checked by `openssl cms -verify` — the same oracle #6 uses — and, for the
+ * archive, by Node's independent CRC-32.
+ */
+
+import { execFileSync } from 'node:child_process';
 import { webcrypto } from 'node:crypto';
+import { rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { crc32 as nodeCrc32 } from 'node:zlib';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { get } from 'svelte/store';
 import BatchQueue from './components/BatchQueue.svelte';
-import { buildManifest, buildZip, createBatchQueue, sha256Hex, type BatchSigner } from './batch';
+import {
+	buildManifest,
+	buildZip,
+	createBatchQueue,
+	sha256Hex,
+	type BatchSigner,
+	type SignedDocument
+} from './batch';
+import { signCadesDetached } from './cms';
 import { copy } from './i18n';
+import { loadSignerSession } from './keystore';
+import type { SignerCert } from './sign';
+import { signingAlgorithmName } from './sign';
+import { createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../test/fixtures';
 
-// jsdom's `crypto` only has getRandomValues; the queue's SHA-256 (and the engine the test drives
-// the queue with) need SubtleCrypto — the same API browsers expose.
+// jsdom's `crypto` only has getRandomValues; the queue's SHA-256 needs SubtleCrypto — the same API
+// browsers expose.
 if (!globalThis.crypto?.subtle) {
 	Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true, writable: true });
 }
+
+let fixtures: CadesFixtures;
+/** The CA-signed leaf: it owns the private key, so it can sign. */
+let certificate: SignerCert;
+/** The CA certificate of the same container: in the list, but with no key — the real failure path. */
+let keyless: SignerCert;
+
+beforeAll(async () => {
+	fixtures = createCadesFixtures();
+	const session = await loadSignerSession(fixtures.p12, FIXTURE_PIN);
+	certificate = session.signer;
+	keyless = session.certificates.find((candidate) => candidate.key === null)!;
+}, 60_000);
+
+afterAll(() => rmSync(fixtures.dir, { recursive: true, force: true }));
 
 afterEach(cleanup);
 
 const file = (name: string, content: string) => new File([content], name, { type: 'text/plain' });
 
-/** A real format engine stand-in: signs the document bytes with an ephemeral ECDSA key. */
-async function engine() {
-	const key = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, false, [
-		'sign',
-		'verify'
-	]);
-	return {
-		algorithm: 'SHA256withECDSA',
-		sign: async (_file: File, bytes: Uint8Array<ArrayBuffer>) =>
-			new Uint8Array(await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key.privateKey, bytes)),
-		verify: async (bytes: Uint8Array<ArrayBuffer>, signature: Uint8Array<ArrayBuffer>) =>
-			crypto.subtle.verify({ name: 'ECDSA', hash: 'SHA-256' }, key.publicKey, signature, bytes)
-	};
+/** The real engine behind the queue: `#lib/cms` over the certificate the container provided. */
+type Engine = (file: File, bytes: Uint8Array<ArrayBuffer>) => Promise<SignedDocument>;
+
+const cadesEngine = (cert: SignerCert = certificate): Engine =>
+	async (_file, bytes) => ({
+		bytes: await signCadesDetached(cert, bytes),
+		algorithm: signingAlgorithmName(cert)
+	});
+
+/** `null` when openssl accepts the signature, its diagnostics otherwise. */
+function verify(signature: Uint8Array, contentPath: string, name: string): string | null {
+	const signaturePath = join(fixtures.dir, name);
+	writeFileSync(signaturePath, signature);
+	try {
+		execFileSync(
+			'openssl',
+			[
+				'cms', '-verify', '-inform', 'DER', '-in', signaturePath, '-content', contentPath,
+				'-CAfile', fixtures.caPath, '-purpose', 'any', '-cades', '-binary', '-out',
+				join(fixtures.dir, 'verified.bin')
+			],
+			{ stdio: 'pipe' }
+		);
+		return null;
+	} catch (error) {
+		return (error as { stderr?: Buffer }).stderr?.toString() ?? String(error);
+	}
+}
+
+/** Writes the document next to the signatures and returns the path openssl will read. */
+function contentPath(name: string, bytes: Uint8Array): string {
+	const path = join(fixtures.dir, `${name}.content`);
+	writeFileSync(path, bytes);
+	return path;
 }
 
 /** Independent ZIP reader — walks the central directory instead of trusting the writer. */
@@ -60,13 +118,13 @@ function readZip(archive: Uint8Array<ArrayBuffer>) {
 }
 
 describe('batch queue', () => {
-	it('signs a 3-file batch one document at a time and leaves every signature verifiable', async () => {
+	it('signs a 3-file batch one document at a time and leaves every signature openssl-verifiable', async () => {
 		const queue = createBatchQueue();
 		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos'), file('c.txt', 'tres')], 'cades');
-		const real = await engine();
 
 		const order: string[] = [];
 		let running = 0;
+		const engine = cadesEngine();
 		const sign: BatchSigner = async (document, bytes) => {
 			running += 1;
 			try {
@@ -76,7 +134,7 @@ describe('batch queue', () => {
 				// The state machine publishes progress before the engine resolves, so the UI can paint.
 				expect(get(queue).phase).toBe('running');
 				expect(get(queue).documents.find((item) => item.file === document)?.status).toBe('signing');
-				return { bytes: await real.sign(document, bytes), algorithm: real.algorithm };
+				return await engine(document, bytes);
 			} finally {
 				running -= 1;
 			}
@@ -98,23 +156,25 @@ describe('batch queue', () => {
 			'c.txt.csig'
 		]);
 
-		for (const document of state.documents) {
+		for (const [index, document] of state.documents.entries()) {
 			const bytes = new Uint8Array(await document.file.arrayBuffer());
 			expect(document.sha256).toBe(await sha256Hex(bytes));
-			expect(await real.verify(bytes, document.bytes as Uint8Array<ArrayBuffer>)).toBe(true);
+			expect(
+				verify(document.bytes!, contentPath(`doc-${index}`, bytes), `doc-${index}.csig`)
+			).toBeNull();
 		}
 	});
 
 	it('keeps going when one document fails, and re-running only retries what is not signed', async () => {
 		const queue = createBatchQueue();
 		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos'), file('c.txt', 'tres')], 'cades');
-		const real = await engine();
 
 		const tried: string[] = [];
+		// A certificate that cannot sign: every document it touches fails for real.
 		const flaky: BatchSigner = async (document, bytes) => {
 			tried.push(document.name);
-			if (document.name === 'b.txt') throw new Error('certificado revocado');
-			return { bytes: await real.sign(document, bytes), algorithm: real.algorithm };
+			if (document.name === 'b.txt') return cadesEngine(keyless)(document, bytes);
+			return cadesEngine()(document, bytes);
 		};
 
 		const state = await queue.run(flaky);
@@ -126,7 +186,7 @@ describe('batch queue', () => {
 			'signed'
 		]);
 		const failed = state.documents[1];
-		expect(failed.description).toBe('certificado revocado');
+		expect(failed.description).toMatch(/no private key/);
 		expect(failed.result).toBe('ERROR_PRE');
 		expect(failed.sha256).toBe(await sha256Hex(new Uint8Array(await failed.file.arrayBuffer())));
 		expect(failed.bytes).toBeNull();
@@ -137,24 +197,22 @@ describe('batch queue', () => {
 			'ERROR_PRE',
 			'DONE_AND_SAVED'
 		]);
-		expect(manifest.singlesigns[1].description).toBe('certificado revocado');
+		expect(manifest.singlesigns[1].description).toMatch(/no private key/);
 		expect(manifest.singlesigns[0]).not.toHaveProperty('description');
 		expect(manifest.singlesigns[0]).toHaveProperty('timestamp');
 		expect(manifest.singlesigns[1]).not.toHaveProperty('timestamp');
 		expect(manifest.signbatch).toEqual({
 			format: 'CAdES-BES',
 			suboperation: 'sign',
-			algorithm: 'SHA256withECDSA'
+			algorithm: 'SHA256withRSA'
 		});
 
 		// Resumable: the second pass signs only what is still missing.
 		const resumed: string[] = [];
-		const retry: BatchSigner = async (document, bytes) => {
+		const final = await queue.run(async (document, bytes) => {
 			resumed.push(document.name);
-			return { bytes: await real.sign(document, bytes), algorithm: real.algorithm };
-		};
-
-		const final = await queue.run(retry);
+			return cadesEngine()(document, bytes);
+		});
 
 		expect(resumed).toEqual(['b.txt']);
 		expect(final.documents.map((document) => document.status)).toEqual([
@@ -164,16 +222,20 @@ describe('batch queue', () => {
 		]);
 		expect(final.documents[1].result).toBe('DONE_AND_SAVED');
 		expect(final.documents[1].description).toBe('');
+		const retried = final.documents[1];
+		expect(
+			verify(
+				retried.bytes!,
+				contentPath('b.txt', new Uint8Array(await retried.file.arrayBuffer())),
+				'resumed.csig'
+			)
+		).toBeNull();
 	});
 
 	it('packages the signed documents and the manifest into a ZIP with unique names', async () => {
 		const queue = createBatchQueue();
 		queue.set([file('dup.txt', 'uno'), file('dup.txt', 'dos')], 'cades');
-		const real = await engine();
-		const state = await queue.run(async (document, bytes) => ({
-			bytes: await real.sign(document, bytes),
-			algorithm: real.algorithm
-		}));
+		const state = await queue.run(cadesEngine());
 
 		const archive = buildZip(state);
 		const entries = readZip(archive);
@@ -199,6 +261,10 @@ describe('batch queue', () => {
 			state.documents[0].sha256,
 			state.documents[1].sha256
 		]);
+
+		// What came out of the archive is a signature openssl accepts over the original document.
+		const original = contentPath('dup', new Uint8Array(await state.documents[0].file.arrayBuffer()));
+		expect(verify(entries[0].data, original, 'dup.txt.csig')).toBeNull();
 	});
 });
 
@@ -220,16 +286,12 @@ describe('BatchQueue UI', () => {
 	it('shows per-document status while the batch runs and downloads the ZIP', async () => {
 		const queue = createBatchQueue();
 		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos'), file('c.txt', 'tres')], 'cades');
-		const real = await engine();
 
 		const { container } = render(BatchQueue, {
 			copy: copy.es,
 			queue,
 			hint: '',
-			signer: async (document, bytes) => ({
-				bytes: await real.sign(document, bytes),
-				algorithm: real.algorithm
-			})
+			signer: cadesEngine()
 		});
 
 		expect(container.querySelectorAll('[data-status="pending"]')).toHaveLength(3);
