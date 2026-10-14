@@ -3,8 +3,8 @@
 
 	interface Props {
 		copy: Copy;
-		/** Receives the first dropped or picked file. */
-		onselect: (file: File) => void;
+		/** Receives every dropped or picked file, in order. */
+		onselect: (files: File[]) => void;
 		/** Overrides the drop-step wording (the verify flow reuses this component). */
 		title?: string;
 		hint?: string;
@@ -15,8 +15,8 @@
 	let input = $state<HTMLInputElement | null>(null);
 
 	function pick(files: ArrayLike<File> | null) {
-		const file = files?.[0];
-		if (file) onselect(file);
+		const picked = Array.from(files ?? []);
+		if (picked.length > 0) onselect(picked);
 	}
 </script>
 
@@ -53,6 +53,7 @@
 			bind:this={input}
 			class="sr-only"
 			type="file"
+			multiple
 			tabindex="-1"
 			aria-hidden="true"
 			onchange={(event) => pick(event.currentTarget.files)}

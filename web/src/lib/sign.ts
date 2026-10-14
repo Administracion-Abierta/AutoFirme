@@ -61,9 +61,16 @@ export interface SignerSession {
 	signer: SignerCert;
 }
 
-export interface SignResult {
-	ok: boolean;
-	message: string;
+/**
+ * JCA name of the certificate's signing algorithm, e.g. `SHA256withRSA` — what a manifest reports
+ * when it has no engine to ask. The pairing is fixed by the curve/RSA + hash WebCrypto was given.
+ */
+export function signingAlgorithmName(cert: SignerCert): string {
+	if (!cert.algorithm) {
+		throw new Error(`certificate ${cert.commonName} has no signing algorithm`);
+	}
+	const { name, hash } = cert.algorithm;
+	return `${hash.replace('-', '')}with${name === 'ECDSA' ? 'ECDSA' : 'RSA'}`;
 }
 
 /** Sign raw bytes with the selected certificate's key. Format wrapping happens in #6–#11. */
@@ -76,16 +83,6 @@ export async function signBytes(cert: SignerCert, data: Bytes): Promise<Bytes> {
 
 export function toSelectedFile(file: File): SelectedFile {
 	return { name: file.name, size: file.size, type: file.type, source: file };
-}
-
-/** Signed output for the format, as a download — nothing leaves the page. */
-export function download(name: string, data: string | Bytes, type: string): void {
-	const url = URL.createObjectURL(new Blob([data], { type }));
-	const link = document.createElement('a');
-	link.href = url;
-	link.download = name;
-	link.click();
-	URL.revokeObjectURL(url);
 }
 
 export function formatBytes(bytes: number): string {

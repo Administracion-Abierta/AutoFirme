@@ -37,11 +37,14 @@ export interface Copy {
 	signButton: string;
 	signNeedsFile: string;
 	signNeedsCert: string;
-	signUnsupported: string;
-	signDone: string;
-	signFailed: string;
-	resultTitle: string;
-	resultEmpty: string;
+	signPendingFormat: string;
+	queueTitle: string;
+	queueProgress: string;
+	queueRunning: string;
+	queueStatus: { pending: string; signing: string; signed: string; error: string };
+	queueHash: string;
+	queueDownload: string;
+	queueArchive: string;
 	modesLabel: string;
 	modeSign: string;
 	modeVerify: string;
@@ -67,10 +70,10 @@ export const copy: Record<Lang, Copy> = {
 		brand: 'AutoFirma Web',
 		tagline: 'Firma electrónica en tu navegador, sin instalar nada.',
 		privacyNote: 'Las claves privadas nunca salen de tu equipo: todo se firma en el navegador.',
-		step1Title: '1. Elige el documento',
-		dropTitle: 'Arrastra aquí el fichero que quieres firmar',
-		dropHint: 'o selecciónalo desde tu equipo',
-		browse: 'Seleccionar fichero',
+		step1Title: '1. Elige los documentos',
+		dropTitle: 'Arrastra aquí los ficheros que quieres firmar',
+		dropHint: 'o selecciónalos desde tu equipo',
+		browse: 'Seleccionar ficheros',
 		dragging: 'Suelta el fichero para cargarlo',
 		fileLabel: 'Fichero',
 		remove: 'Quitar',
@@ -104,11 +107,19 @@ export const copy: Record<Lang, Copy> = {
 		signButton: 'Firmar',
 		signNeedsFile: 'Selecciona primero un documento.',
 		signNeedsCert: 'Selecciona un certificado para habilitar la firma.',
-		signUnsupported: 'Ese formato todavía no está disponible.',
-		signDone: 'Documento firmado: se ha descargado el fichero.',
-		signFailed: 'No se ha podido firmar el documento.',
-		resultTitle: 'Resultado',
-		resultEmpty: 'Todavía no se ha firmado ningún documento.',
+		signPendingFormat: 'Este formato llegará en otra entrega.',
+		queueTitle: 'Cola de firma',
+		queueProgress: 'Firmados',
+		queueRunning: 'Firmando lote…',
+		queueStatus: {
+			pending: 'Pendiente',
+			signing: 'Firmando',
+			signed: 'Firmada',
+			error: 'Error'
+		},
+		queueHash: 'SHA-256',
+		queueDownload: 'Descargar ZIP',
+		queueArchive: 'firmas-lote.zip',
 		modesLabel: 'Modo',
 		modeSign: 'Firmar',
 		modeVerify: 'Verificar',
@@ -142,10 +153,10 @@ export const copy: Record<Lang, Copy> = {
 		brand: 'AutoFirma Web',
 		tagline: 'Electronic signature in your browser, nothing to install.',
 		privacyNote: 'Private keys never leave your machine: signing happens in the browser.',
-		step1Title: '1. Choose the document',
-		dropTitle: 'Drag the file you want to sign here',
-		dropHint: 'or pick it from your machine',
-		browse: 'Choose file',
+		step1Title: '1. Choose the documents',
+		dropTitle: 'Drag the files you want to sign here',
+		dropHint: 'or pick them from your machine',
+		browse: 'Choose files',
 		dragging: 'Drop the file to load it',
 		fileLabel: 'File',
 		remove: 'Remove',
@@ -179,11 +190,19 @@ export const copy: Record<Lang, Copy> = {
 		signButton: 'Sign',
 		signNeedsFile: 'Choose a document first.',
 		signNeedsCert: 'Choose a certificate to enable signing.',
-		signUnsupported: 'That format is not available yet.',
-		signDone: 'Document signed: the file has been downloaded.',
-		signFailed: 'The document could not be signed.',
-		resultTitle: 'Result',
-		resultEmpty: 'No document has been signed yet.',
+		signPendingFormat: 'This format ships in a later delivery.',
+		queueTitle: 'Signing queue',
+		queueProgress: 'Signed',
+		queueRunning: 'Signing batch…',
+		queueStatus: {
+			pending: 'Pending',
+			signing: 'Signing',
+			signed: 'Signed',
+			error: 'Error'
+		},
+		queueHash: 'SHA-256',
+		queueDownload: 'Download ZIP',
+		queueArchive: 'signed-batch.zip',
 		modesLabel: 'Mode',
 		modeSign: 'Sign',
 		modeVerify: 'Verify',
