@@ -304,3 +304,6 @@ collapse into `crypto.subtle` calls.
   constant; `[INFERENCE]` baseline B-T given `PdfTimestamper`.
 - Deeper: `standalone/ui/preferences/**` (43 classes) and `standalone/plugins/**` govern
   behaviour/config that the web rewrite will redesign rather than port.
+- Citations are machine-checked: `python3 docs/check-architecture-doc.py` resolves every
+  `file:line` citation against `decompiled/` and fails if a range is out of bounds or does not
+  contain the identifiers the sentence names.
