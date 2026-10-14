@@ -26,6 +26,7 @@ browser. No backend, no key material leaving the client.
 | `src/lib/verify/` | Verification engine: DER/X.509/CMS, canonicalization, XMLDSig/XAdES |
 | `scripts/fetch-roots.sh` | Refreshes the bundled FNMT trust anchor from fnmt.es (checks subject + fingerprint) |
 | `test/fixtures/` | Valid/tampered CAdES + XAdES samples, their generator and cross-check script |
+| `src/lib/ooxml.ts` | OOXML (docx/xlsx/pptx) signing: XAdES v1.3.2 signature part, zip surgery via `fflate` |
 | `src/lib/i18n.ts` | ES/EN copy |
 | `Caddyfile` | Static hosting with SPA fallback (used by the root `Containerfile`) |
 
@@ -152,3 +153,8 @@ and long-term validation (XAdES-T/XL).
 Document selection, PKCS#12 certificate loading (#5), CAdES-BES signing (#6) and XAdES-EPES XML
 signing (#7) work. PAdES follows in #11 and its button is marked "pendiente"; the `.csig` embeds
 only the signer certificate, not its chain.
+
+OOXML signing (#10) exists as a library (`src/lib/ooxml.ts`): it adds
+`_xmlsignatures/sig-<uuid>.xml` (XAdES v1.3.2 EPES with MDSSI `SignatureTime`), the
+`origin.sigs` origin part and its relationships, and leaves every other part byte-identical.
+The UI does not call it yet — that wiring needs the certificate flow from #5.
