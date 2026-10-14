@@ -100,6 +100,12 @@ export const EMPTY_BATCH_STATE: BatchState = {
 
 export function createBatchQueue(): BatchQueue {
 	const store = writable<BatchState>(EMPTY_BATCH_STATE);
+	/**
+	 * Bumped every time the document list is replaced. A run in flight compares it before every write
+	 * and gives up once it changed, so dropping or removing files mid-run can neither sign the
+	 * discarded documents nor record their results against the new list's entries.
+	 */
+	let generation = 0;
 
 	function patch(id: string, changes: Partial<BatchDocument>) {
 		store.update((state) => ({
@@ -113,6 +119,7 @@ export function createBatchQueue(): BatchQueue {
 	return {
 		subscribe: store.subscribe,
 		set(files, format) {
+			generation += 1;
 			store.set({
 				documents: files.map((file, index) => ({
 					id: String(index + 1),
@@ -132,6 +139,7 @@ export function createBatchQueue(): BatchQueue {
 			});
 		},
 		clear() {
+			generation += 1;
 			store.set({ documents: [], phase: 'idle', format: get(store).format, current: null });
 		},
 		async run(sign) {
@@ -145,12 +153,16 @@ export function createBatchQueue(): BatchQueue {
 					.filter((document) => document.status === 'signed')
 					.map((document) => document.output)
 			);
+			const run = generation;
 
 			store.update((state) => ({ ...state, phase: 'running', current: null }));
 
 			// Sequential by construction: one await at a time, so the UI thread is free between files
 			// and an early failure cannot skip later documents.
 			for (const document of start.documents) {
+				// The list was replaced while this run was in flight: the queue no longer describes
+				// these documents, so stop rather than sign files nobody is waiting for.
+				if (generation !== run) return get(store);
 				if (document.status === 'signed') continue;
 				patch(document.id, { status: 'signing', description: '' });
 				store.update((state) => ({ ...state, current: document.id }));
@@ -159,6 +171,7 @@ export function createBatchQueue(): BatchQueue {
 					const bytes = new Uint8Array(await document.file.arrayBuffer());
 					digest = await sha256Hex(bytes);
 					const signed = await sign(document.file, bytes, format);
+					if (generation !== run) return get(store);
 					patch(document.id, {
 						status: 'signed',
 						result: 'DONE_AND_SAVED',
@@ -169,6 +182,7 @@ export function createBatchQueue(): BatchQueue {
 						algorithm: signed.algorithm ?? ''
 					});
 				} catch (reason) {
+					if (generation !== run) return get(store);
 					patch(document.id, {
 						status: 'error',
 						result: 'ERROR_PRE',

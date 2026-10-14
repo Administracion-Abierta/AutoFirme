@@ -232,6 +232,34 @@ describe('batch queue', () => {
 		).toBeNull();
 	});
 
+	it('abandons a run whose document list was replaced while a signature was in flight', async () => {
+		const queue = createBatchQueue();
+		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos'), file('c.txt', 'tres')], 'cades');
+
+		const signed: string[] = [];
+		let release = () => {};
+		const gate = new Promise<void>((resolve) => (release = resolve));
+		const engine: BatchSigner = async (document, bytes) => {
+			signed.push(document.name);
+			await gate;
+			return cadesEngine()(document, bytes);
+		};
+
+		const run = queue.run(engine);
+		// The user drops another document while `a.txt` is still being signed.
+		queue.set([file('nuevo.txt', 'cuatro')], 'cades');
+		release();
+		const state = await run;
+
+		// The abandoned documents are neither signed nor recorded against the new list's entries.
+		expect(signed).toEqual(['a.txt']);
+		expect(state.phase).toBe('idle');
+		expect(state.current).toBeNull();
+		expect(
+			state.documents.map((document) => [document.file.name, document.status, document.sha256])
+		).toEqual([['nuevo.txt', 'pending', '']]);
+	});
+
 	it('packages the signed documents and the manifest into a ZIP with unique names', async () => {
 		const queue = createBatchQueue();
 		queue.set([file('dup.txt', 'uno'), file('dup.txt', 'dos')], 'cades');
