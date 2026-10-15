@@ -18,7 +18,7 @@ const source=()=>({id:'extension',url:'https://site.test/form',tab:{id:4},frameI
 const app=()=>({id:'extension',url:'chrome-extension://extension/index.html',tab:{id:9,url:'chrome-extension://extension/index.html'},frameId:0});
 const chooser=item=>({id:'extension',url:`chrome-extension://extension/index.html?request=${item.id}`,tab:{id:item.chooserTabId,url:`chrome-extension://extension/index.html?request=${item.id}`},frameId:0});
 async function connect(chrome) {
-  const replies=[];const port={name:'autofirme-page',sender:source(),onMessage:event(),onDisconnect:event(),postMessage:m=>replies.push(m),disconnect(){this.onDisconnect.emit();}};
+  const replies=[];const port={name:'autofirme-page',sender:source(),onMessage:event(),onDisconnect:event(),postMessage(m){if(this.disconnected)throw Error('Disconnected port');replies.push(m);},disconnect(){this.disconnected=true;}};
   await chrome.runtime.onConnect.emit(port);return {port,replies};
 }
 async function capture(env) {
@@ -98,4 +98,15 @@ test('signing view contains original data, explicit mode and SHA-256 document di
   const view=await env.bridge.handleMessage({type:'request:get',id:item.id},chooser(item));
   assert.equal(view.data,'YQ==');assert.equal(view.mode,'explicit');assert.equal(view.digest,'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb');
   await env.bridge.handleMessage({type:'request:fallback',id:item.id},chooser(item));assert.equal(replies[0].response.kind,'fallback');
+});
+
+
+test('worker-initiated disconnect immediately revokes outstanding chooser authorization',async()=>{
+  const env=setup();await env.bridge.ready;const {item,port}=await capture(env);
+  for(let i=0;i<128;i++) await port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
+  assert.equal(env.bridge.coordinator.get(item.id),undefined);
+  assert.equal(env.bridge.coordinator.requests.size,0);
+  assert.ok(env.state.removed.includes(item.windowId));
+  await assert.rejects(env.bridge.handleMessage({type:'request:begin',id:item.id},chooser(item)),/expired/i);
+  await port.onDisconnect.emit();assert.equal(env.bridge.coordinator.requests.size,0);
 });

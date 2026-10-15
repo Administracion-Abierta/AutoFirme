@@ -45,6 +45,13 @@ export function installAdapter(win, transport) {
       get: () => current, set(value) { current = value; wrapAutoScript(value, transport); }});
   }
   apply();
-  const timer = win.setInterval(apply, 250);
-  win.addEventListener('pagehide', () => win.clearInterval(timer), {once: true});
+  let timer = win.setInterval(apply, 250);
+  win.addEventListener('pagehide', () => {
+    if (timer !== null) win.clearInterval(timer);
+    timer = null;
+  });
+  win.addEventListener('pageshow', () => {
+    apply();
+    if (timer === null) timer = win.setInterval(apply, 250);
+  });
 }

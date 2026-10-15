@@ -16,7 +16,7 @@ export function installPage(win) {
   win.addEventListener('pagehide', () => {
     for (const item of pending.values()) { win.clearTimeout(item.timer);item.resolve({kind:'error'}); }
     pending.clear();
-  }, {once:true});
+  });
   installAdapter(win, request => new Promise(resolve => {
     if (pending.size >= 8) { resolve({kind:'fallback'}); return; }
     const id = crypto.randomUUID();

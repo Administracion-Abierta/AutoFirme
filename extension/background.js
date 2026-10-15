@@ -118,7 +118,8 @@ export function createBridge(chrome) {
     const seen = new Set();
     const timers = new Map();
     let alive = true;
-    port.onDisconnect.addListener(() => {
+    function cleanup() {
+      if (!alive) return;
       alive = false;
       for (const id of ids) {
         const item = coordinator.requests.get(id);
@@ -127,11 +128,12 @@ export function createBridge(chrome) {
         if (item) closeWindow(item);
       }
       ids.clear();timers.clear();
-    });
+    }
+    port.onDisconnect.addListener(cleanup);
     port.onMessage.addListener(async message => {
-      if (!message || typeof message.id !== 'string' || !UUID.test(message.id) || seen.has(message.id)) return;
+      if (!alive || !message || typeof message.id !== 'string' || !UUID.test(message.id) || seen.has(message.id)) return;
       seen.add(message.id);
-      if (seen.size > 128) { port.disconnect(); return; }
+      if (seen.size > 128) { cleanup();port.disconnect();return; }
       let item;
       try {
         const origin = new URL(port.sender.url).origin;
