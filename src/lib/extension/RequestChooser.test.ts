@@ -8,18 +8,20 @@ import { copy } from '../i18n';
 import RequestChooser from './RequestChooser.svelte';
 let fixtures: CadesFixtures;
 let vault: Vault;
+let expiresAt: number;
 beforeAll(async () => {
  fixtures = createCadesFixtures();
  vault = createVault(memoryBackend());
  const session = await loadSignerSession(fixtures.p12, FIXTURE_PIN);
+ expiresAt = session.signer.notAfter.getTime();
  await vault.saveIdentity({label:'My signing certificate',session,container:fixtures.p12,pin:FIXTURE_PIN});
 });
 afterAll(() => rmSync(fixtures.dir,{recursive:true,force:true}));
-afterEach(cleanup);
+afterEach(()=>{cleanup();vi.restoreAllMocks();});
 const request = {id:'id',origin:'https://example.com',operation:'selectCertificate',digest:'abcdef'};
-function mount(fail = false) {
+function mount(failAt = '') {
  const calls: string[] = [];
- const send = async (m: {type:string}) => { calls.push(m.type); if (m.type === 'request:get') return request; if (fail && m.type === 'request:begin') throw new Error('Request expired'); return true; };
+ const send = async (m: {type:string}) => { calls.push(m.type); if (m.type === 'request:get') return request; if (m.type === failAt) throw new Error('Request expired'); return true; };
  render(RequestChooser, {props:{id:'id',vault,send}});
  return calls;
 }
@@ -51,10 +53,38 @@ describe('request chooser', () => {
   await waitFor(() => expect(calls).toEqual(['request:get','request:cancel']));
  });
  it('fails safely when the request expires before consent reaches the worker',async () => {
-  const calls=mount(true); await choose();
+  const calls=mount('request:begin'); await choose();
   await fireEvent.click(document.querySelector('#request-confirm')!);
   await waitFor(() => expect(document.querySelector('#request-error')?.textContent).toContain('Request expired'));
   expect(calls).toEqual(['request:get','request:begin']);
   expect((document.querySelector('#request-fallback') as HTMLButtonElement).disabled).toBe(true);
  });
+});
+
+
+it('keeps certificate selection, cancellation and fallback available when the certificate expires before begin', async () => {
+ const calls = mount();
+ await choose();
+ // The window stays open after unlock; eligibility cached by the rendered UI is now stale.
+ vi.spyOn(Date, 'now').mockReturnValue(expiresAt + 1);
+ await fireEvent.click(document.querySelector('#request-confirm')!);
+ await waitFor(() => expect((document.querySelector('#request-fallback') as HTMLButtonElement).disabled).toBe(false));
+ expect((document.querySelector('#request-cancel') as HTMLButtonElement).disabled).toBe(false);
+ expect((document.querySelector('#request-confirm') as HTMLButtonElement).disabled).toBe(true);
+ expect(document.querySelector('#pkcs12-picker')).not.toBeNull();
+ expect(document.querySelector('#request-error')?.textContent).toContain('El certificado ha caducado.');
+ expect(calls).toEqual(['request:get']);
+ await fireEvent.click(document.querySelector('#request-fallback')!);
+ await waitFor(() => expect(calls).toEqual(['request:get', 'request:fallback']));
+});
+
+
+it('keeps fallback disabled after begin when completing the operation fails', async () => {
+ const calls = mount('request:complete');
+ await choose();
+ await fireEvent.click(document.querySelector('#request-confirm')!);
+ await waitFor(() => expect(calls).toEqual(['request:get', 'request:begin', 'request:complete', 'request:fail']));
+ expect((document.querySelector('#request-fallback') as HTMLButtonElement).disabled).toBe(true);
+ expect((document.querySelector('#request-cancel') as HTMLButtonElement).disabled).toBe(true);
+ expect(document.querySelector('#pkcs12-picker')).toBeNull();
 });

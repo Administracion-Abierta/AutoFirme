@@ -6,6 +6,13 @@ import type { ExtensionRequest, Rpc, SignatureResult } from './runtime';
 
 export const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
 export type CertificateProblem = 'expired' | 'notYetValid' | 'privateKey' | 'rsa' | 'invalid' | 'ca' | 'keyUsage';
+/** Local rejection before any begin RPC; the waiting request can still be cancelled or retried. */
+export class RequestValidationError extends Error {
+ constructor(message: string, readonly certificateProblem?: CertificateProblem) {
+  super(message);
+  this.name = 'RequestValidationError';
+ }
+}
 export function certificateProblem(cert: SignerCert, now = Date.now()): CertificateProblem | null {
  if (!Number.isFinite(cert.notBefore.getTime()) || !Number.isFinite(cert.notAfter.getTime())) return 'invalid';
  if (cert.notAfter.getTime() <= now) return 'expired';
@@ -47,8 +54,11 @@ export async function signRequest(request: ExtensionRequest, cert: SignerCert, c
 /** Called only by explicit confirmation. The begin transition prevents unsafe native replay. */
 export async function confirmRequest(request: ExtensionRequest, cert: SignerCert, chain: readonly SignerCert[], send: Rpc, sign = signRequest): Promise<void> {
  const problem = certificateProblem(cert);
- if (problem) throw new Error(problem);
- if (request.operation !== 'selectCertificate') decodeContent(request);
+ if (problem) throw new RequestValidationError(problem, problem);
+ if (request.operation !== 'selectCertificate') {
+  try { decodeContent(request); }
+  catch (reason) { throw new RequestValidationError(reason instanceof Error ? reason.message : String(reason)); }
+ }
  await send({ type: 'request:begin', id: request.id });
  try {
   const result = await sign(request, cert, chain);

@@ -7,7 +7,7 @@
  import type { SignerCert } from '#lib/sign';
  import { applyTheme, readTheme } from '#lib/theme';
  import { rpc, type Rpc, type ExtensionRequest } from './runtime';
- import { certificateProblem, confirmRequest } from './sign-request';
+ import { certificateProblem, confirmRequest, RequestValidationError } from './sign-request';
  import { extensionCopy } from './copy';
  let { id, vault = browserVault(), send = rpc }: { id:string; vault?:Vault; send?:Rpc } = $props();
  let lang = $state<Lang>('es');
@@ -17,7 +17,8 @@
  let chain = $state<readonly SignerCert[]>([]);
  let phase = $state<'loading' | 'waiting' | 'signing' | 'done' | 'cancelled' | 'continued' | 'failed'>('loading');
  let error = $state('');
- const problem = $derived(cert ? certificateProblem(cert) : null);
+ let eligibilityTime = $state(Date.now());
+ const problem = $derived(cert ? certificateProblem(cert, eligibilityTime) : null);
  const waiting = $derived(phase === 'waiting');
  onMount(() => {
   const cleanup = applyTheme(readTheme());
@@ -28,7 +29,13 @@
   if (!waiting || !cert || !request || problem) return;
   phase='signing'; error='';
   try { await confirmRequest(request, cert, chain, send); phase='done'; }
-  catch (reason) { error=reason instanceof Error ? reason.message : String(reason); phase='failed'; }
+  catch (reason) {
+   if (reason instanceof RequestValidationError) {
+    eligibilityTime=Date.now();
+    error=reason.certificateProblem ? t[reason.certificateProblem] : reason.message;
+    phase='waiting';
+   } else { error=reason instanceof Error ? reason.message : String(reason); phase='failed'; }
+  }
  }
  async function finish(action: 'cancel' | 'fallback') {
   if (!waiting) return;
@@ -65,7 +72,7 @@
   </section>
   {#if waiting}
    <p class="text-muted-foreground text-sm">{t.consent}</p>
-   <CertPicker copy={copy[lang]} {cert} {vault} compact onpick={(picked, certificates)=>{cert=picked;chain=certificates;}} />
+   <CertPicker copy={copy[lang]} {cert} {vault} compact onpick={(picked, certificates)=>{cert=picked;chain=certificates;eligibilityTime=Date.now();error='';}} />
    {#if problem}<p role="alert" class="text-destructive text-sm">{t[problem]}</p>{/if}
   {/if}
  {/if}
