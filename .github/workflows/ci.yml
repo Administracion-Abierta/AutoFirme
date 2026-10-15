@@ -18,8 +18,18 @@ jobs:
   checks:
     name: check, test, build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    # Debian trixie (OpenSSL 3.5) instead of the runner image (OpenSSL 3.0: the fixture
+    # generator in src/test/fixtures.ts needs >= 3.4 for `-not_before`/`-not_after`).
+    container:
+      image: debian:trixie
     steps:
+      # The image is minimal and checkout needs git, so the toolchain comes first.
+      - name: Toolchain
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends git openssl unzip python3 ca-certificates
+          openssl version
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -51,7 +61,7 @@ jobs:
   e2e:
     name: extension end-to-end (Chromium, CDP)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
