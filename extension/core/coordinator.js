@@ -12,15 +12,19 @@ export function normalizeOrigin(value) {
 export function trustedApp(sender, extensionId, root) {
   if (sender?.id !== extensionId || !Number.isInteger(sender.tab?.id) || sender.frameId !== 0) return false;
   try {
-    const url = new URL(sender.url);
-    return url.origin === new URL(root).origin && url.protocol === 'chrome-extension:' &&
-      url.host === new URL(root).host && url.pathname === '/index.html' && !url.hash &&
-      sender.tab.url === sender.url;
+    const appHost = new URL(root).host;
+    // Chrome preserves the document's initial sender URL across SPA history changes.
+    // Authenticate both app locations independently; chooser queries stay exact below.
+    return [sender.url,sender.tab.url].every(value => {
+      const url = new URL(value);
+      return url.protocol === 'chrome-extension:' && url.host === appHost &&
+        url.pathname === '/index.html' && !url.hash;
+    });
   } catch { return false; }
 }
 export function trustedChooser(sender, item, extensionId, root) {
   return trustedApp(sender, extensionId, root) && sender.tab.id === item.chooserTabId &&
-    sender.url === `${root}index.html?request=${item.id}`;
+    sender.url === `${root}index.html?request=${item.id}` && sender.tab.url === sender.url;
 }
 export class Coordinator {
   requests = new Map();

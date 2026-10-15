@@ -110,3 +110,10 @@ test('worker-initiated disconnect immediately revokes outstanding chooser author
   await assert.rejects(env.bridge.handleMessage({type:'request:begin',id:item.id},chooser(item)),/expired/i);
   await port.onDisconnect.emit();assert.equal(env.bridge.coordinator.requests.size,0);
 });
+
+test('site management accepts main app after history replaces its search parameters',async()=>{
+  const env=setup();await env.bridge.ready;env.state.granted.add('https://site.test/*');
+  const navigated={...app(),tab:{id:9,url:'chrome-extension://extension/index.html?tab=verificar'}};
+  assert.equal(await env.bridge.handleMessage({type:'sites:set',origin:'https://site.test',enabled:true},navigated),true);
+  assert.deepEqual(env.state.enabled,['https://site.test']);
+});

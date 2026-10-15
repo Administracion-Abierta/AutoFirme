@@ -64,3 +64,26 @@ test('expiry and stale document invalidation reject late results without fallbac
   const stale=c.capture(sender(),sign,r=>results.push(r));c.invalidateDocument(4,0,'document-new');
   assert.equal(c.get(stale.id),undefined);assert.equal(c.finish(stale.id,{kind:'fallback'}),false);assert.equal(results.at(-1).kind,'error');
 });
+
+test('main app management survives SPA search changes while both document and tab remain own app',()=>{
+  const app={id:'extension',url:root+'index.html',tab:{id:15,url:root+'index.html?tab=verificar'},frameId:0};
+  assert.equal(trustedApp(app,'extension',root),true);
+  const forbidden=[
+    'https://outside.test/index.html',
+    'chrome-extension://outside/index.html',
+    root+'index.html.evil',
+    root+'other.html',
+    root+'index.html#section',
+  ];
+  for(const url of forbidden){
+    assert.equal(trustedApp({...app,url},'extension',root),false,url);
+    assert.equal(trustedApp({...app,tab:{...app.tab,url}},'extension',root),false,url);
+  }
+});
+
+test('chooser tab URL must still exactly match its request after main app query relaxation',()=>{
+  const c=new Coordinator();const item=c.capture(sender(),sign,()=>{});item.chooserTabId=15;
+  for(const url of [root+'index.html',root+'index.html?request='+item.id+'&tab=verificar',root+'index.html?request='+crypto.randomUUID()]){
+    assert.equal(trustedChooser({...ui(item.id),tab:{id:15,url}},item,'extension',root),false,url);
+  }
+});
