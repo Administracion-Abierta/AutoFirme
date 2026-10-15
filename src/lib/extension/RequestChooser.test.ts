@@ -26,7 +26,6 @@ function mount(failAt = '') {
  return calls;
 }
 async function choose() {
- await fireEvent.click(await screen.findByRole('button',{name:new RegExp(copy.es.selectSign)}));
  await fireEvent.click(await screen.findByRole('button',{name:/My signing certificate/}));
  await fireEvent.input(document.querySelector('#store-pin')!,{target:{value:FIXTURE_PIN}});
  await fireEvent.click(screen.getByRole('button',{name:copy.es.storeOpen}));
@@ -71,7 +70,7 @@ it('keeps certificate selection, cancellation and fallback available when the ce
  await waitFor(() => expect((document.querySelector('#request-fallback') as HTMLButtonElement).disabled).toBe(false));
  expect((document.querySelector('#request-cancel') as HTMLButtonElement).disabled).toBe(false);
  expect((document.querySelector('#request-confirm') as HTMLButtonElement).disabled).toBe(true);
- expect(document.querySelector('#pkcs12-picker')).not.toBeNull();
+ expect(document.querySelector('#pkcs12-choices')).not.toBeNull();
  expect(document.querySelector('#request-error')?.textContent).toContain('El certificado ha caducado.');
  expect(calls).toEqual(['request:get']);
  await fireEvent.click(document.querySelector('#request-fallback')!);
@@ -86,5 +85,15 @@ it('keeps fallback disabled after begin when completing the operation fails', as
  await waitFor(() => expect(calls).toEqual(['request:get', 'request:begin', 'request:complete', 'request:fail']));
  expect((document.querySelector('#request-fallback') as HTMLButtonElement).disabled).toBe(true);
  expect((document.querySelector('#request-cancel') as HTMLButtonElement).disabled).toBe(true);
- expect(document.querySelector('#pkcs12-picker')).toBeNull();
+ expect(document.querySelector('#pkcs12-choices')).toBeNull();
+});
+
+
+it('shows real saved certificate choices beside the website immediately without a nested dialog', async () => {
+ const calls = mount();
+ await screen.findByRole('button', {name:/My signing certificate/});
+ expect(document.querySelector('#request-origin')?.textContent).toBe('https://example.com');
+ expect(screen.queryByRole('dialog')).toBeNull();
+ expect(screen.getByRole('button', {name:new RegExp(copy.es.addSign)})).toBeTruthy();
+ expect(calls).toEqual(['request:get']);
 });
