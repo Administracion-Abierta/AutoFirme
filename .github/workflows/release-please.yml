@@ -1,0 +1,23 @@
+name: Release Please
+
+# Conventional commits merged into main become a release PR (version bump in
+# package.json and extension/manifest.json + CHANGELOG.md). Merging that PR tags vX.Y.Z
+# and publishes a GitHub release, which is what triggers `release.yml`.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

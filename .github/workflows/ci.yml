@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: check, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Debian trixie (OpenSSL 3.5) instead of the runner image (OpenSSL 3.0: the fixture
+    # generator in src/test/fixtures.ts needs >= 3.4 for `-not_before`/`-not_after`).
+    container:
+      image: debian:trixie
+    steps:
+      # The image is minimal and checkout needs git, so the toolchain comes first.
+      - name: Toolchain
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends git openssl unzip python3 ca-certificates xmlsec1 libxml2-utils
+          # The workspace is mounted from the host; without this, git refuses to read it.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          openssl version
+          xmlsec1 --version
+          xmllint --version
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      # package.json and extension/manifest.json must agree before anything is packaged.
+      - run: pnpm check:versions
+      # Webapp plus extension suites; the extension tests need no build output.
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm build:extension
+      - run: pnpm check:extension
+      # Cross-checks against tools that did not write the artifacts: Info-ZIP for
+      # the batch archive, openssl/python3 for every fixture (positive and negative).
+      - run: pnpm verify:zip
+      - run: bash test/fixtures/verify-fixtures.sh
+      - run: pnpm package:extension
+      - uses: actions/upload-artifact@v4
+        with:
+          name: autofirme-extension
+          path: |
+            dist/autofirme-extension-*.zip
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+  e2e:
+    name: extension end-to-end (Chromium, CDP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:extension
+      # Chrome for Testing keeps --load-extension, which branded Chrome >=137 dropped;
+      # the harness picks the binary up from ~/.cache/ms-playwright by itself.
+      - run: npx --yes playwright@1.64.1 install --with-deps chromium
+      - run: pnpm test:extension:browser

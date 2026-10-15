@@ -1,6 +1,6 @@
 {
   "name": "autofirme-web",
-  "version": "0.0.0",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.24.0",
@@ -12,16 +12,17 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run && node --test extension/tests/*.test.js && node --test scripts/check-extension.test.mjs",
     "verify:zip": "node scripts/verify-batch-zip.mjs",
     "verify:real": "bash scripts/smoke-real.sh",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "build:extension": "node scripts/build-extension.mjs",
+    "build:extension": "svelte-kit sync && node scripts/build-extension.mjs",
     "check:extension": "node scripts/check-extension.mjs",
     "test:extension:unit": "node --test extension/tests/*.test.js",
     "test:extension:browser": "node scripts/test-extension-browser.mjs",
     "test:extension:artifacts": "node --test scripts/check-extension.test.mjs",
-    "package:extension": "python3 scripts/package-extension.py"
+    "package:extension": "python3 scripts/package-extension.py",
+    "check:versions": "node scripts/check-versions.mjs"
   },
   "devDependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
