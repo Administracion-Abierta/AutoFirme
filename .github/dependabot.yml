@@ -1,6 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: pnpm
+  # GitHub's YAML value for pnpm lockfiles is "npm" (NpmAndYarn ecosystem).
+  - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
