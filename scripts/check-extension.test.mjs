@@ -12,13 +12,20 @@ const manifest = {
 };
 const good = {
   'manifest.json': JSON.stringify(manifest),
-  'index.html': '<link href="assets/app.css"><script src="assets/app.js"></script>',
+  'index.html': '<link href="assets/app.css"><script type="module" src="assets/app.js"></script>',
   'assets/app.css': '.flex{display:flex}.grid{display:grid}',
   'assets/app.js': '/* PKCS timestamp CAdES PAdES XAdES */',
   'background.js': '', 'page.js': '', 'content.js': ''
 };
 for (const [name, changes, message] of [
   ['accepts self-contained app', {}, null],
+  ['rejects removed app entry with orphan bundle retained', { 'index.html': '<link href="assets/app.css">' }, 'application module entry absent'],
+  ['rejects classic script as app entry', { 'index.html': '<script src="assets/app.js"></script>' }, 'application module entry absent'],
+  ['rejects orphan app features when entry is empty', { 'assets/entry.js': '', 'index.html': '<script type="module" src="assets/entry.js"></script>' }, 'full application feature absent'],
+  ['accepts features in reachable app import', { 'assets/entry.js': 'import "./app.js";', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
+  ['accepts features in reachable dynamic import', { 'assets/entry.js': 'import("./app.js");', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
+  ['accepts features in re-exported chunk', { 'assets/entry.js': 'export * from "./app.js";', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
+  ['rejects missing reachable chunk', { 'assets/app.js': 'import "./missing.js";' }, 'ENOENT'],
   ['rejects inline bootstrap', { 'index.html': '<script>mountApp()</script>' }, 'inline executable script'],
   ['rejects eval', { 'assets/app.js': 'eval("remote")' }, 'dynamic code execution'],
   ['rejects missing assets', { 'index.html': '<script src="missing.js"></script>' }, 'ENOENT'],

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
+import ts from 'typescript';
 
 const root = path.resolve(process.argv[2] ?? 'dist/extension');
 const read = (name) => readFile(path.join(root, name), 'utf8');
@@ -29,8 +30,49 @@ const javascript = await Promise.all((await files(root)).filter((name) => name.e
 const code = javascript.join('\n');
 assert.ok(!/\beval\s*\(|\bnew\s+Function\s*\(/.test(code), 'dynamic code execution');
 assert.ok(!/serviceWorker\s*\.\s*register\s*\(/.test(code), 'webapp worker registration');
+// A complete orphaned bundle cannot prove that index.html actually loads the app.
+const moduleEntries = [...html.matchAll(/<script\b([^>]*)>/gi)]
+  .map((match) => match[1])
+  .filter((attributes) => /\btype=["']module["']/i.test(attributes))
+  .map((attributes) => /\bsrc=["']([^"']+)["']/i.exec(attributes)?.[1])
+  .filter(Boolean);
+assert.ok(moduleEntries.length > 0, 'application module entry absent');
+const reachable = new Map();
+function localModule(specifier, importer) {
+  assert.ok(!/^[a-z][a-z\d+.-]*:|^\/\//i.test(specifier), 'remote application module');
+  assert.ok(specifier.startsWith('.') || specifier.startsWith('/'), 'unbundled application module');
+  const filename = specifier.startsWith('/')
+    ? path.resolve(root, `.${specifier}`)
+    : path.resolve(path.dirname(importer), specifier);
+  assert.ok(filename.startsWith(`${root}${path.sep}`), 'application module escapes package');
+  return filename;
+}
+async function visitModule(filename) {
+  if (reachable.has(filename)) return;
+  const source = await readFile(filename, 'utf8');
+  reachable.set(filename, source);
+  // Parse JavaScript rather than matching import-like strings in comments or data.
+  const syntax = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS);
+  const imports = [];
+  function visit(node) {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
+      assert.ok(ts.isStringLiteral(node.moduleSpecifier), 'nonliteral module dependency');
+      imports.push(node.moduleSpecifier.text);
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      assert.ok(node.arguments.length > 0 && ts.isStringLiteral(node.arguments[0]), 'nonliteral dynamic module dependency');
+      imports.push(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(syntax);
+  for (const specifier of imports) await visitModule(localModule(specifier, filename));
+}
+for (const entry of moduleEntries) {
+  await visitModule(localModule(entry.startsWith('/') || entry.startsWith('.') ? entry : `./${entry}`, path.join(root, 'index.html')));
+}
+const applicationCode = [...reachable.values()].join('\n');
 for (const feature of ['PKCS', 'timestamp', 'CAdES', 'PAdES', 'XAdES']) {
-  assert.ok(code.includes(feature), `full application feature absent: ${feature}`);
+  assert.ok(applicationCode.includes(feature), `full application feature absent: ${feature}`);
 }
 const cssFiles = (await files(root)).filter((name) => name.endsWith('.css'));
 const css = (await Promise.all(cssFiles.map((name) => readFile(name, 'utf8')))).join('\n');
