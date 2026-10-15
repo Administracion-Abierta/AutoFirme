@@ -1,0 +1,134 @@
+name: Release
+
+# Tag v* → artefactos verificables → GitHub Release + imagen ghcr (+ Chrome Web Store
+# cuando existan los secretos). Refs #3
+# Nota: el nombre del zip sale de extension/manifest.json ("version"); antes de
+# etiquetar, sincronizar esa version con el tag.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: build, determinar, publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Construccion A: sitio estatico del adaptador + extension + paquete.
+      - name: Build and package (A)
+        run: |
+          pnpm build
+          pnpm build:extension
+          pnpm package:extension
+          cp dist/SHA256SUMS sums-a.txt
+
+      # Construccion B desde cero: dos builds del mismo commit deben dar el mismo
+      # SHA256SUMS. Si package-extension.py pierde el determinismo, esto rompe aqui.
+      - name: Build and package (B) and compare
+        run: |
+          rm -rf dist build .svelte-kit
+          pnpm build
+          pnpm build:extension
+          pnpm package:extension
+          diff sums-a.txt dist/SHA256SUMS
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/autofirme-extension-*.zip dist/SHA256SUMS
+
+      - name: Attesting build provenance para el zip
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ github.workspace }}/dist/autofirme-extension-*.zip
+
+  docker:
+    name: imagen de contenedor a ghcr
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=${{ github.ref_name }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@v6
+        with:
+          file: Containerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # self-host (k3s) es x86_64; anadir platforms aqui si aparece destino arm.
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Publicacion en Chrome Web Store cuando la cuenta exista: la variable de
+  # repositorio CWS_EXTENSION_ID activa el trabajo; hacen falta ademas los
+  # secretos OAuth (OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET, OAUTH_REFRESH_TOKEN).
+  # OJO: la Web Store exige politica de privacidad con host_permissions amplias
+  # — resolver antes el issue de permisos opcionales.
+  chrome-webstore:
+    name: Chrome Web Store
+    needs: release
+    if: ${{ vars.CWS_EXTENSION_ID != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      # No se reempaqueta: se descarga el zip ya publicado y se verifica su hash.
+      - name: Descargar zip de la release
+        id: zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$GITHUB_REF_NAME" -p 'autofirme-extension-*.zip' -p 'SHA256SUMS'
+          sha256sum --check SHA256SUMS
+          zip_path=$(printf '%s\n' autofirme-extension-*.zip | head -n 1)
+          echo "path=$PWD/$zip_path" >> "$GITHUB_OUTPUT"
+      - name: Subir a la Chrome Web Store
+        uses: browser-actions/release-chrome-extension@master
+        with:
+          extension-id: ${{ vars.CWS_EXTENSION_ID }}
+          extension-path: ${{ steps.zip.outputs.path }}
+          oauth-client-id: ${{ secrets.OAUTH_CLIENT_ID }}
+          oauth-client-secret: ${{ secrets.OAUTH_CLIENT_SECRET }}
+          oauth-refresh-token: ${{ secrets.OAUTH_REFRESH_TOKEN }}
