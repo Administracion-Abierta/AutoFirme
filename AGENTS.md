@@ -57,8 +57,10 @@ Build/test from the repo root (pnpm is canonical; the lockfile and `Containerfil
 ## Agent workflow
 
 - Work on branches; `Refs #N` only in commits (never closing keywords).
-- Issues on Forgejo (git.eduard3v.com/EduarD3V/AutoFirme) drive the fleet (bullet).
-  Big problems get split into ≤~400-line deliverables per issue.
+- Issues on GitHub (github.com/Administracion-Abierta/AutoFirme) drive the fleet (bullet).
+  Big problems get split into ≤~400-line deliverables per issue; PRs to `main` need CI green
+  (`checks`, `e2e`, `secret-scan`, `dependency-audit`), 1 review, and `CODEOWNERS` sign-off on
+  the crypto paths.
 - Crypto code MUST ship with a verification check (e.g. generated signature verified
   by `openssl cms -verify` in a script/test) before the issue can move to review.
 - UI: clean, modern, accessible; ES/EN copy. Prettier than AutoFirma is a requirement,
