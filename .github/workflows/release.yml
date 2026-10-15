@@ -56,9 +56,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # `|| upload --clobber`: re-ejecucion idempotente cuando un paso
+          # posterior (attestation) fallo tras crear la release.
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes \
+            dist/autofirme-extension-*.zip dist/SHA256SUMS ||
+          gh release upload "$GITHUB_REF_NAME" --clobber \
             dist/autofirme-extension-*.zip dist/SHA256SUMS
 
       - name: Attesting build provenance para el zip
@@ -68,6 +72,7 @@ jobs:
 
   docker:
     name: imagen de contenedor a ghcr
+    needs: release
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -125,7 +130,8 @@ jobs:
           zip_path=$(printf '%s\n' autofirme-extension-*.zip | head -n 1)
           echo "path=$PWD/$zip_path" >> "$GITHUB_OUTPUT"
       - name: Subir a la Chrome Web Store
-        uses: browser-actions/release-chrome-extension@master
+        # SHA fijo de master (ultima tag, v0.2.1, corre en node20).
+        uses: browser-actions/release-chrome-extension@0d9fa09bc1baea4c18ca62ffbf37e400572628a0
         with:
           extension-id: ${{ vars.CWS_EXTENSION_ID }}
           extension-path: ${{ steps.zip.outputs.path }}
