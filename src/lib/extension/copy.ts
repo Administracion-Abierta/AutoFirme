@@ -1,3 +1,4 @@
+import type { Lang } from '#lib/i18n';
 export const extensionCopy = {
  es: {
   requestDetails:'Detalles de la solicitud', certDetails:'Detalles del certificado', copyDigest:'Copiar SHA256', digestCopied:'SHA256 copiado', copyFailed:'No se pudo copiar el SHA256. Puedes consultarlo en los detalles de la solicitud.',
@@ -31,3 +32,14 @@ export const extensionCopy = {
   ca:'Choose a personal signing certificate, not a certificate authority.', keyUsage:'The certificate does not permit document signing.'
  }
 };
+// Worker and runtime errors arrive as fixed English sentences; translate the known ones and pass anything else through.
+const errorMessages: Record<string, [string, string]> = {
+ 'The requesting document has changed': ['El documento de la página solicitante ha cambiado.', 'The requesting document has changed.'],
+ 'Request state does not permit this action': ['El estado de la solicitud no permite esta acción.', 'Request state does not permit this action.'],
+ 'Website permission was removed or the document has changed': ['Se retiró el permiso del sitio o el documento ha cambiado.', 'Website permission was removed or the document has changed.'],
+ 'Use an HTTP or HTTPS origin': ['Usa un origen HTTP o HTTPS.', 'Use an HTTP or HTTPS origin.']
+};
+export function errorCopy(lang: Lang, message: string): string {
+ const pair = errorMessages[message];
+ return pair ? pair[lang === 'es' ? 0 : 1] : message;
+}

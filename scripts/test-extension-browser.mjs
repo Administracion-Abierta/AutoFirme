@@ -263,5 +263,6 @@ try {
 } finally {
   cdp?.close(); processHandle?.kill('SIGKILL');
   if (server) await new Promise(resolve=>server.close(resolve));
-  await rm(directory,{recursive:true,force:true});
+  // SIGKILL can leave the profile mid-write: retry the removal so it never masks the real error.
+  await rm(directory,{recursive:true,force:true,maxRetries:20,retryDelay:100});
 }

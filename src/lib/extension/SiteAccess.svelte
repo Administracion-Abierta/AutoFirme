@@ -4,7 +4,7 @@
  import { Input } from '#lib/components/ui/input/index.js';
  import type { Lang } from '#lib/i18n';
  import { exactOrigin, requestOriginPermission, rpc, type Rpc } from './runtime';
- import { extensionCopy } from './copy';
+ import { extensionCopy, errorCopy } from './copy';
  let {lang='es',send=rpc}: {lang?:Lang;send?:Rpc} = $props();
  const t=$derived(extensionCopy[lang]);
  let origins=$state<string[]>([]);
@@ -14,7 +14,7 @@
  let status=$state('');
  let busy=$state(false);
  onMount(()=>{void refresh().catch(report);});
- function report(reason:unknown) {error=reason instanceof Error ? reason.message : String(reason);}
+ function report(reason:unknown) {error=errorCopy(lang,reason instanceof Error ? reason.message : String(reason));}
  async function refresh(){
   const result=await send({type:'sites:list'}) as {disabledOrigins:string[];suggestedOrigin:string|null};
   origins=result.disabledOrigins;

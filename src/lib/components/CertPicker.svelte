@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { StoreError, type IdentityMeta, type Vault } from '#lib/certstore';
 	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -63,6 +64,15 @@
 	let session = $state<SignerSession | null>(null);
 	let storeError = $state('');
 	let fileInput = $state<HTMLInputElement | null>(null);
+	// The compact chooser has no dialog focus trap: the pressed row unmounts when its PIN form
+	// opens, and an applied sign leaves the list. Park focus on a node that survives each change.
+	$effect(() => {
+		if (compact && openId) void tick().then(() => document.getElementById('store-pin')?.focus());
+	});
+	$effect(() => {
+		if (compact && usedId && cert)
+			void tick().then(() => document.getElementById('pkcs12-selection')?.focus());
+	});
 
 	const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
@@ -222,7 +232,7 @@
 	<!-- The trigger is a file-shaped target: dashed and dim until a sign is loaded, then solid. -->
 	{#if compact}
 		{#if cert}
-			<div id="pkcs12-selection" class="border-primary/60 grid min-w-0 gap-1 rounded-lg border p-2.5">
+		<div id="pkcs12-selection" tabindex="-1" class="border-primary/60 grid min-w-0 gap-1 rounded-lg border p-2.5">
 				<div class="flex min-w-0 items-center gap-2">
 					<FileIcon class="text-primary size-4 shrink-0"/>
 					<div class="min-w-0">
@@ -457,7 +467,7 @@
 
 {#snippet certificateSummary()}
 	<FileIcon
-		class={cn(compact ? 'size-6 shrink-0' : 'size-12 shrink-0', chosen ? 'text-primary' : 'text-muted-foreground/70')}
+		class={cn('size-12 shrink-0', chosen ? 'text-primary' : 'text-muted-foreground/70')}
 		stroke-width={1.25}
 	/>
 	<span

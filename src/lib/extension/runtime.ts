@@ -13,7 +13,7 @@ export type Message = { type: string; [key: string]: unknown };
 export type Rpc = (message: Message) => Promise<unknown>;
 interface ChromeApi {
  runtime: { sendMessage(message: Message): Promise<{ ok: boolean; value?: unknown; error?: string }> };
- permissions: { request(grant: { origins: string[] }): Promise<boolean>; remove(grant: {origins: string[]}): Promise<boolean> };
+ permissions: { request(grant: { origins: string[] }): Promise<boolean> };
 }
 export function isExtension(locationLike: Pick<Location, 'protocol'> | undefined = typeof location === 'object' ? location : undefined): boolean {
  return locationLike?.protocol === 'chrome-extension:';
@@ -36,7 +36,4 @@ export function exactOrigin(input: string): string {
 }
 export function requestOriginPermission(input: string): Promise<boolean> {
  return api().permissions.request({ origins: [`${exactOrigin(input)}/*`] });
-}
-export function removeOriginPermission(input: string): Promise<boolean> {
- return api().permissions.remove({ origins: [`${exactOrigin(input)}/*`] });
 }
