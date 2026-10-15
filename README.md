@@ -22,7 +22,7 @@ pnpm build
 The complete webapp is also available as a responsive Manifest V3 extension, with
 a certificate chooser for supported website AutoFirma requests. Build with
 `pnpm build:extension` and load `dist/extension` in Chrome Developer mode.
-See [extension installation, features and security boundaries](docs/chrome-extension.md).
+See [extension installation, features and security boundaries](docs/CHROME-EXTENSION.md).
 
 ## Stack
 

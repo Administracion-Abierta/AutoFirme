@@ -20,3 +20,7 @@ webapp identities are not automatically copied.
 
 Do not publish this package until its license is resolved: upstream revision
 `d6dfa434d3be2aa2ed53b3956f7d10c3ab8c1035` did not declare an application license.
+
+See [the extension guide](../docs/CHROME-EXTENSION.md),
+[design](../docs/CHROME-EXTENSION-DESIGN.md) and
+[verification results](../docs/CHROME-EXTENSION-VERIFICATION.md).

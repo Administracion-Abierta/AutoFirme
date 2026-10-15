@@ -1,11 +1,14 @@
-# AutoFirme Chrome extension
+# Chrome extension
 
-This extension is built in the AutoFirme repository and renders its actual Svelte
-webapp. It is a separate implementation from the earlier SuperFirma project. The
-app, certificate store, signing engines, verification engines, batch queue and
-stamp controls are shared with the ordinary web build.
+The Chrome extension renders the AutoFirme Svelte webapp. It shares the app,
+certificate store, signing and verification engines, batch queue and stamp controls
+with the ordinary web build.
 
-## Build and install
+See [CHROME-EXTENSION-DESIGN.md](CHROME-EXTENSION-DESIGN.md) for the implementation
+and request protocol, and [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md)
+for the recorded checks and remaining manual tests.
+
+## 1. Build and install
 
 Use Node 22+ (Node 24 verified), pnpm 11.24.0, and Chrome/Chromium 116+:
 
@@ -15,8 +18,7 @@ pnpm check
 pnpm build:extension
 ```
 
-Disable the earlier SuperFirma extension before using this implementation, so two
-extensions do not intercept the same signing call.
+Disable other extensions that intercept AutoFirma calls before testing this one.
 
 In `chrome://extensions`, enable Developer mode and choose Load unpacked, then
 select `dist/extension`. Pin AutoFirme to the toolbar. Clicking it opens the
@@ -27,7 +29,7 @@ The standalone web build remains `pnpm build`, producing `build/`. Extension cod
 is bundled locally; this is not a hosted iframe. The extension uses Chrome's
 installation/update system, so PWA install/update buttons are web-only.
 
-## App features
+## 2. App features
 
 Use the same signing and verification workflows, certificate import and saved
 identities, PDF visible image/text stamps, implemented signature formats, batch
@@ -41,7 +43,7 @@ webapp and extension are different origins: existing webapp storage does not
 migrate automatically. Import certificates into the extension. The extension does
 not provide operating-system certificate-store access or a native helper.
 
-## Signing requests from websites
+## 3. Signing requests from websites
 
 Interception is enabled on all HTTP and HTTPS websites by default. Chrome requests
 website access when the extension is installed or updated. Reload already-open
@@ -81,11 +83,12 @@ methods, formats, algorithms, parameters, sticky identities and custom stores
 continue through the original implementation unchanged. This website contract is
 narrower than the full app's interactive feature set.
 
-## Security boundaries and limits
+## 4. Security boundaries and limits
 
 HTTP/HTTPS websites with Chrome host access get MAIN/isolated-world bridge scripts,
-except origins disabled in AutoFirme. Request identity comes from Chrome's sender tab/frame/document data; it is not accepted
-from a website-supplied origin field. An opaque ID is bound to the actual chooser
+except origins disabled in AutoFirme. Chrome supplies the requesting tab, frame
+and document identity. The bridge does not accept an origin
+supplied by the website. An opaque ID is bound to the actual chooser
 tab. Other app tabs cannot confirm or retrieve that chooser's payload. Private
 keys and PINs stay in extension-owned contexts; callbacks receive only the public
 certificate and signature. Navigation, stale documents, timeouts and disconnects
@@ -102,7 +105,7 @@ The upstream revision is `d6dfa434d3be2aa2ed53b3956f7d10c3ab8c1035`. No declared
 license was found in that revision; clarify distribution rights before publishing.
 No original installers or decompiled Java trees are included in this extension.
 
-## Verification commands
+## 5. Verification commands
 
 ```sh
 pnpm test --maxWorkers=2
@@ -126,6 +129,6 @@ first request with fresh storage, without enabling the fixture origin. Chrome's
 native grant prompts and actual desktop AutoFirma launch need separate manual
 checks.
 
-See the [verification record](chrome-extension-verification.md) for executed checks
+See the [verification record](CHROME-EXTENSION-VERIFICATION.md) for executed checks
 and remaining manual/environment-specific checks. `pnpm package:extension` packages
 the existing verified build; rebuild first after making source changes.
