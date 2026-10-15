@@ -29,7 +29,7 @@ See [extension installation, features and security boundaries](docs/CHROME-EXTEN
 - SvelteKit 3 (static adapter) + Svelte 5 runes + Vite + TypeScript
 - Tailwind CSS v4 (`@tailwindcss/vite`)
 - shadcn-svelte components (bits-ui) on the same tokens; dark mode is the `.dark` class on `<html>`,
-  driven by the system preference from an inline script in `src/app.html` (#27)
+  set before first paint by `static/theme-bootstrap.js` (saved preference, system fallback), loaded from `src/app.html` (#27)
 - pnpm, Node 22 for builds
 - Vitest + `@testing-library/svelte` + jsdom for the smoke test
 

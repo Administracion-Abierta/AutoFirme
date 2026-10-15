@@ -127,10 +127,14 @@ bash test/fixtures/verify-fixtures.sh
 ```
 
 The extension browser workflow uses a disposable unpacked Chromium profile, local
-non-binding website fixture and freshly generated OpenSSL test certificate. It
-requires OpenSSL and Chrome/Chromium. Set `CHROME_PATH` to its executable, or install
+non-binding website fixture and freshly generated OpenSSL test certificate. It requires OpenSSL,
+`unzip` (batch-ZIP check) and Chrome/Chromium. Set `CHROME_PATH` to its executable, or install
 Chromium using Playwright's browser installer (the script can discover its Linux
-cache). The browser test loads the production all-sites manifest and checks the
+cache: `npx playwright install --with-deps chromium` leaves the binary in
+`~/.cache/ms-playwright/chromium-<build>/chrome-linux64/chrome`). Branded Google Chrome builds 137
+and newer ignore `--load-extension`; use Chromium or Chrome for Testing, and the script rejects a
+branded `CHROME_PATH` before launching. `pnpm package:extension` additionally requires `python3`.
+The browser test loads the production all-sites manifest and checks the
 first request with fresh storage, without enabling the fixture origin. Chrome's
 native grant prompts and actual desktop AutoFirma launch need separate manual
 checks.

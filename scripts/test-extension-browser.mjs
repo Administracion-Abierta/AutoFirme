@@ -23,7 +23,8 @@ try {
   let executable = process.env.CHROME_PATH;
   if (!executable) {
     const cache = join(homedir(), '.cache/ms-playwright');
-    const entries = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a,b) => Number(b.split('-')[1])-Number(a.split('-')[1]));
+    let entries = [];
+    try {entries = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a,b) => Number(b.split('-')[1])-Number(a.split('-')[1]));} catch {} // No Playwright cache anywhere: fall through to the CHROME_PATH hint below instead of ENOENT.
     for (const entry of entries) {
       for (const suffix of ['chrome-linux64/chrome', 'chrome-linux/chrome']) {
         const candidate = join(cache, entry, suffix);
@@ -33,6 +34,11 @@ try {
     }
   }
   if (!executable) throw Error('Set CHROME_PATH to Chrome/Chromium or install Chromium with Playwright.');
+  // Branded Google Chrome builds >=137 ignore --load-extension; only Chromium and Chrome for
+  // Testing keep it. Say so before launch instead of dying on a chooser timeout.
+  const version = spawnSync(executable, ['--version'], {encoding: 'utf8'});
+  const flavour = `${version.stdout ?? ''}${version.stderr ?? ''}`.trim();
+  if (/^Google Chrome\b/.test(flavour) && !/for Testing/.test(flavour)) throw Error(`${flavour} ignores --load-extension since 137. Set CHROME_PATH to Chromium or Chrome for Testing, e.g. after: npx playwright install --with-deps chromium (~/.cache/ms-playwright/chromium-<build>/chrome-linux64/chrome).`);
   const fixture = await readFile('test/extension-site.html');
   server = createServer((request, response) => {response.writeHead(200, {'content-type': 'text/html; charset=utf-8'}); response.end(fixture);});
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
