@@ -51,7 +51,9 @@ function namePairs(node: Der): Array<[string, string]> {
 	const pairs: Array<[string, string]> = [];
 	for (const set of node.children) {
 		for (const attribute of set.children) {
-			pairs.push([oid(attribute.children[0]), string(attribute.children[1])]);
+			const value = attribute.children[1];
+			// NumericString is legal in certificate names; decode it as ASCII for display only.
+			pairs.push([oid(attribute.children[0]), value.tag === 0x12 ? new TextDecoder().decode(value.value) : string(value)]);
 		}
 	}
 	return pairs;
@@ -156,4 +158,15 @@ export function samePublicKey(a: PublicKey, b: PublicKey): boolean {
 	}
 	if (a.kind === 'ec' && b.kind === 'ec') return sameBytes(a.point, b.point);
 	return false;
+}
+
+/** CMS needs the encoded name, never a decoded display name (which may use unusual string tags). */
+export function certificateIdentity(der: Bytes): Pick<Certificate, 'issuerDer' | 'serialDer'> {
+ const certificate = parseDer(der);
+ const tbs = certificate.children[0];
+ const offset = tbs.children[0].tag === 0xa0 ? 1 : 0;
+ const serial = tbs.children[offset];
+ const issuer = tbs.children[offset + 2];
+ if (certificate.tag !== 0x30 || tbs.tag !== 0x30 || serial.tag !== 0x02 || issuer.tag !== 0x30) throw new Error('invalid certificate');
+ return { issuerDer: issuer.raw, serialDer: serial.raw };
 }

@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { type Bytes, concatBytes, derInteger, objectId, seq, setOf, tlv } from './asn1';
+import { type Bytes, concatBytes, derInteger, objectId, parseDer, seq, setOf, tlv } from './asn1';
 import { parseCertificate } from './x509';
 
 /** OID of a name attribute (CN) and of the RSA public-key algorithm. */
@@ -66,4 +66,21 @@ describe('certificate times', () => {
 		expect(withSeconds.notBefore.toISOString()).toBe('2025-01-01T00:00:00.000Z');
 		expect(withoutSeconds.notBefore.toISOString()).toBe('2025-01-01T00:00:00.000Z');
 	});
+});
+
+it('extracts CMS issuer and serial without decoding legal NumericString names', async () => {
+ const { certificateIdentity } = await import('./x509');
+ const issuer = seq(setOf(seq(objectId(OID_CN), tlv(0x12, utf8('12345')))));
+ const algorithm = seq(objectId(OID_RSA), tlv(0x05, new Uint8Array()));
+ const der = seq(seq(tlv(0xa0, derInteger(2)), derInteger(4097), algorithm, issuer), algorithm);
+ expect(certificateIdentity(der)).toEqual({ issuerDer: issuer, serialDer: derInteger(4097) });
+});
+
+it('shows legal NumericString names when importing a certificate', () => {
+ const original = certificate(generalizedTime('20250101000000Z'), generalizedTime('20300101000000Z'));
+ const parsed = parseDer(original);
+ const children = parsed.children[0].children.map((node) => node.raw);
+ children[3] = seq(setOf(seq(objectId(OID_CN), tlv(0x12, utf8('12345')))));
+ const encoded = seq(seq(...children), ...parsed.children.slice(1).map((node) => node.raw));
+ expect(parseCertificate(encoded).issuer).toBe('CN=12345');
 });

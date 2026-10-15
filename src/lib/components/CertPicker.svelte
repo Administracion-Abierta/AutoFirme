@@ -22,6 +22,8 @@
 	import XIcon from '@lucide/svelte/icons/x';
 
 	interface Props {
+		/** Compact extension chooser trigger and identity rows. */
+		compact?: boolean;
 		copy: Copy;
 		/** Selected certificate, or null while nothing is loaded. */
 		cert: SignerCert | null;
@@ -30,7 +32,7 @@
 		onpick: (cert: SignerCert | null, chain: readonly SignerCert[]) => void;
 	}
 
-	let { copy, cert, vault, onpick }: Props = $props();
+	let { copy, cert, vault, onpick, compact = false }: Props = $props();
 
 	let file = $state<File | null>(null);
 	// A picked file already counts as a chosen signature: the dotted dim look is only the empty state.
@@ -219,7 +221,8 @@
 		id="pkcs12-picker"
 		variant="outline"
 		class={cn(
-			'min-h-28 h-auto w-full flex-col gap-2 px-4 py-4 text-center',
+			'h-auto w-full flex-col gap-2 px-4 py-4 text-center',
+			compact ? 'min-h-20' : 'min-h-28',
 			chosen
 				? 'border-primary/60'
 				: 'border-2 border-dashed border-muted-foreground/40 text-muted-foreground/70'
@@ -231,7 +234,7 @@
 		}}
 	>
 		<FileIcon
-			class={cn('size-12 shrink-0', chosen ? 'text-primary' : 'text-muted-foreground/70')}
+			class={cn(compact ? 'size-6 shrink-0' : 'size-12 shrink-0', chosen ? 'text-primary' : 'text-muted-foreground/70')}
 			stroke-width={1.25}
 		/>
 		<span
@@ -283,7 +286,7 @@
 </div>
 
 <Dialog bind:open={pickerOpen}>
-	<DialogContent class="sm:max-w-2xl">
+	<DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
 		<DialogHeader>
 			<DialogTitle>{copy.storeTitle}</DialogTitle>
 			<DialogDescription>{copy.storeHint}</DialogDescription>
@@ -344,7 +347,7 @@
 			</div>
 		{:else}
 		<!-- Four columns, four rows tall, the rest scrolls. -->
-		<div class="grid max-h-80 grid-cols-4 gap-3 overflow-y-auto pr-1">
+		<div class={cn("grid max-h-80 gap-3 overflow-y-auto pr-1", compact ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-4")}>
 			{#if pending}
 				<!-- The sign sitting in memory: first cell, and no button — there is nothing to re-pick. -->
 				<div class="relative rounded-lg border">

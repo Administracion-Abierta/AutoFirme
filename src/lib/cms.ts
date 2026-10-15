@@ -1,10 +1,9 @@
 /**
- * CAdES-BES detached signatures (RFC 5652 CMS + RFC 5035 / ETSI EN 319 122), built by hand.
+ * CAdES-BES signatures (RFC 5652 CMS + RFC 5035 / ETSI EN 319 122), built by hand.
  *
  * The document digest and the RSA/ECDSA signature come from WebCrypto; the signed attributes,
  * the `SignerInfo` and the `SignedData` wrapper are DER-encoded here. Only what CAdES-BES with
- * SHA-256 needs is implemented: `id-data` content, detached (the document is never embedded,
- * only its digest travels), and the four signed attributes the reference implementation uses —
+ * SHA-256 needs is implemented: `id-data` content (detached by default), and the four signed attributes the reference implementation uses —
  * `contentType`, `messageDigest`, `signingTime` and `signingCertificateV2`. Setting `timeStamp`
  * adds the RFC 3161 `id-aa-timeStampToken` unsigned attribute, i.e. CAdES-T.
  */
@@ -23,7 +22,7 @@ import {
 } from './asn1';
 import { type SignerCert, signBytes } from './sign';
 import { requestTimeStamp, timeStampAttributes } from './timestamp';
-import { parseCertificate } from './x509';
+import { certificateIdentity } from './x509';
 
 const OID_SIGNED_DATA = '1.2.840.113549.1.7.2';
 const OID_DATA = '1.2.840.113549.1.7.1';
@@ -41,6 +40,10 @@ const NULL_PARAMS = tlv(0x05, new Uint8Array(0));
 const HASH = 'SHA-256';
 
 export interface CadesSignOptions {
+	/** Embed content for AutoScript implicit mode; detached remains the default. */
+	attached?: boolean;
+	/** Public certificates to include alongside the signer. */
+	chain?: readonly SignerCert[];
 	/** Defaults to now; injectable so a signature can be reproduced in tests. */
 	signingTime?: Date;
 	/**
@@ -65,7 +68,7 @@ function attribute(id: string, ...values: Bytes[]): Bytes {
 }
 
 /**
- * Detached CAdES-BES over `content`, as DER `ContentInfo`. Signing time is the only
+ * CAdES-BES over `content`, detached by default, as DER `ContentInfo`. Signing time is the only
  * non-deterministic input, so two calls with the same `options` produce the same bytes.
  */
 export async function signCadesDetached(
@@ -79,7 +82,7 @@ export async function signCadesDetached(
 	if (cert.algorithm.hash !== HASH) {
 		throw new Error(`CAdES-BES is SHA-256 here, but the key is bound to ${cert.algorithm.hash}`);
 	}
-	const certificate = parseCertificate(cert.der);
+	const certificate = certificateIdentity(cert.der);
 	const ecdsa = cert.algorithm.name === 'ECDSA';
 
 	// ESSCertIDv2 locates the signer by certificate hash, and offers the issuer and serial as
@@ -122,8 +125,10 @@ export async function signCadesDetached(
 	const signedData = seq(
 		derInteger(1), // version: id-data content plus IssuerAndSerialNumber signers
 		setOf(seq(objectId(OID_SHA256))), // digestAlgorithms
-		seq(objectId(OID_DATA)), // encapContentInfo — detached, so no eContent
-		implicitTagged(0, setOf(cert.der)), // certificates: the signer only, detached chain is out of scope
+		seq(objectId(OID_DATA), ...(options.attached ? [explicitTagged(0, octetString(content))] : [])),
+		implicitTagged(0, setOf(...[cert, ...(options.chain ?? [])].filter((entry, index, all) =>
+			all.findIndex((other) => other.der.length === entry.der.length && other.der.every((b, i) => b === entry.der[i])) === index
+		).map((entry) => entry.der))),
 		signerInfos
 	);
 
