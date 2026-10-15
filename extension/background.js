@@ -10,30 +10,31 @@ export function createBridge(chrome) {
   const root = chrome.runtime.getURL('');
   let scriptsQueue = Promise.resolve();
   let sitesQueue = Promise.resolve();
-  async function enabledOrigins() {
-    const {enabledOrigins = []} = await chrome.storage.local.get('enabledOrigins');
-    return Array.isArray(enabledOrigins) ? [...new Set(enabledOrigins.filter(origin => {
+  async function disabledOrigins() {
+    const {disabledOrigins = []} = await chrome.storage.local.get('disabledOrigins');
+    return Array.isArray(disabledOrigins) ? [...new Set(disabledOrigins.filter(origin => {
       try { return normalizeOrigin(origin) === origin; } catch { return false; }
     }))] : [];
   }
   const hostGranted = origin => chrome.permissions.contains({origins:[origin + '/*']});
-  async function permitted(origin) { return (await enabledOrigins()).includes(origin) && await hostGranted(origin); }
+  async function permitted(origin) { return !(await disabledOrigins()).includes(origin) && await hostGranted(origin); }
   async function syncScripts() {
-    const matches = [];
-    for (const origin of await enabledOrigins()) if (await hostGranted(origin)) matches.push(origin + '/*');
+    const {origins = []} = await chrome.permissions.getAll();
+    const matches = origins.filter(pattern => /^https?:\/\//.test(pattern));
+    const excludeMatches = (await disabledOrigins()).map(origin => origin + '/*');
     const current = await chrome.scripting.getRegisteredContentScripts();
     const ids = current.filter(script => SCRIPT_IDS.includes(script.id)).map(script => script.id);
     if (ids.length) await chrome.scripting.unregisterContentScripts({ids});
     if (matches.length) await chrome.scripting.registerContentScripts([
-      {id:SCRIPT_IDS[0],matches,js:['content.js'],runAt:'document_start',allFrames:true,world:'ISOLATED',persistAcrossSessions:true},
-      {id:SCRIPT_IDS[1],matches,js:['page.js'],runAt:'document_start',allFrames:true,world:'MAIN',persistAcrossSessions:true},
+      {id:SCRIPT_IDS[0],matches,excludeMatches,js:['content.js'],runAt:'document_start',allFrames:true,world:'ISOLATED',persistAcrossSessions:true},
+      {id:SCRIPT_IDS[1],matches,excludeMatches,js:['page.js'],runAt:'document_start',allFrames:true,world:'MAIN',persistAcrossSessions:true},
     ]);
   }
   function updateScripts() { scriptsQueue = scriptsQueue.catch(() => {}).then(syncScripts); return scriptsQueue; }
   function editSites(change) {
     sitesQueue = sitesQueue.catch(() => {}).then(async () => {
-      const origins = await change(await enabledOrigins());
-      await chrome.storage.local.set({enabledOrigins:origins});
+      const origins = await change(await disabledOrigins());
+      await chrome.storage.local.set({disabledOrigins:origins});
       await updateScripts();
     });
     return sitesQueue;
@@ -70,14 +71,13 @@ export function createBridge(chrome) {
     if (message.type === 'sites:list') {
       let suggestedOrigin = null;
       try { suggestedOrigin = normalizeOrigin(new URL(sender.url).searchParams.get('site')); } catch { /* No website was supplied. */ }
-      return {origins:await enabledOrigins(),suggestedOrigin};
+      return {disabledOrigins:await disabledOrigins(),suggestedOrigin};
     }
     if (message.type === 'sites:set') {
       const origin = normalizeOrigin(message.origin);
       if (typeof message.enabled !== 'boolean') throw Error('Invalid site setting');
       await editSites(async origins => {
-        if (message.enabled && !await hostGranted(origin)) throw Error('Website host permission is required');
-        return message.enabled ? [...new Set([...origins,origin])] : origins.filter(value => value !== origin);
+        return message.enabled ? origins.filter(value => value !== origin) : [...new Set([...origins,origin])];
       });
       if (!message.enabled) for (const item of coordinator.requests.values()) if (item.origin === origin) terminate(item);
       return true;
@@ -180,11 +180,7 @@ export function createBridge(chrome) {
   });
   chrome.permissions.onAdded.addListener(() => updateScripts().catch(() => {}));
   chrome.permissions.onRemoved.addListener(async () => {
-    await editSites(async origins => {
-      const retained = [];
-      for (const origin of origins) if (await hostGranted(origin)) retained.push(origin);
-      return retained;
-    });
+    await updateScripts();
     for (const item of coordinator.requests.values()) if (!await permitted(item.origin)) terminate(item);
   });
   chrome.action.onClicked.addListener(tab => {

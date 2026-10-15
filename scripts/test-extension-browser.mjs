@@ -19,9 +19,7 @@ try {
   const manifest = JSON.parse(await readFile(join(extension, 'manifest.json'), 'utf8'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.action.default_popup, undefined, 'app must survive focus changes');
-  assert.equal(manifest.host_permissions?.length ?? 0, 0, 'no production blanket grants');
-  manifest.host_permissions = ['http://127.0.0.1/*'];
-  await writeFile(join(extension, 'manifest.json'), JSON.stringify(manifest));
+  assert.deepEqual(manifest.host_permissions, ['http://*/*','https://*/*'], 'all websites enabled on installation');
   let executable = process.env.CHROME_PATH;
   if (!executable) {
     const cache = join(homedir(), '.cache/ms-playwright');
@@ -120,8 +118,7 @@ try {
   await cdp.wait(main.session, 'document.querySelector("[data-check=signature]")?.dataset.status==="pass"');
   assert.equal(await cdp.evaluate(main.session,'document.querySelector("[data-check=structure]").dataset.status'),'pass');
   process.stdout.write('PASS: full app PDF stamps, two-document batch signing, saved outputs, valid ZIP and PDF verification; OpenSSL checks both signatures.\n');
-  const enabled = await cdp.evaluate(main.session, `chrome.runtime.sendMessage({type:'sites:set',origin:${JSON.stringify(origin)},enabled:true})`);
-  assert.equal(enabled.ok, true, JSON.stringify(enabled));
+  // No sites:set: the first website request must work with fresh storage.
   const page = await open(origin);
   await cdp.wait(page.session, 'Boolean(window.fixture)');
   async function picker(selector) {

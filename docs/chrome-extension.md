@@ -11,6 +11,7 @@ Use Node 22+ (Node 24 verified), pnpm 11.24.0, and Chrome/Chromium 116+:
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm check
 pnpm build:extension
 ```
 
@@ -32,7 +33,7 @@ Use the same signing and verification workflows, certificate import and saved
 identities, PDF visible image/text stamps, implemented signature formats, batch
 queue and ZIP downloads, saved outputs, themes and ES/EN language controls as the
 webapp. Files and keys are processed locally. Optional timestamping contacts the
-configured TSA after its host permission is explicitly granted.
+configured TSA when Chrome grants access to its origin.
 
 Identities are sealed in extension-origin IndexedDB using the app's existing
 PIN-protected store. Unlocking uses the certificate container's PIN. The hosted
@@ -42,9 +43,15 @@ not provide operating-system certificate-store access or a native helper.
 
 ## Signing requests from websites
 
-Under site access, enable the exact website origin, approve Chrome's permission,
-and reload the website. Host permission used for a timestamp server does not
-activate website interception. Revoke site access to remove interception there.
+Interception is enabled on all HTTP and HTTPS websites by default. Chrome requests
+website access when the extension is installed or updated. Reload already-open
+websites after installing or updating. You no longer need to add individual sites.
+
+Site access lists disabled origins: enter a website to disable interception there,
+or re-enable a listed website and reload it. Existing enabled-site lists from
+0.1.0 do not restrict the new default. Chrome's own site-access settings can still
+withhold host access; AutoFirme respects those restrictions. Restricted browser
+pages such as chrome:// pages cannot be intercepted.
 
 A supported AutoScript request opens a compact certificate chooser inspired by
 Bitwarden's passkey-selection interaction. It uses AutoFirme's real certificate
@@ -76,8 +83,8 @@ narrower than the full app's interactive feature set.
 
 ## Security boundaries and limits
 
-Only explicitly enabled origins get MAIN/isolated-world bridge scripts. Request
-identity comes from Chrome's sender tab/frame/document data; it is not accepted
+HTTP/HTTPS websites with Chrome host access get MAIN/isolated-world bridge scripts,
+except origins disabled in AutoFirme. Request identity comes from Chrome's sender tab/frame/document data; it is not accepted
 from a website-supplied origin field. An opaque ID is bound to the actual chooser
 tab. Other app tabs cannot confirm or retrieve that chooser's payload. Private
 keys and PINs stay in extension-owned contexts; callbacks receive only the public
@@ -114,9 +121,10 @@ The extension browser workflow uses a disposable unpacked Chromium profile, loca
 non-binding website fixture and freshly generated OpenSSL test certificate. It
 requires OpenSSL and Chrome/Chromium. Set `CHROME_PATH` to its executable, or install
 Chromium using Playwright's browser installer (the script can discover its Linux
-cache). Only the temporary test manifest pregrants localhost; production has no
-default host grants. Chrome's native grant prompts and actual desktop AutoFirma
-launch need separate manual checks.
+cache). The browser test loads the production all-sites manifest and checks the
+first request with fresh storage, without enabling the fixture origin. Chrome's
+native grant prompts and actual desktop AutoFirma launch need separate manual
+checks.
 
 See the [verification record](chrome-extension-verification.md) for executed checks
 and remaining manual/environment-specific checks. `pnpm package:extension` packages

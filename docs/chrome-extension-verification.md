@@ -85,3 +85,31 @@ browser test. No external security audit or production-readiness claim is made.
 Packaging records the pinned upstream revision, local source revision, dependency
 notices and SHA-256. Upstream has no declared application license at the inspected
 revision; this is recorded rather than inventing a license grant.
+
+
+## 0.1.1 — all websites by default (2026-10-15)
+
+The user approved replacing the opt-in site list with automatic interception on
+all HTTP/HTTPS websites. Required host permissions now request that access at
+installation/update. Chrome restrictions still apply. `disabledOrigins` persists
+per-site exceptions; the old `enabledOrigins` list no longer gates interception.
+Signing still requires the original chooser confirmation, and native fallback
+semantics are unchanged. ES/EN site settings now manage disabled origins.
+
+Verified in the fork checkout:
+
+- `pnpm test`: 221 passed, 2 skipped.
+- `pnpm check`: 0 errors, 0 warnings.
+- `pnpm build` and `pnpm build:extension`: passed (existing bundle-size warnings).
+- `pnpm test:extension:unit`: 26 passed, including default capture with no site
+  entry, old allowlist independence, persisted exceptions, and host revocation.
+- `pnpm test:extension:artifacts`: 15 passed.
+- `pnpm test:extension:browser`: passed using the unmodified production manifest
+  in a fresh disposable Chromium profile, without calling `sites:set` before the
+  first website request. It also checks explicit consent, attached/detached CAdES
+  with OpenSSL, PDF/batch workflows, dismissal, cancellation, unsupported calls,
+  stale requests, concurrent isolation, and disabling an already-loaded website.
+
+Chrome installation/update permission dialogs and physical Windows/macOS remain
+manual checks. Update/reload the extension and reload already-open websites;
+Chrome may require accepting the expanded website-access permission.

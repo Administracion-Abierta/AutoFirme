@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process';
 
 const manifest = {
   manifest_version: 3, minimum_chrome_version: '116',
+  host_permissions: ['http://*/*', 'https://*/*'],
   content_security_policy: { extension_pages: "script-src 'self'; object-src 'none'" },
   action: {}, options_page: 'index.html'
 };

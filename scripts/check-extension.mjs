@@ -11,7 +11,7 @@ assert.equal(manifest.minimum_chrome_version, '116');
 assert.equal(manifest.content_security_policy.extension_pages, "script-src 'self'; object-src 'none'");
 assert.equal(manifest.action.default_popup, undefined, 'signing must survive focus loss');
 assert.equal(manifest.options_page, 'index.html');
-assert.equal(manifest.host_permissions?.length ?? 0, 0, 'hosts require explicit grants');
+assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*'], 'interception defaults to all websites');
 const html = await read('index.html');
 assert.ok(!/<script\b(?![^>]*\bsrc=)[^>]*>\s*\S/i.test(html), 'inline executable script');
 assert.ok(!/\son\w+\s*=/i.test(html), 'inline event handler');

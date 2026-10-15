@@ -4,10 +4,10 @@ import {createBridge} from '../background.js';
 
 const event = () => ({listeners:[],addListener(fn){this.listeners.push(fn);},async emit(...args){return Promise.all(this.listeners.map(fn=>fn(...args)));}});
 function browser() {
-  const state={enabled:[],granted:new Set(),registered:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'}};
+  const state={disabled:[],enabled:[],granted:new Set(),registered:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'}};
   const chrome={runtime:{id:'extension',getURL:path=>'chrome-extension://extension/'+path,onInstalled:event(),onStartup:event(),onMessage:event(),onConnect:event()},
-    storage:{local:{async get(){return {enabledOrigins:state.enabled};},async set(v){state.enabled=v.enabledOrigins;},async setAccessLevel(){}}},
-    permissions:{async contains({origins}){return origins.every(x=>state.granted.has(x));},onAdded:event(),onRemoved:event()},
+    storage:{local:{async get(){return {enabledOrigins:state.enabled,disabledOrigins:state.disabled};},async set(v){if(v.disabledOrigins)state.disabled=v.disabledOrigins;},async setAccessLevel(){}}},
+    permissions:{async getAll(){return {origins:[...state.granted]};},async contains({origins}){return origins.every(x=>state.granted.has(x)||state.granted.has(new URL(x).protocol+'//*/*'));},onAdded:event(),onRemoved:event()},
     scripting:{async getRegisteredContentScripts(){return state.registered;},async unregisterContentScripts(){state.registered=[];},async registerContentScripts(v){state.registered=v;}},
     windows:{async create(options){const win={id:20+state.windows.length,tabs:[{id:15+state.windows.length}]};state.windows.push({...win,...options});return win;},async remove(id){state.removed.push(id);},onRemoved:event()},
     tabs:{async create(options){state.windows.push(options);},onRemoved:event()},
@@ -22,26 +22,35 @@ async function connect(chrome) {
   await chrome.runtime.onConnect.emit(port);return {port,replies};
 }
 async function capture(env) {
-  env.state.enabled=['https://site.test'];env.state.granted.add('https://site.test/*');
+  env.state.granted.add('https://site.test/*');
   const connected=await connect(env.chrome);
   await connected.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
   return {...connected,item:[...env.bridge.coordinator.requests.values()][0]};
 }
 function setup(){const env=browser();env.bridge=createBridge(env.chrome);return env;}
 
-test('host grants alone never activate interception and enabling requires existing grant',async()=>{
-  const env=setup();await env.bridge.ready;env.state.granted.add('https://tsa.test/*');
-  await env.bridge.updateScripts();assert.deepEqual(env.state.registered,[]);
-  await assert.rejects(env.bridge.handleMessage({type:'sites:set',origin:'https://site.test',enabled:true},app()),/permission/i);
-  env.state.granted.add('https://site.test/*');
-  await env.bridge.handleMessage({type:'sites:set',origin:'https://site.test',enabled:true},app());
-  assert.deepEqual(env.state.enabled,['https://site.test']);assert.equal(env.state.registered.length,2);
-  for(const script of env.state.registered){assert.deepEqual(script.matches,['https://site.test/*']);assert.equal(script.allFrames,true);assert.equal(script.runAt,'document_start');}
-  env.state.granted.delete('https://site.test/*');await env.chrome.permissions.onRemoved.emit({origins:['https://site.test/*']});
-  assert.deepEqual(env.state.registered,[]);assert.deepEqual(env.state.enabled,[]);
+test('all websites are active by default without an enabled-site entry',async()=>{
+  const env=setup();env.state.enabled=['https://old-allowed.test'];env.state.granted.add('http://*/*');env.state.granted.add('https://*/*');await env.bridge.ready;
+  assert.equal(env.state.registered.length,2);
+  for(const script of env.state.registered){assert.deepEqual(script.matches,['http://*/*','https://*/*']);assert.equal(script.allFrames,true);assert.equal(script.runAt,'document_start');}
+  const {port,replies}=await connect(env.chrome);
+  await port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
+  const item=[...env.bridge.coordinator.requests.values()][0];assert.ok(item);assert.deepEqual(replies,[]);
+  await env.bridge.handleMessage({type:'request:cancel',id:item.id},chooser(item));
 });
 
-test('request reception checks enabled origin, validates payload and authenticates exact chooser tab',async()=>{
+test('site exceptions persist across restarts and restoring does not need a new host grant',async()=>{
+  const env=setup();env.state.granted.add('https://*/*');await env.bridge.ready;
+  await env.bridge.handleMessage({type:'sites:set',origin:'https://site.test',enabled:false},app());
+  assert.deepEqual(env.state.disabled,['https://site.test']);
+  for(const script of env.state.registered)assert.deepEqual(script.excludeMatches,['https://site.test/*']);
+  const restarted=createBridge(env.chrome);await restarted.ready;
+  const list=await restarted.handleMessage({type:'sites:list'},app());assert.deepEqual(list.disabledOrigins,['https://site.test']);
+  await restarted.handleMessage({type:'sites:set',origin:'https://site.test',enabled:true},app());
+  assert.deepEqual(env.state.disabled,[]);
+});
+
+test('request reception checks Chrome host access, validates payload and authenticates exact chooser tab',async()=>{
   const env=setup();await env.bridge.ready;
   const unenabled=await connect(env.chrome);await unenabled.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});assert.equal(unenabled.replies[0].response.kind,'fallback');
   const {item}=await capture(env);assert.ok(item);assert.equal(env.state.windows[0].width,480);
@@ -91,7 +100,7 @@ test('cached documents cannot authorize signing even when their document ID stil
 });
 
 test('signing view contains original data, explicit mode and SHA-256 document digest',async()=>{
-  const env=setup();await env.bridge.ready;env.state.enabled=['https://site.test'];env.state.granted.add('https://site.test/*');
+  const env=setup();await env.bridge.ready;env.state.granted.add('https://site.test/*');
   const {port,replies}=await connect(env.chrome);
   await port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'sign',data:'YQ==',algorithm:'SHA256withRSA',format:'CAdES',mode:'explicit'}});
   const item=[...env.bridge.coordinator.requests.values()][0];
@@ -115,7 +124,7 @@ test('site management accepts main app after history replaces its search paramet
   const env=setup();await env.bridge.ready;env.state.granted.add('https://site.test/*');
   const navigated={...app(),tab:{id:9,url:'chrome-extension://extension/index.html?tab=verificar'}};
   assert.equal(await env.bridge.handleMessage({type:'sites:set',origin:'https://site.test',enabled:true},navigated),true);
-  assert.deepEqual(env.state.enabled,['https://site.test']);
+  assert.deepEqual(env.state.disabled,[]);
 });
 
 test('new calls from an already loaded disabled site delegate exactly once without capture or chooser',async()=>{
