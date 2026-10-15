@@ -1,0 +1,5 @@
+# `esbuild` needs no build script here: its platform binary arrives as an optional dependency and
+# the bundler works without it. pnpm exits non-zero while the script is neither allowed nor denied,
+# so it is denied explicitly.
+allowBuilds:
+  esbuild: false

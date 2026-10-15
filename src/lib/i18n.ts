@@ -1,0 +1,442 @@
+/** ES/EN copy. The app ships both; Spanish is the default (AutoFirma's audience). */
+
+import type { Pkcs12ErrorCode } from '#lib/pkcs12';
+import type { StoreErrorCode } from '#lib/certstore';
+import type { SignatureCorner } from '#lib/pades-visible';
+import type { CheckId } from '#lib/verify';
+
+export type Lang = 'es' | 'en';
+
+export interface Copy {
+	langLabel: string;
+	/** Theme switcher: group label plus the three choices. */
+	themeLabel: string;
+	themeLight: string;
+	themeDark: string;
+	themeSystem: string;
+	brand: string;
+	tagline: string;
+	privacyNote: string;
+	/** Label of the header help menu. */
+	helpMenu: string;
+	/** Title of the privacy dialog opened from that menu. */
+	privacyTitle: string;
+	/** Menu entry linking to the project's source repository. */
+	sourceCode: string;
+	/** Header button that opens the browser's install prompt (#47). */
+	installApp: string;
+	/** Header button that activates a downloaded update of the installed app (#47). */
+	updateApp: string;
+	/** Selected-files table headers. */
+	colFile: string;
+	colActions: string;
+	step1Title: string;
+	dropTitle: string;
+	dropHint: string;
+	browse: string;
+	dragging: string;
+	remove: string;
+	step2Title: string;
+	/** Trigger of the signature picker modal. */
+	selectSign: string;
+	/** Cell of that modal that opens the file dialog for a PKCS#12 from disk. */
+	addSign: string;
+	certLoading: string;
+	certExpired: string;
+	certNotYetValid: string;
+	/** Summary lines under the picker icon: who issued the sign, and how long it holds. */
+	signIssuer: string;
+	signValidity: string;
+	/** The page is not a secure context, so the browser withholds WebCrypto entirely. */
+	insecureContext: string;
+	certErrors: Record<Pkcs12ErrorCode | 'unknown', string>;
+	formatTitle: string;
+	formatHint: string;
+	/** Optional RFC 3161 timestamp: the TSA address field of the sign panel. */
+	timeStampTitle: string;
+	timeStampPlaceholder: string;
+	timeStampHint: string;
+	pendingIssue: string;
+	/** Visible signature block (PAdES only): toggle, image, page and corner picker. */
+	visibleTitle: string;
+	visibleHint: string;
+	visibleImage: string;
+	visibleImageChoose: string;
+	visibleImageInvalid: string;
+	visiblePage: string;
+	visibleCorner: string;
+	visibleCorners: Record<SignatureCorner, string>;
+	/** Prefix of the block's date line. */
+	signedOn: string;
+	signButton: string;
+	signNeedsFile: string;
+	signNeedsCert: string;
+	signPendingFormat: string;
+	queueTitle: string;
+	queueProgress: string;
+	queueRunning: string;
+	queueCancel: string;
+	queueCancelled: string;
+	queueStatus: { pending: string; signing: string; signed: string; error: string };
+	queueHash: string;
+	queueDownload: string;
+	queueArchive: string;
+	downloadOne: string;
+	modesLabel: string;
+	modeSign: string;
+	modeVerify: string;
+	verifyStepTitle: string;
+	/** Closes the loaded signature and its report, back to the verify drop zone. */
+	verifyClose: string;
+	verifyDropTitle: string;
+	verifyDropHint: string;
+	verifyRunning: string;
+	verifyReportTitle: string;
+	verifyOk: string;
+	/** Valid signature whose signer certificate is outside its validity window (#40). */
+	verifyExpired: string;
+	verifyFail: string;
+	verifySigner: string;
+	verifySigningTime: string;
+	verifyNoSigner: string;
+	verifyAddDocument: string;
+	verifyAddDocumentHint: string;
+	verifyDocumentLabel: string;
+	checkLabels: Record<CheckId, string>;
+	storeTitle: string;
+	storeHint: string;
+	storeEmpty: string;
+	/** Shown when the browser gives no database, so saved signatures cannot outlive the visit. */
+	storeEphemeral: string;
+	/** Button in that notice: deletes the unusable store and reloads. */
+	storeReset: string;
+	/** Leaves the PIN prompt of a saved signature without selecting it. */
+	storeBack: string;
+	/** Badge on the modal cell that mirrors the sign currently loaded in memory. */
+	storeCurrent: string;
+	storePin: string;
+	storeSave: string;
+	storeUnlock: string;
+	storeOpen: string;
+	storeExpiry: string;
+	storeErrors: Record<StoreErrorCode, string>;
+	downloadsLabel: string;
+	downloadsTitle: string;
+	downloadsEmpty: string;
+	downloadsDownload: string;
+	downloadsClose: string;
+	/** MCP endpoint settings dialog, opened from the help menu. */
+	mcpMenu: string;
+	mcpTitle: string;
+	mcpHint: string;
+	mcpUrlLabel: string;
+	mcpUrlHint: string;
+	mcpTokenLabel: string;
+	mcpTokenHint: string;
+	mcpCopy: string;
+	mcpCopied: string;
+	mcpCopiedNote: string;
+}
+
+export const copy: Record<Lang, Copy> = {
+	es: {
+		langLabel: 'Idioma',
+		themeLabel: 'Tema',
+		themeLight: 'Claro',
+		themeDark: 'Oscuro',
+		themeSystem: 'Sistema',
+		brand: 'AutoFirma Web',
+		tagline: 'Firma electrónica en tu navegador, sin instalar nada.',
+		privacyNote: 'Las claves privadas nunca salen de tu equipo: todo se firma en el navegador.',
+		helpMenu: 'Ayuda',
+		privacyTitle: 'Privacidad',
+		sourceCode: 'Código fuente',
+		installApp: 'Instalar app',
+		updateApp: 'Actualizar versión',
+		colFile: 'Fichero',
+		colActions: 'Acciones',
+		step1Title: '1. Elige los documentos',
+		dropTitle: 'Arrastra aquí los ficheros que quieres firmar',
+		dropHint: 'o selecciónalos desde tu equipo',
+		browse: 'Seleccionar ficheros',
+		dragging: 'Suelta el fichero para cargarlo',
+		remove: 'Quitar',
+		step2Title: '2. Configura la firma',
+		selectSign: 'Seleccionar firma',
+		addSign: 'Agregar firma',
+		certLoading: 'Descifrando el fichero…',
+		certExpired: 'Este certificado está caducado; puedes firmar, pero puede ser rechazado.',
+		certNotYetValid: 'Este certificado aún no es válido.',
+		signIssuer: 'Emisor',
+		signValidity: 'Vigencia',
+		insecureContext:
+			'Este navegador no permite la criptografía (WebCrypto) porque la página no es segura: se sirve por http. Ábrela por https o desde localhost.',
+		certErrors: {
+			'wrong-pin': 'PIN incorrecto.',
+			'not-pkcs12': 'El fichero no es un PKCS#12 válido.',
+			'unsupported-pbe': 'El fichero usa un cifrado que no se puede procesar. Vuelve a exportarlo o usa el almacén del sistema.',
+			'unsupported-cipher': 'El fichero usa un cifrado que el navegador no admite.',
+			'unsupported-key': 'La clave privada de este fichero no se puede usar en el navegador.',
+			'no-cert': 'El fichero no contiene ningún certificado.',
+			'no-key': 'El fichero no contiene ninguna clave privada.',
+			'key-mismatch': 'La clave privada no corresponde a los certificados del fichero.',
+			unknown: 'No se ha podido leer el fichero.'
+		},
+		formatTitle: 'Formato de firma',
+		formatHint: 'Elige el tipo de firma digital que quieres generar',
+		timeStampTitle: 'Sello de tiempo (TSA)',
+		timeStampPlaceholder: 'https://tu-servidor-tsa/ruta',
+		timeStampHint:
+			'Opcional: con una TSA la firma lleva sello de tiempo (CAdES-T). Solo sale de tu equipo el hash de la firma, nunca el documento ni la clave.',
+		pendingIssue: 'pendiente',
+		visibleTitle: 'Bloque de firma visible',
+		visibleHint: 'Dibuja tu firma en el PDF: imagen, nombre y fecha.',
+		visibleImage: 'Imagen de la firma (PNG o JPEG)',
+		visibleImageChoose: 'Elegir imagen',
+		visibleImageInvalid: 'Solo se admiten imágenes PNG o JPEG.',
+		visiblePage: 'Página',
+		visibleCorner: 'Posición',
+		visibleCorners: {
+			'bottom-left': 'Abajo izq.',
+			'bottom-right': 'Abajo dcha.',
+			'top-left': 'Arriba izq.',
+			'top-right': 'Arriba dcha.'
+		},
+		signedOn: 'Firmado el',
+		signButton: 'Firmar',
+		signNeedsFile: 'Selecciona primero un documento.',
+		signNeedsCert: 'Selecciona un certificado para habilitar la firma.',
+		signPendingFormat: 'Este formato llegará en otra entrega.',
+		queueTitle: 'Cola de firma',
+		queueProgress: 'Firmados',
+		queueRunning: 'Firmando lote…',
+		queueCancel: 'Cancelar',
+		queueCancelled: 'Lote cancelado',
+		queueStatus: {
+			pending: 'Pendiente',
+			signing: 'Firmando',
+			signed: 'Firmada',
+			error: 'Error'
+		},
+		queueHash: 'SHA-256',
+		queueDownload: 'Descargar ZIP',
+		queueArchive: 'firmas-lote.zip',
+		downloadOne: 'Descargar',
+		modesLabel: 'Modo',
+		modeSign: 'Firmar',
+		modeVerify: 'Verificar',
+		verifyStepTitle: 'Comprueba una firma',
+		verifyClose: 'Cerrar',
+		verifyDropTitle: 'Arrastra aquí el fichero firmado (.csig, .xsig o PDF)',
+		verifyDropHint: 'se analiza en tu equipo, sin subir nada',
+		verifyRunning: 'Comprobando la firma…',
+		verifyReportTitle: 'Informe de validación',
+		verifyOk: 'Firma verificada: todas las comprobaciones han pasado.',
+		verifyExpired: 'Firma válida, pero el certificado del firmante ha caducado.',
+		verifyFail: 'La firma no supera todas las comprobaciones.',
+		verifySigner: 'Firmante',
+		verifySigningTime: 'Fecha de firma',
+		verifyNoSigner: 'No se ha encontrado el certificado del firmante.',
+		verifyAddDocument: 'Añade el documento original',
+		verifyAddDocumentHint: 'la firma es separada (detached): sin el documento no se puede comprobar el contenido',
+		verifyDocumentLabel: 'Documento original',
+		checkLabels: {
+			structure: 'Estructura de la firma',
+			contentDigest: 'Integridad del contenido',
+			signature: 'Firma criptográfica',
+			reference: 'Referencia firmada',
+			signerCert: 'Certificado del firmante',
+			certValidity: 'Vigencia del certificado',
+			certChain: 'Cadena de confianza',
+			signingTime: 'Fecha de firma'
+		},
+		storeTitle: 'Firmas guardadas',
+		storeHint:
+			'Guarda tu fichero PKCS#12 cifrado en este navegador para no volver a subirlo. El PIN no se guarda: solo tú puedes abrirlo.',
+		storeEmpty: 'No hay ninguna firma guardada.',
+		storeEphemeral:
+			'Este navegador no puede guardar datos ahora mismo: las firmas se quedan solo en esta sesión. Cierra las otras pestañas de la app y recarga.',
+		storeCurrent: 'En uso',
+		storePin: 'PIN de la firma',
+		storeReset: 'Reiniciar el almacén',
+		storeBack: 'Volver',
+		storeSave: 'Guardar',
+		storeUnlock: 'Usar',
+		storeOpen: 'Abrir',
+		storeExpiry: 'Caduca',
+		storeErrors: {
+			'wrong-pin': 'PIN incorrecto.',
+			tampered: 'El PIN no es el correcto, o la firma guardada está alterada.',
+			quota: 'No queda espacio en el navegador para guardar la firma.',
+			unavailable: 'El almacén del navegador no está disponible.',
+			missing: 'Esa firma ya no está guardada.'
+		},
+		downloadsLabel: 'Descargas',
+		downloadsTitle: 'Firmas generadas',
+		downloadsEmpty: 'Todavía no has firmado ningún documento.',
+		downloadsDownload: 'Descargar',
+		downloadsClose: 'Cerrar',
+		mcpMenu: 'Servidor MCP',
+		mcpTitle: 'Servidor MCP remoto',
+		mcpHint:
+			'Si has desplegado autofirma-mcp (Streamable HTTP), guarda aquí su dirección para tenerla a mano al configurar un agente.',
+		mcpUrlLabel: 'Dirección del endpoint',
+		mcpUrlHint: 'Se copia tal cual en la configuración del agente, normalmente `https://tu-dominio/mcp`.',
+		mcpTokenLabel: 'Token de acceso',
+		mcpTokenHint:
+			'Es el valor de AUTOFIRME_MCP_TOKEN del servidor: el agente debe enviarlo como cabecera `Authorization: Bearer …`. Se guarda en este navegador; la aplicación no lo envía a ningún sitio.',
+		mcpCopy: 'Copiar dirección',
+		mcpCopied: 'Copiado',
+		mcpCopiedNote: 'Dirección copiada al portapapeles.'
+	},
+	en: {
+		langLabel: 'Language',
+		themeLabel: 'Theme',
+		themeLight: 'Light',
+		themeDark: 'Dark',
+		themeSystem: 'System',
+		brand: 'AutoFirma Web',
+		tagline: 'Electronic signature in your browser, nothing to install.',
+		privacyNote: 'Private keys never leave your machine: signing happens in the browser.',
+		helpMenu: 'Help',
+		privacyTitle: 'Privacy',
+		sourceCode: 'Source code',
+		installApp: 'Install app',
+		updateApp: 'Update version',
+		colFile: 'File',
+		colActions: 'Actions',
+		step1Title: '1. Choose the documents',
+		dropTitle: 'Drag the files you want to sign here',
+		dropHint: 'or pick them from your machine',
+		browse: 'Choose files',
+		dragging: 'Drop the file to load it',
+		remove: 'Remove',
+		step2Title: '2. Configure the signature',
+		selectSign: 'Select signature',
+		addSign: 'Add signature',
+		certLoading: 'Decrypting the file…',
+		certExpired: 'This certificate has expired; you can sign, but it may be rejected.',
+		certNotYetValid: 'This certificate is not valid yet.',
+		signIssuer: 'Issuer',
+		signValidity: 'Validity',
+		insecureContext:
+			'This browser withholds WebCrypto because the page is not secure: it is served over http. Open it over https or from localhost.',
+		certErrors: {
+			'wrong-pin': 'Wrong PIN.',
+			'not-pkcs12': 'The file is not a valid PKCS#12 container.',
+			'unsupported-pbe': 'This file uses an encryption that cannot be processed. Re-export it, or use the system keystore.',
+			'unsupported-cipher': 'This file uses a cipher the browser does not support.',
+			'unsupported-key': 'The private key in this file cannot be used in a browser.',
+			'no-cert': 'The file holds no certificate.',
+			'no-key': 'The file holds no private key.',
+			'key-mismatch': 'The private key does not match the certificates in the file.',
+			unknown: 'The file could not be read.'
+		},
+		formatTitle: 'Signature format',
+		formatHint: 'Pick the type of digital signature to generate',
+		timeStampTitle: 'Trusted timestamp (TSA)',
+		timeStampPlaceholder: 'https://your-tsa-server/path',
+		timeStampHint:
+			'Optional: with a TSA the signature carries a trusted timestamp (CAdES-T). Only the signature hash leaves your machine — never the document, never the key.',
+		pendingIssue: 'pending',
+		visibleTitle: 'Visible signature block',
+		visibleHint: 'Draws your signature on the PDF: image, name and date.',
+		visibleImage: 'Signature image (PNG or JPEG)',
+		visibleImageChoose: 'Choose image',
+		visibleImageInvalid: 'Only PNG or JPEG images are supported.',
+		visiblePage: 'Page',
+		visibleCorner: 'Position',
+		visibleCorners: {
+			'bottom-left': 'Bottom left',
+			'bottom-right': 'Bottom right',
+			'top-left': 'Top left',
+			'top-right': 'Top right'
+		},
+		signedOn: 'Signed on',
+		signButton: 'Sign',
+		signNeedsFile: 'Choose a document first.',
+		signNeedsCert: 'Choose a certificate to enable signing.',
+		signPendingFormat: 'This format ships in a later delivery.',
+		queueTitle: 'Signing queue',
+		queueProgress: 'Signed',
+		queueRunning: 'Signing batch…',
+		queueCancel: 'Cancel',
+		queueCancelled: 'Batch cancelled',
+		queueStatus: {
+			pending: 'Pending',
+			signing: 'Signing',
+			signed: 'Signed',
+			error: 'Error'
+		},
+		queueHash: 'SHA-256',
+		queueDownload: 'Download ZIP',
+		queueArchive: 'signed-batch.zip',
+		downloadOne: 'Download',
+		modesLabel: 'Mode',
+		modeSign: 'Sign',
+		modeVerify: 'Verify',
+		verifyStepTitle: 'Check a signature',
+		verifyClose: 'Close',
+		verifyDropTitle: 'Drop the signed file here (.csig, .xsig or PDF)',
+		verifyDropHint: 'it is analysed on your machine, nothing is uploaded',
+		verifyRunning: 'Checking the signature…',
+		verifyReportTitle: 'Validity report',
+		verifyOk: 'Signature verified: every check passed.',
+		verifyExpired: 'Signature valid, but the signer certificate has expired.',
+		verifyFail: 'The signature does not pass every check.',
+		verifySigner: 'Signer',
+		verifySigningTime: 'Signing time',
+		verifyNoSigner: 'No signer certificate was found.',
+		verifyAddDocument: 'Add the original document',
+		verifyAddDocumentHint: 'this is a detached signature: without the document the content cannot be checked',
+		verifyDocumentLabel: 'Original document',
+		checkLabels: {
+			structure: 'Signature structure',
+			contentDigest: 'Content integrity',
+			signature: 'Cryptographic signature',
+			reference: 'Signed reference',
+			signerCert: 'Signer certificate',
+			certValidity: 'Certificate validity',
+			certChain: 'Trust chain',
+			signingTime: 'Signing time'
+		},
+		storeTitle: 'Saved signatures',
+		storeHint:
+			'Keep your PKCS#12 encrypted in this browser so you do not upload it again. Each signature uses its own PIN, which is never stored.',
+		storeEmpty: 'No saved signature yet.',
+		storeEphemeral:
+			'This browser cannot store data right now: signatures stay in this session only. Close the other tabs of the app and reload.',
+		storeCurrent: 'In use',
+		storePin: 'PIN of the signature',
+		storeReset: 'Reset the store',
+		storeBack: 'Back',
+		storeSave: 'Save',
+		storeUnlock: 'Use',
+		storeOpen: 'Open',
+		storeExpiry: 'Expires',
+		storeErrors: {
+			'wrong-pin': 'Wrong PIN.',
+			tampered: 'The PIN is wrong, or the saved signature was altered.',
+			quota: 'The browser has no room left to save the signature.',
+			unavailable: 'The browser store is not available.',
+			missing: 'That signature is no longer saved.'
+		},
+		downloadsLabel: 'Downloads',
+		downloadsTitle: 'Produced signatures',
+		downloadsEmpty: 'You have not signed anything yet.',
+		downloadsDownload: 'Download',
+		downloadsClose: 'Close',
+		mcpMenu: 'MCP server',
+		mcpTitle: 'Remote MCP server',
+		mcpHint:
+			'If you deployed autofirma-mcp (Streamable HTTP), keep its address here so it is at hand when you configure an agent.',
+		mcpUrlLabel: 'Endpoint address',
+		mcpUrlHint: 'Paste it as-is into the agent configuration, normally `https://your-domain/mcp`.',
+		mcpTokenLabel: 'Access token',
+		mcpTokenHint:
+			'The server\'s AUTOFIRME_MCP_TOKEN: the agent sends it as an `Authorization: Bearer …` header. It is kept in this browser; the app never sends it anywhere.',
+		mcpCopy: 'Copy address',
+		mcpCopied: 'Copied',
+		mcpCopiedNote: 'Address copied to the clipboard.'
+	}
+};

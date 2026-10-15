@@ -1,0 +1,28 @@
+{
+  "name": "autofirme-mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "stdio and Streamable-HTTP MCP server exposing AutoFirma Web's signing and verification engine to coding agents.",
+  "bin": {
+    "autofirme-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "esbuild src/server.ts src/server-http.ts --bundle --platform=node --target=node22 --format=esm --outdir=dist --packages=external && chmod +x dist/server.js dist/server-http.js",
+    "test": "vitest run",
+    "e2e": "pnpm build && node scripts/e2e.mjs",
+    "check": "tsc --noEmit",
+    "start:http": "node dist/server-http.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "esbuild": "^0.27.0",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.4"
+  },
+  "packageManager": "pnpm@11.24.0"
+}

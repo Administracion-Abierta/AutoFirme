@@ -1,0 +1,5 @@
+# Never commit the throwaway test PKI private keys: generate.sh recreates them.
+ca/*.key
+
+# Scratch space (CSRs, extension files, temporary verification material).
+scratch/

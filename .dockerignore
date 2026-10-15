@@ -1,0 +1,13 @@
+# Build context is the repo root; keep the image context tiny.
+.git
+.bullet
+original
+extracted
+work
+# Untracked jadx reference trees (~115 MB); not needed to build.
+decompiled
+decompiled-configurador
+docs
+**/node_modules
+.svelte-kit
+build

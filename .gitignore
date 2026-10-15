@@ -1,0 +1,25 @@
+original/
+extracted/
+work/
+# Real-PIN file for `scripts/smoke-real.sh` (read at runtime, mode 600). Never commit it.
+.p12pass
+*.zip
+*.deb
+*.rpm
+*.exe
+*.jar
+.bullet/state/
+.bullet/meta/
+.bullet/worktrees/
+.bullet/logs/
+node_modules/
+.svelte-kit/
+build/
+# Reverse-engineering reference (jadx output). Untracked since #26; recover with
+# `git checkout reference/decompile-1.9 -- decompiled decompiled-configurador`.
+decompiled/
+decompiled-configurador/
+
+.p12pass
+
+bun.lock

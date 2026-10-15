@@ -1,0 +1,18 @@
+<!--
+	App icon source — the seal motif from src/lib/App.svelte (#47). Full-bleed teal with the mark
+	centred, so the same art also works as a maskable icon. Regenerate the PNG set with:
+	rsvg-convert -w 192 -h 192 static/icon.svg -o static/icon-192.png
+	rsvg-convert -w 512 -h 512 static/icon.svg -o static/icon-512.png
+	rsvg-convert -w 512 -h 512 static/icon-maskable.svg -o static/icon-maskable-512.png
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AutoFirma Web">
+	<rect width="512" height="512" fill="#008d80" />
+	<g fill="none" stroke="#fff" stroke-linecap="round">
+		<circle cx="256" cy="256" r="146.2" stroke-width="13.6" />
+		<circle cx="256" cy="256" r="112.2" stroke-width="6.8" stroke-dasharray="17 20.4" />
+		<path
+			d="M194.8 290c30.6 8.2 64.6 4.1 88.4 -17M211.8 259.4c20.4 -23.8 51 -37.4 74.8 -34M242.4 174.4l-23.8 98.6a23.12 23.12 0 0 0 31.3 25.8"
+			stroke-width="15"
+		/>
+	</g>
+</svg>

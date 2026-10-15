@@ -1,0 +1,84 @@
+# AutoFirma MCP over Streamable HTTP, behind the operator's existing Cloudflare Tunnel.
+#
+# Operator-run. The image is built from the repo root with `podman build -f mcp/Containerfile`
+# (see mcp/README.md); the two secrets are created out of band and never committed:
+#
+#   kubectl -n autofirme create secret generic autofirme-mcp \
+#     --from-literal=AUTOFIRME_MCP_TOKEN="$(openssl rand -hex 32)" \
+#     --from-literal=AUTOFIRME_MCP_PIN="<pkcs12 pin>"
+#
+#   kubectl -n autofirme apply -f mcp/deploy/k3s.yaml
+#
+# Then point a cloudflared ingress rule at http://autofirme-mcp.autofirme.svc:8790 (the tunnel
+# terminates TLS; the pod itself serves plain HTTP on loopback/ClusterIP only).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: autofirme-mcp-certs
+spec:
+  accessModes: [ReadOnlyMany]
+  resources:
+    requests:
+      storage: 1Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autofirme-mcp
+  labels: { app: autofirme-mcp }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: autofirme-mcp }
+  template:
+    metadata:
+      labels: { app: autofirme-mcp }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: mcp
+          image: registry.example/autofirme-mcp:0.1
+          ports:
+            - { name: http, containerPort: 8790 }
+          envFrom:
+            # AUTOFIRME_MCP_TOKEN and AUTOFIRME_MCP_PIN
+            - secretRef: { name: autofirme-mcp }
+          env:
+            - { name: AUTOFIRME_MCP_HOST, value: "0.0.0.0" }
+            - { name: AUTOFIRME_MCP_PORT, value: "8790" }
+            - { name: AUTOFIRME_MCP_CERTS, value: /certs }
+            # Documents handed over by path resolve inside this root; base64 needs no volume.
+            - { name: AUTOFIRME_MCP_WORKSPACE, value: /work }
+          volumeMounts:
+            # The operator's .p12 containers, provisioned out of band.
+            - { name: certs, mountPath: /certs, readOnly: true }
+          # No GET route exists on purpose (stateless, JSON responses): probe the socket.
+          readinessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 2
+          livenessProbe:
+            tcpSocket: { port: http }
+            initialDelaySeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+      volumes:
+        - name: certs
+          persistentVolumeClaim: { claimName: autofirme-mcp-certs }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: autofirme-mcp
+  labels: { app: autofirme-mcp }
+spec:
+  selector: { app: autofirme-mcp }
+  ports:
+    - { name: http, port: 8790, targetPort: http }

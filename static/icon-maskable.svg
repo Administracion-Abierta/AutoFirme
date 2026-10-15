@@ -1,0 +1,15 @@
+<!--
+	Maskable variant: same seal, art pulled in to 6/6.8 of the size so the launcher's circular crop
+	never clips it (the safe zone is the middle 80 % of the canvas).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AutoFirma Web">
+	<rect width="512" height="512" fill="#008d80" />
+	<g fill="none" stroke="#fff" stroke-linecap="round">
+		<circle cx="256" cy="256" r="129" stroke-width="12" />
+		<circle cx="256" cy="256" r="99" stroke-width="6" stroke-dasharray="15 18" />
+		<path
+			d="M202 286c27 7.2 57 3.6 78 -15M217 259c18 -21 45 -33 66 -30M244 184l-21 87a20.4 20.4 0 0 0 27.6 22.8"
+			stroke-width="13.2"
+		/>
+	</g>
+</svg>

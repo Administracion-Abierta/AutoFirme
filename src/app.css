@@ -1,0 +1,121 @@
+@import '@fontsource-variable/inter';
+/* Fraunces (SOFT/WONK axes) — the display voice: official-gazette serif for brand + steps. */
+@import '@fontsource-variable/fraunces';
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@theme {
+	--font-sans:
+		'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--font-display:
+		'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+	--font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Menlo, Consolas, monospace;
+	/* Colors kept as raw hex so Tailwind sees plain values; oklch lives in the shadcn vars. */
+	--color-brand: #008d80;
+	--color-brand-strong: #006e64;
+	--color-brand-soft: #d9efec;
+}
+
+:root {
+	--radius: 0.75rem;
+	--background: oklch(0.985 0.004 95);
+	--foreground: oklch(0.216 0.014 158);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.216 0.014 158);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.216 0.014 158);
+	--primary: oklch(0.552 0.104 186);
+	--primary-foreground: oklch(0.99 0.004 186);
+	--secondary: oklch(0.955 0.008 95);
+	--secondary-foreground: oklch(0.3 0.016 158);
+	--muted: oklch(0.955 0.008 95);
+	--muted-foreground: oklch(0.51 0.016 158);
+	--accent: oklch(0.955 0.008 95);
+	--accent-foreground: oklch(0.3 0.016 158);
+	--destructive: oklch(0.55 0.19 28);
+	--border: oklch(0.9 0.011 110);
+	--input: oklch(0.88 0.012 110);
+	--ring: oklch(0.552 0.104 186);
+	color-scheme: light;
+}
+
+.dark {
+	--background: oklch(0.175 0.012 168);
+	--foreground: oklch(0.965 0.005 120);
+	--card: oklch(0.226 0.014 168);
+	--card-foreground: oklch(0.965 0.005 120);
+	--popover: oklch(0.226 0.014 168);
+	--popover-foreground: oklch(0.965 0.005 120);
+	--primary: oklch(0.71 0.098 182);
+	--primary-foreground: oklch(0.183 0.021 186);
+	--secondary: oklch(0.282 0.014 168);
+	--secondary-foreground: oklch(0.965 0.005 120);
+	--muted: oklch(0.282 0.014 168);
+	--muted-foreground: oklch(0.71 0.012 150);
+	--accent: oklch(0.282 0.014 168);
+	--accent-foreground: oklch(0.965 0.005 120);
+	--destructive: oklch(0.68 0.17 25);
+	--border: oklch(1 0 0 / 12%);
+	--input: oklch(1 0 0 / 16%);
+	--ring: oklch(0.71 0.098 182);
+	color-scheme: dark;
+}
+
+@theme inline {
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+}
+
+/* Notaría-digital surface grammar: browsers ship defaults no design chose — theme them. */
+body {
+	@apply bg-background text-foreground antialiased;
+}
+::selection {
+	background: color-mix(in oklch, var(--color-brand) 25%, transparent);
+}
+a:focus-visible,
+summary:focus-visible,
+label:has(input:focus-visible):focus-within {
+	outline: 2px solid var(--ring);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+code,
+kbd,
+pre,
+samp {
+	font-family: var(--font-mono);
+}
+/* Hashes, serials, dates: tabular numerals align in tables. */
+.tnum {
+	font-variant-numeric: tabular-nums;
+}
+/* Reduced motion collapses the one authored moment (seal reveal) to a plain state. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}

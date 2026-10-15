@@ -1,0 +1,571 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
+import App from './App.svelte';
+import { copy } from '#lib/i18n';
+import {
+	ASYNC,
+	cmsTimeStamp,
+	createPkcs12Fixtures,
+	createTsaFixtures,
+	tsVerifyToken,
+	writeFixtureFile,
+	xmlsec1Verify,
+	FIXTURE_PIN,
+	LEAF_COMMON_NAME,
+	type Pkcs12Fixtures
+} from '../test/fixtures';
+
+afterEach(() => {
+	cleanup();
+	vi.restoreAllMocks();
+	// The theme is persisted, so a test that switches it must not colour the next one.
+	localStorage.clear();
+	document.documentElement.classList.remove('dark');
+});
+
+let fixtures: Pkcs12Fixtures;
+
+beforeAll(() => {
+	fixtures = createPkcs12Fixtures();
+}, 60_000);
+
+afterAll(() => rmSync(fixtures.dir, { recursive: true, force: true }));
+
+async function pickDocumentAndKey(container: HTMLElement, keystore: Uint8Array = fixtures.modern) {
+	await fireEvent.change(fileInput(container), {
+		target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+	});
+	await loadKey(container, keystore);
+}
+
+/** The picker's only load path now: pick the file in the modal, type the PIN, seal it. */
+async function loadKey(container: HTMLElement, bytes: Uint8Array = fixtures.modern) {
+	await fireEvent.click(container.querySelector<HTMLElement>('#pkcs12-picker')!);
+	await fireEvent.change(document.querySelector<HTMLInputElement>('#pkcs12-file')!, {
+		target: { files: [new File([bytes.slice()], 'keystore.p12')] }
+	});
+	await fireEvent.input(document.querySelector<HTMLInputElement>('#add-pin')!, {
+		target: { value: FIXTURE_PIN }
+	});
+	await fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+	// Sealing runs PBKDF2 with 250k iterations, which outlasts the default wait when the suite
+	// runs its files in parallel; a successful seal closes the modal on the selected sign.
+	await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), { timeout: 25_000 });
+}
+
+function fileInput(container: HTMLElement): HTMLInputElement {
+	const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+	if (!input) throw new Error('file input not rendered');
+	return input;
+}
+
+/** jsdom has no `URL.createObjectURL`: capture the Blobs and the download names instead. */
+function captureDownloads() {
+	const blobs: Blob[] = [];
+	const names: string[] = [];
+	// jsdom defines `URL.revokeObjectURL` as a read-only member, so it has to be redefined, not assigned.
+	Object.defineProperty(URL, 'createObjectURL', {
+		value: (blob: Blob) => {
+			blobs.push(blob);
+			return 'blob:test';
+		},
+		configurable: true,
+		writable: true
+	});
+	Object.defineProperty(URL, 'revokeObjectURL', {
+		value: () => {},
+		configurable: true,
+		writable: true
+	});
+	const click = vi
+		.spyOn(HTMLAnchorElement.prototype, 'click')
+		.mockImplementation(function (this: HTMLAnchorElement) {
+			names.push(this.download);
+		});
+	return {
+		blobs,
+		names,
+		restore: () => click.mockRestore()
+	};
+}
+
+describe('App (sign workflow shell)', () => {
+	// The store tests below seal and unlock with PBKDF2 (250k iterations); under the full suite's
+	// parallel files that outlasts the default 5s, so allow the operations to finish.
+	vi.setConfig({ testTimeout: 30_000 });
+
+	it('starts on the drop step, with the sign bar disabled', () => {
+		const { container } = render(App);
+
+		expect(container.textContent).toContain('AutoFirma Web');
+		expect(container.textContent).toContain('Arrastra aquí los ficheros que quieres firmar');
+		expect(fileInput(container)).toBeInstanceOf(HTMLInputElement);
+		// Nothing can run before a document is loaded: the bar renders but stays disabled.
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+		expect(container.textContent).toContain('Selecciona primero un documento.');
+	});
+
+	it('shows the sign step on file selection, but keeps signing disabled until a cert exists', async () => {
+		const { container } = render(App);
+
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
+
+		expect(container.textContent).toContain('contrato.pdf');
+		expect(container.textContent).toContain('8 B');
+
+		const sign = screen.getByRole('button', { name: 'Firmar' });
+		expect(sign.hasAttribute('disabled')).toBe(true);
+		expect(container.textContent).toContain('Selecciona un certificado para habilitar la firma');
+
+		// The picker lives behind its trigger and has loaded nothing yet.
+		expect(container.querySelector('#pkcs12-file')).not.toBeNull();
+		expect(screen.getByRole('button', { name: /Seleccionar firma/ })).toBeTruthy();
+		expect(container.textContent).toContain('CAdES-BES');
+		// The document row shows its pending status.
+		expect(container.querySelector('[data-status="pending"]')?.textContent).toContain('contrato.pdf');
+
+		// Removing the document empties the batch again.
+		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
+		expect(container.querySelector('[data-status="pending"]')).toBeNull();
+	});
+
+	it('switches language', async () => {
+		const { container } = render(App);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'EN' }));
+
+		expect(container.textContent).toContain('Drag the files you want to sign here');
+		expect(container.textContent).toContain('Choose files');
+	});
+
+	it('switches the theme, remembering it for the next visit', async () => {
+		render(App);
+
+		// The switcher is one group of three buttons; the picker trigger also carries hovers.
+		const group = screen.getByRole('group', { name: 'Tema' });
+		const pick = (name: string) => within(group).getByRole('button', { name });
+
+		await fireEvent.click(pick('Oscuro'));
+		expect(document.documentElement.classList.contains('dark')).toBe(true);
+		expect(localStorage.getItem('autofirme-theme')).toBe('dark');
+
+		await fireEvent.click(pick('Claro'));
+		expect(document.documentElement.classList.contains('dark')).toBe(false);
+		expect(localStorage.getItem('autofirme-theme')).toBe('light');
+
+		// "Sistema" hands the decision back to the platform preference.
+		await fireEvent.click(pick('Sistema'));
+		expect(localStorage.getItem('autofirme-theme')).toBe('system');
+	});
+
+	it('opens on the tab ?tab= names and mirrors the choice back into the URL', async () => {
+		history.replaceState(null, '', '/?tab=verificar');
+		try {
+			const { container } = render(App);
+			expect(screen.getByRole('tab', { name: 'Verificar' }).getAttribute('aria-selected')).toBe('true');
+			expect(container.querySelector('#panel-verify')).not.toBeNull();
+
+			// Switching tabs mirrors the param, so the address bar stays linkable.
+			await fireEvent.click(screen.getByRole('tab', { name: 'Firmar' }));
+			expect(new URLSearchParams(location.search).get('tab')).toBe('firmar');
+		} finally {
+			history.replaceState(null, '', '/');
+		}
+
+		// The English spelling is accepted too.
+		history.replaceState(null, '', '/?tab=verify');
+		try {
+			const { container } = render(App);
+			expect(container.querySelector('#panel-verify')).not.toBeNull();
+		} finally {
+			history.replaceState(null, '', '/');
+		}
+	});
+
+	it('loads a PKCS#12 file and enables signing with the certificate it holds', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		// The trigger names the file and shows which certificate will sign.
+		expect(screen.getByRole('button', { name: /keystore\.p12/ })).toBeTruthy();
+		expect(container.textContent).toContain(LEAF_COMMON_NAME);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+		// And it carries the sign's summary: issuer DN and validity window under the icon.
+		const trigger = container.querySelector<HTMLButtonElement>('#pkcs12-picker')!;
+		expect(trigger.textContent).toContain(`${copy.es.signIssuer}: CN=`);
+		expect(trigger.textContent).toContain('O=AutoFirme');
+		expect(trigger.textContent).toContain(copy.es.signValidity);
+	});
+
+	it('shows the wrong-PIN error from the modal add and keeps signing disabled', async () => {
+		const { container } = render(App);
+
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
+		// The add flow lives in the picker's modal: wrong PIN there must not load anything.
+		await fireEvent.click(container.querySelector<HTMLElement>('#pkcs12-picker')!);
+		await fireEvent.change(document.querySelector<HTMLInputElement>('#pkcs12-file')!, {
+			target: { files: [new File([fixtures.modern], 'keystore.p12')] }
+		});
+		await fireEvent.input(document.querySelector<HTMLInputElement>('#add-pin')!, {
+			target: { value: '0000' }
+		});
+		await fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+		// The modal stays open on failure; its alert carries the message. The vault runs in memory
+		// here (jsdom has no IndexedDB), so the ephemeral-store notice sits in the dialog too —
+		// wait for the PIN error to join it.
+		await waitFor(
+			() =>
+				expect(
+					screen
+						.getAllByRole('alert')
+						.map((entry) => entry.textContent)
+						.join(' ')
+				).toContain('PIN incorrecto.'),
+			ASYNC
+		);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+	});
+
+	it('says the page is insecure when the browser withholds WebCrypto', () => {
+		const descriptor = Object.getOwnPropertyDescriptor(globalThis.crypto, 'subtle');
+		Object.defineProperty(globalThis.crypto, 'subtle', { value: undefined, configurable: true });
+		try {
+			const { container } = render(App);
+			expect(container.textContent).toContain(copy.es.insecureContext);
+		} finally {
+			if (descriptor) Object.defineProperty(globalThis.crypto, 'subtle', descriptor);
+			else Reflect.deleteProperty(globalThis.crypto, 'subtle');
+		}
+	});
+
+	it('warns that the picked certificate has expired and still enables signing (#40)', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container, fixtures.expired);
+
+		// The amber banner (shadcn `Alert`, role=alert) says the expiry out loud…
+		const banner = await screen.findByRole('alert');
+		expect(banner.textContent).toContain('caducado');
+		expect(banner.textContent).toContain(String(new Date(fixtures.expiredNotAfter).getFullYear()));
+		// …and the certificate still signs: AutoFirma's behaviour, and the point of #40.
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+	});
+
+	it('seals the added sign into the store and selects it again from the modal', async () => {
+		const { container } = render(App);
+
+		// The add flow seals the container into the store as it loads it (label = file name) and
+		// closes the modal on the sign it selected.
+		await pickDocumentAndKey(container);
+		expect(container.textContent).toContain(LEAF_COMMON_NAME);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+
+		// Drop the session the file gave, as an empty form would on a fresh visit.
+		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
+			target: { files: [] }
+		});
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+
+		// The stored sign is a cell of the picker's modal (the grid is the store's own listing).
+		// It was unsealed this visit, so one click selects it again and closes the modal; a sign
+		// from a previous visit asks for its PIN first — that path lives in CertPicker.test.
+		await fireEvent.click(screen.getByRole('button', { name: /Seleccionar firma/ }));
+		await fireEvent.click(await screen.findByRole('button', { name: /keystore\.p12/ }, ASYNC));
+		await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull(), ASYNC);
+
+		const trigger = container.querySelector<HTMLButtonElement>('#pkcs12-picker')!;
+		expect(trigger.textContent).toContain('keystore.p12');
+		expect(trigger.textContent).toContain(LEAF_COMMON_NAME);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+	});
+
+	it('clears the loaded certificates when another keystore file is picked', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+
+		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
+			target: { files: [new File([fixtures.ec], 'other.p12')] }
+		});
+
+		// A different file invalidates the loaded signer: the trigger now names the new file only.
+		expect(screen.getByRole('button', { name: /other\.p12/ })).toBeTruthy();
+		expect(container.textContent).not.toContain(LEAF_COMMON_NAME);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+	});
+
+	it('signs a 3-file batch with the loaded certificate and hands over one ZIP', async () => {
+		const downloaded: string[] = [];
+		vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+			this: HTMLAnchorElement
+		) {
+			downloaded.push(this.download);
+		});
+		// jsdom has no blob URLs; only their creation matters here.
+		Object.defineProperty(URL, 'createObjectURL', { value: () => 'blob:batch', configurable: true });
+		Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, configurable: true });
+
+		const { container } = render(App);
+		await fireEvent.change(fileInput(container), {
+			target: {
+				files: [
+					new File(['uno'], 'uno.txt', { type: 'text/plain' }),
+					new File(['dos'], 'dos.txt', { type: 'text/plain' }),
+					new File(['tres'], 'tres.txt', { type: 'text/plain' })
+				]
+			}
+		});
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
+
+		// Every document ends signed and the per-file download arms with the signature's name.
+		await waitFor(() => expect(container.textContent).toContain('Firmados: 3/3'), ASYNC);
+		expect(container.querySelectorAll('[data-status="signed"]')).toHaveLength(3);
+		const firstRow = container.querySelector('[data-status="signed"]');
+		expect(firstRow?.textContent).toContain('uno.txt');
+		expect(
+			[...(firstRow?.querySelectorAll('button') ?? [])].some(
+				(button) => button.textContent?.includes('Descargar') && !button.hasAttribute('disabled')
+			)
+		).toBe(true);
+
+		const download = screen.getByRole('button', { name: 'Descargar ZIP' });
+		expect(download.hasAttribute('disabled')).toBe(false);
+		await fireEvent.click(download);
+		expect(downloaded).toEqual(['firmas-lote.zip']);
+	});
+
+	it('signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies', async () => {
+		const { container } = render(App);
+
+		await fireEvent.change(fileInput(container), {
+			target: {
+				files: [new File(['<fe:Facturae xmlns:fe="urn:fe"><N>2026-0001</N></fe:Facturae>'], 'facturae.xml', {
+					type: 'application/xml'
+				})]
+			}
+		});
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		// The format chooser is a button labeled with the current format; it opens the modal.
+		await fireEvent.click(screen.getByRole('button', { name: /CAdES-BES/ }));
+		await fireEvent.click(screen.getByRole('radio', { name: /XAdES-EPES/ }));
+
+		const downloads = captureDownloads();
+		try {
+			await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
+			await waitFor(() => expect(container.textContent).toContain('Firmados: 1/1'), ASYNC);
+			await fireEvent.click(screen.getByRole('button', { name: 'Descargar ZIP' }));
+		} finally {
+			downloads.restore();
+		}
+
+		expect(downloads.names).toEqual(['firmas-lote.zip']);
+		const archive = writeFixtureFile(
+			fixtures.dir,
+			'lote.zip',
+			new Uint8Array(await downloads.blobs[0].arrayBuffer())
+		);
+		// Info-ZIP extracts the entry, so the queue's naming is checked by a tool that did not write it.
+		const xsig = execFileSync('unzip', ['-p', archive, 'facturae.xml.xsig']);
+		expect(xsig.toString()).toContain('<ds:Signature');
+		// The leaf fixture is self-signed, so it is its own trust anchor.
+		const path = writeFixtureFile(fixtures.dir, 'ui.xsig', new Uint8Array(xsig));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+	});
+
+	it('timestamps the signature when a TSA address is typed in the panel (CAdES-T)', async () => {
+		const tsa = createTsaFixtures();
+		const { container } = render(App);
+		try {
+			vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+				const query = init.body;
+				if (!(query instanceof Uint8Array)) throw new Error('the timestamp request has no DER body');
+				return new Response(tsa.respond(query), { status: 200 });
+			});
+
+			await fireEvent.change(fileInput(container), {
+				target: { files: [new File(['contenido\n'], 'contrato.txt', { type: 'text/plain' })] }
+			});
+			await loadKey(container);
+
+			// The TSA field starts empty (no timestamp) and takes the address the user types.
+			const tsaField = container.querySelector<HTMLInputElement>('#tsa-url');
+			expect(tsaField?.value).toBe('');
+			await fireEvent.input(tsaField!, { target: { value: 'https://tsa.test/' } });
+
+			const downloads = captureDownloads();
+			try {
+				await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
+				await waitFor(() => expect(container.textContent).toContain('Firmados: 1/1'), {
+					timeout: 25_000
+				});
+				await fireEvent.click(screen.getByRole('button', { name: 'Descargar ZIP' }));
+			} finally {
+				downloads.restore();
+			}
+
+			const archive = writeFixtureFile(
+				fixtures.dir,
+				'tsa-lote.zip',
+				new Uint8Array(await downloads.blobs[0].arrayBuffer())
+			);
+			const csig = new Uint8Array(execFileSync('unzip', ['-p', archive, 'contrato.txt.csig']));
+			const { signature, token } = cmsTimeStamp(csig);
+			expect(tsVerifyToken(tsa.dir, tsa.certPath, token, signature)).toMatch(/Verification: OK/);
+		} finally {
+			vi.unstubAllGlobals();
+			rmSync(tsa.dir, { recursive: true, force: true });
+		}
+	});
+
+	it('keeps the picked signature but disables signing when the document list is emptied', async () => {
+		const { container } = render(App);
+
+		await pickDocumentAndKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
+
+		// Removing the document must not throw the signature away — configuring the signature and
+		// choosing its documents can happen in either order — but nothing signable is left.
+		expect(container.textContent).toContain(LEAF_COMMON_NAME);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+		expect(container.textContent).toContain('Selecciona primero un documento.');
+
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'otro.pdf', { type: 'application/pdf' })] }
+		});
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+	});
+
+	it('keeps a signature picked before any document exists', async () => {
+		const { container } = render(App);
+
+		// The config card is step 2 and the drop zone step 1, but a user may well start with the
+		// signature; the picker must not discard it for want of a document.
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
+		expect(container.textContent).toContain(LEAF_COMMON_NAME);
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+	});
+
+});
+
+describe('verify mode', () => {
+	it('renders a per-check validity report for a dropped artifact', async () => {
+		const { container } = render(App);
+		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
+
+		expect(container.textContent).toContain('Arrastra aquí el fichero firmado');
+
+		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/cades-tampered.csig'));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File([bytes], 'firma.csig')] }
+		});
+
+		await screen.findByText(/no supera todas las comprobaciones/, {}, ASYNC);
+		expect(container.querySelector('[data-check="contentDigest"]')?.getAttribute('data-status')).toBe('fail');
+		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
+		expect(container.textContent).toContain('Firmante');
+	});
+
+	it('verifies a signed PDF as PAdES, check by check', async () => {
+		const { container } = render(App);
+		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
+
+		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/pades-b-b-signed.pdf'));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File([bytes], 'contrato.pdf')] }
+		});
+
+		await screen.findByText(/comprobaciones/, {}, ASYNC);
+		expect(container.textContent).toContain('PAdES');
+		expect(container.querySelector('[data-check="contentDigest"]')?.getAttribute('data-status')).toBe('pass');
+		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
+		// The test signer is self-signed and outside the bundled roots: red banner, right reason.
+		expect(container.querySelector('[data-check="certChain"]')?.getAttribute('data-status')).toBe('fail');
+		expect(container.textContent).toContain('Test Signer RSA');
+	});
+
+	it('shows one signature at a time, closed by a button at the bottom', async () => {
+		const { container } = render(App);
+		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
+
+		// One file per pick: in this mode the chooser is single-select.
+		const drop = container.querySelector<HTMLInputElement>('input[type=file]');
+		expect(drop?.multiple).toBe(false);
+		expect(container.textContent).toContain('Comprueba una firma');
+
+		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/cades-tampered.csig'));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File([bytes], 'firma.csig')] }
+		});
+		await screen.findByText(/no supera todas las comprobaciones/, {}, ASYNC);
+
+		// The step-1 card steps aside while a signature is loaded; Cerrar is the way out.
+		expect(container.textContent).not.toContain('Comprueba una firma');
+		expect(screen.getByRole('button', { name: 'Cerrar' })).toBeTruthy();
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+		expect(container.textContent).toContain('Comprueba una firma');
+		expect(screen.queryByText(/no supera todas las comprobaciones/)).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Cerrar' })).toBeNull();
+	});
+
+	it('labels the trust-chain check as failed when the root is not bundled, keeping the rest green', async () => {
+		const { container } = render(App);
+		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
+
+		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/xades-valid.xsig'));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File([bytes], 'firma.xsig')] }
+		});
+
+		await screen.findByText(/no supera todas las comprobaciones/, {}, ASYNC);
+		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
+		expect(container.querySelector('[data-check="reference"]')?.getAttribute('data-status')).toBe('pass');
+		expect(container.querySelector('[data-check="certChain"]')?.getAttribute('data-status')).toBe('fail');
+		expect(container.textContent).toContain('XAdES');
+	});
+});
+
+describe('MCP endpoint settings', () => {
+	it('stores the endpoint and token typed into the help-menu dialog', async () => {
+		render(App);
+		await fireEvent.pointerDown(screen.getByRole('button', { name: 'Ayuda' }), { button: 0 });
+		const item = await screen.findByRole('menuitem', { name: 'Servidor MCP' });
+		await fireEvent.pointerDown(item, { button: 0 });
+		await fireEvent.click(item);
+
+		const url = await screen.findByLabelText('Dirección del endpoint');
+		await fireEvent.input(url, { target: { value: 'https://mcp.example.com/mcp' } });
+		await fireEvent.input(screen.getByLabelText('Token de acceso'), { target: { value: 'secreto' } });
+
+		expect(JSON.parse(localStorage.getItem('autofirme-mcp')!)).toEqual({
+			url: 'https://mcp.example.com/mcp',
+			token: 'secreto'
+		});
+		await screen.findByText(/no lo envía a ningún sitio/);
+	});
+});

@@ -1,0 +1,10 @@
+# Static SPA: prerendered shell, every unknown path gets the fallback document.
+:80 {
+	root * /srv
+	encode gzip zstd
+	# Go's mime table has no .webmanifest, so name the type the install prompt expects.
+	header /manifest.webmanifest Content-Type "application/manifest+json"
+	header /_app/immutable/* Cache-Control "public, max-age=31536000, immutable"
+	try_files {path} {path}/ /404.html
+	file_server
+}
