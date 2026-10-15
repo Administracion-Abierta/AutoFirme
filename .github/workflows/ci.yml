@@ -29,6 +29,8 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends git openssl unzip python3 ca-certificates xmlsec1 libxml2-utils
+          # The workspace is mounted from the host; without this, git refuses to read it.
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           openssl version
           xmlsec1 --version
           xmllint --version
