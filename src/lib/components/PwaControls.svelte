@@ -20,6 +20,7 @@
 	let waiting = $state<ServiceWorker | null>(null);
 
 	onMount(() => {
+		if (location.protocol === 'chrome-extension:') return;
 		// `beforeinstallprompt` is Chromium-only and missing from lib.dom, hence the bare EventTarget.
 		const events = window as EventTarget;
 		const onInstallable = (event: Event) => {

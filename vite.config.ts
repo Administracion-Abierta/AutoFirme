@@ -1,9 +1,18 @@
 import adapter from '@sveltejs/adapter-static';
+import { fileURLToPath } from 'node:url';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => mode === 'extension' ? {
+	root: 'extension',
+	base: './',
+	publicDir: '../static',
+	plugins: [tailwindcss(), svelte()],
+	resolve: { alias: { '#lib': fileURLToPath(new URL('./src/lib', import.meta.url)) } },
+	build: { outDir: '../dist/extension', emptyOutDir: true, target: 'chrome116' }
+} : {
 	plugins: [
 		tailwindcss(),
 		// The sidebar-07 demo renders shadcn's sample data with "#" links; keep the SPA

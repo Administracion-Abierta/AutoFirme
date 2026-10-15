@@ -92,6 +92,17 @@ export function timeStampImprint(token: Bytes): Bytes {
  * `fetch` is read from the global scope on every call, so tests stub it.
  */
 export async function requestTimeStamp(url: string, data: Bytes): Promise<Bytes> {
+	if (globalThis.location?.protocol === 'chrome-extension:') {
+		const tsa = new URL(url);
+		if (tsa.protocol !== 'https:' && tsa.protocol !== 'http:') {
+			throw new Error('TSA permission requires an HTTP(S) URL');
+		}
+		const extension = globalThis as typeof globalThis & {
+			chrome?: { permissions?: { contains: (permission: { origins: string[] }) => Promise<boolean> } };
+		};
+		const granted = await extension.chrome?.permissions?.contains({ origins: [`${tsa.origin}/*`] });
+		if (!granted) throw new Error(`Grant TSA host permission before timestamping: ${tsa.origin}`);
+	}
 	const imprint = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
 	const response = await globalThis.fetch(url, {
 		method: 'POST',

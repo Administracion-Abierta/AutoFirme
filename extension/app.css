@@ -1,0 +1,3 @@
+@import '../src/app.css';
+/* The extension's Vite root is separate; scan the shared application as well. */
+@source '../src';
