@@ -1,6 +1,6 @@
 # Chrome extension design
 
-Status: implemented in extension 0.1.1. This document describes the current code.
+Status: implemented in extension 0.1.2. This document describes the current code.
 Installation and supported calls are in [CHROME-EXTENSION.md](CHROME-EXTENSION.md).
 Recorded checks are in [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md).
 
@@ -39,13 +39,22 @@ and webapp service-worker registration.
 ## 2. App windows and certificate storage
 
 The toolbar opens a persistent, resizable 520 by 760 window. A request opens its
-own 480 by 720 chooser. The full app can also open in a tab. These windows remain
+own chooser, initially 480 by 520. The chooser resizes to its content, capped by
+the available screen height and a 1200px limit. Longer content scrolls. The full
+app can also open in a tab. These windows remain
 open when focus moves elsewhere during signing or a batch operation.
 
 The chooser renders the existing `CertPicker` inline. Saved choices remain beside
-the requesting website, operation and document digest. Certificate rows show the
-owner, issuer and expiry. The normal full-app certificate dialog shares the same
-import, PIN and selection logic.
+the requesting website. The compact header contains the request title and app
+name. The site section keeps
+the origin visible and offers a SHA-256 copy button with a tooltip. Request
+parameters and the full digest sit in a collapsed disclosure. Selected certificate
+details also start collapsed. The selected identity is excluded from saved choices,
+and the add button sits beside their heading. Signing actions share a 40px height.
+The normal full-app certificate dialog shares the same import, PIN and selection
+logic. A resize observer tracks natural content height; DOM
+mutations also handle disclosure and PIN/import changes when painting is paused.
+Resizing uses the original browser-frame height to avoid viewport feedback loops.
 
 The extension uses the app's PIN-protected identity store in extension-origin
 IndexedDB. Hosted webapp storage belongs to a different origin and does not migrate
@@ -91,6 +100,7 @@ Extension UI messages use `chrome.runtime.sendMessage`. Replies are
 | Message | Result or effect |
 |---|---|
 | `request:get`, `id` | Request origin, operation, data, format, mode and digest |
+| `request:resize`, `id`, `height` | Resize the bound chooser only, within 320 to 1200px, without changing signing state |
 | `request:begin`, `id` | Transition from waiting to signing after confirmation |
 | `request:complete`, `id`, `result` | Return the public certificate and optional signature after signing begins |
 | `request:fail`, `id` | End with an error |

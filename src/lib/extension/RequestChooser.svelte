@@ -1,5 +1,7 @@
 <script lang="ts">
  import { onMount } from 'svelte';
+ import CopyIcon from '@lucide/svelte/icons/copy';
+ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '#lib/components/ui/tooltip/index.js';
  import CertPicker from '#lib/components/CertPicker.svelte';
  import { Button } from '#lib/components/ui/button/index.js';
  import { browserVault, type Vault } from '#lib/certstore';
@@ -17,6 +19,9 @@
  let chain = $state<readonly SignerCert[]>([]);
  let phase = $state<'loading' | 'waiting' | 'signing' | 'done' | 'cancelled' | 'continued' | 'failed'>('loading');
  let error = $state('');
+ let copied = $state(false);
+ let digestHintOpen = $state(false);
+ let content = $state<HTMLElement | null>(null);
  let eligibilityTime = $state(Date.now());
  const problem = $derived(cert ? certificateProblem(cert, eligibilityTime) : null);
  const waiting = $derived(phase === 'waiting');
@@ -25,6 +30,39 @@
   void send({type:'request:get',id}).then((value) => { request = value as ExtensionRequest; phase='waiting'; }).catch((reason) => { error=String(reason instanceof Error ? reason.message : reason); phase='failed'; });
   return cleanup;
  });
+ // Measure natural content height, not the viewport, to avoid resize feedback loops.
+ $effect(() => {
+  if (!content || !request || typeof ResizeObserver === 'undefined') return;
+  const element=content;
+  let timer:ReturnType<typeof setTimeout>;
+  let lastHeight=0;
+  const frame=Math.max(0,window.outerHeight-window.innerHeight);
+  function schedule() {
+   clearTimeout(timer);
+   timer=setTimeout(() => {
+    const limit=Math.min(1200,window.screen.availHeight || 900);
+    const height=Math.max(320,Math.min(limit,Math.ceil(element.getBoundingClientRect().height+frame+2)));
+    if(height===lastHeight)return;
+    lastHeight=height;
+    // Resizing is cosmetic: failure must never affect signing or fallback.
+    void send({type:'request:resize',id,height}).catch(()=>{});
+   },80);
+  }
+  const observer=new ResizeObserver(schedule);
+  observer.observe(element);
+  // Native disclosure and PIN/import updates must also resize without a paint.
+  const mutations=new MutationObserver(schedule);
+  mutations.observe(element,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['open','class','hidden']});
+  window.addEventListener('resize',schedule);
+  schedule();
+  return () => {observer.disconnect();mutations.disconnect();clearTimeout(timer);window.removeEventListener('resize',schedule);};
+ });
+ async function copyDigest() {
+  if (!request?.digest) return;
+  copied=false;
+  try {await navigator.clipboard.writeText(request.digest);copied=true;}
+  catch {error=t.copyFailed;}
+ }
  async function confirm() {
   if (!waiting || !cert || !request || problem) return;
   phase='signing'; error='';
@@ -49,41 +87,56 @@
  }
 </script>
 
-<main class="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-5 p-4 sm:p-6">
- <header class="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-  <span class="font-display text-xl font-semibold">AutoFirme</span>
-  <div class="flex gap-1" role="group" aria-label={copy[lang].langLabel}>
+<main bind:this={content} id="request-chooser" class="mx-auto flex w-full max-w-lg flex-col gap-3 p-3 sm:p-4">
+ <header class="flex items-center justify-between gap-2 border-b pb-2">
+  <div class="flex min-w-0 flex-wrap items-baseline gap-x-2">
+   <span class="font-display text-lg font-semibold">AutoFirme</span>
+   <h1 class="text-muted-foreground text-xs font-medium">{request?.operation==='sign' ? t.sign : t.request}</h1>
+  </div>
+  <div class="flex shrink-0 gap-1" role="group" aria-label={copy[lang].langLabel}>
    <Button size="sm" variant={lang==='es'?'default':'ghost'} aria-pressed={lang==='es'} onclick={()=>lang='es'}>ES</Button>
    <Button size="sm" variant={lang==='en'?'default':'ghost'} aria-pressed={lang==='en'} onclick={()=>lang='en'}>EN</Button>
   </div>
  </header>
- <div>
-  <h1 class="font-display text-2xl font-semibold">{request?.operation==='sign' ? t.sign : t.request}</h1>
-  <p class="text-muted-foreground mt-2 text-sm">{t.requestedBy}</p>
-  <p id="request-origin" class="mt-1 break-all font-semibold">{request?.origin ?? '…'}</p>
- </div>
+ <section id="request-site" class="flex min-w-0 items-center justify-between gap-2">
+  <div class="min-w-0">
+   <p class="text-muted-foreground text-xs">{t.requestedBy}</p>
+   <p id="request-origin" class="break-all text-sm font-semibold">{request?.origin ?? '…'}</p>
+  </div>
+  {#if request?.operation==='sign' && request.digest}
+   <TooltipProvider><Tooltip bind:open={digestHintOpen}><TooltipTrigger>
+    {#snippet child({props})}
+     <Button {...props} id="request-copy-digest" size="icon-sm" variant="ghost" aria-label={t.copyDigest} onclick={copyDigest}><CopyIcon class="size-3.5"/></Button>
+    {/snippet}
+   </TooltipTrigger>{#if digestHintOpen}<TooltipContent>{copied ? t.digestCopied : t.copyDigest}</TooltipContent>{/if}</Tooltip></TooltipProvider>
+  {/if}
+ </section>
+ {#if copied}<p role="status" class="sr-only">{t.digestCopied}</p>{/if}
  {#if request}
-  <section class="bg-muted/50 grid gap-2 rounded-xl border p-3 text-sm">
-   <p>{request.operation==='sign' ? `${request.format} · SHA-256 · ${request.mode}` : t.select}</p>
-   {#if request.operation==='sign'}
-    <p class="text-muted-foreground">{t.digest}</p>
-    <code id="request-digest" class="break-all text-xs">{request.digest ?? '—'}</code>
-   {:else}<p class="text-muted-foreground">{t.noDigest}</p>{/if}
-  </section>
+  <details id="request-details" class="text-xs">
+   <summary class="text-muted-foreground cursor-pointer py-1">{t.requestDetails}</summary>
+   <div class="bg-muted/50 mt-1 grid gap-2 rounded-lg border p-2">
+    <p>{request.operation==='sign' ? `${request.format} · SHA-256 · ${request.mode}` : t.select}</p>
+    {#if request.operation==='sign'}
+     <p class="text-muted-foreground">{t.digest}</p>
+     <code id="request-digest" class="break-all">{request.digest ?? '—'}</code>
+    {:else}<p class="text-muted-foreground">{t.noDigest}</p>{/if}
+    <p class="text-muted-foreground">{t.consent}</p>
+   </div>
+  </details>
   {#if waiting}
-   <p class="text-muted-foreground text-sm">{t.consent}</p>
-   <CertPicker copy={copy[lang]} {cert} {vault} compact onpick={(picked, certificates)=>{cert=picked;chain=certificates;eligibilityTime=Date.now();error='';}} />
+   <CertPicker copy={copy[lang]} {cert} {vault} compact detailsLabel={t.certDetails} onpick={(picked, certificates)=>{cert=picked;chain=certificates;eligibilityTime=Date.now();error='';}} />
    {#if problem}<p role="alert" class="text-destructive text-sm">{t[problem]}</p>{/if}
   {/if}
  {/if}
  {#if error}<p id="request-error" role="alert" class="text-destructive break-words text-sm">{error}</p>{/if}
  {#if phase!=='waiting'}<p role="status" class="text-sm">{phase==='loading' ? t.loading : phase==='signing' ? t.signing : phase==='done' ? t.done : phase==='cancelled' ? t.cancelled : phase==='continued' ? t.continued : t.failed}</p>{/if}
- <div class="mt-auto grid gap-2 pt-3">
-  <Button id="request-confirm" class="h-auto min-h-10 whitespace-normal" disabled={!waiting || !cert || !!problem} onclick={confirm}>{request?.operation==='selectCertificate' ? t.confirmSelect : t.confirm}</Button>
+ <footer class="grid gap-2 border-t pt-3">
+  <Button id="request-confirm" class="h-10 w-full whitespace-normal text-center leading-tight" disabled={!waiting || !cert || !!problem} onclick={confirm}>{request?.operation==='selectCertificate' ? t.confirmSelect : t.confirm}</Button>
   <div class="grid grid-cols-2 gap-2">
-   <Button id="request-cancel" variant="outline" disabled={!waiting} onclick={()=>finish('cancel')}>{t.cancel}</Button>
-   <Button id="request-fallback" variant="outline" class="h-auto min-h-10 whitespace-normal" disabled={!waiting} onclick={()=>finish('fallback')}>{t.fallback}</Button>
+   <Button id="request-cancel" variant="outline" class="h-10 w-full min-w-0 whitespace-normal text-center leading-tight" disabled={!waiting} onclick={()=>finish('cancel')}>{t.cancel}</Button>
+   <Button id="request-fallback" variant="outline" class="h-10 w-full min-w-0 whitespace-normal text-center leading-tight" disabled={!waiting} onclick={()=>finish('fallback')}>{t.fallback}</Button>
   </div>
-  <Button id="request-open-app" variant="ghost" class="h-auto min-h-10 whitespace-normal" onclick={openApp}>{t.fullTab}</Button>
- </div>
+  <Button id="request-open-app" variant="ghost" class="h-8 w-full whitespace-normal text-center text-xs" onclick={openApp}>{t.fullTab}</Button>
+ </footer>
 </main>

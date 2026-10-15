@@ -1,5 +1,6 @@
 export const extensionCopy = {
  es: {
+  requestDetails:'Detalles de la solicitud', certDetails:'Detalles del certificado', copyDigest:'Copiar SHA256', digestCopied:'SHA256 copiado', copyFailed:'No se pudo copiar el SHA256. Puedes consultarlo en los detalles de la solicitud.',
   request:'Solicitud de certificado', sign:'Firmar documento', select:'Compartir certificado público',
   requestedBy:'Sitio solicitante', digest:'Resumen SHA-256', noDigest:'No se solicita firmar un documento.',
   consent:'Selecciona y desbloquea un certificado. Solo el botón de confirmación autoriza esta solicitud.',
@@ -16,6 +17,7 @@ export const extensionCopy = {
   ca:'Selecciona un certificado de firma personal, no una autoridad certificadora.', keyUsage:'El certificado no permite firmar documentos.'
  },
  en: {
+  requestDetails:'Request details', certDetails:'Certificate details', copyDigest:'Copy SHA256', digestCopied:'SHA256 copied', copyFailed:'Could not copy SHA256. You can find it in the request details.',
   request:'Certificate request', sign:'Sign document', select:'Share public certificate', requestedBy:'Requesting website', digest:'SHA-256 digest',
   noDigest:'No document signature is requested.', consent:'Select and unlock a certificate. Only the confirmation button authorizes this request.',
   confirm:'Confirm and sign', confirmSelect:'Share certificate', cancel:'Cancel', fallback:'Continue with AutoFirma', fullTab:'Open full application',

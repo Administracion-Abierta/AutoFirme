@@ -61,6 +61,12 @@ picker and saved identities; there is no Bitwarden integration. Review the
 requesting origin, operation and digest, choose or import/unlock a certificate,
 and explicitly confirm. Choosing a certificate alone never signs.
 
+The request title shares the header with AutoFirme. Request and certificate details
+start collapsed; expand them to review the format, full digest, subject, issuer and
+validity. The copy button beside the website copies the full SHA-256. The selected
+certificate leaves the saved-choices list. The chooser adjusts its height when
+content changes and scrolls when it reaches the available screen height.
+
 Continue with AutoFirma resumes the website's original desktop integration.
 Closing the chooser before signing has the same effect, once. Cancel reports
 cancellation. Once signing starts, closing or losing the chooser cannot trigger

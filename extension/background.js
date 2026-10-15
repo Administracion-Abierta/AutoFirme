@@ -87,6 +87,10 @@ export function createBridge(chrome) {
     if (!trustedChooser(sender, item, chrome.runtime.id, root)) throw Error('This chooser is not authorized for the request');
     await fresh(item);
     switch (message.type) {
+      case 'request:resize':
+        if (!Number.isInteger(message.height) || message.height < 320 || message.height > 1200) throw Error('Invalid chooser height');
+        await chrome.windows.update(item.windowId,{height:message.height});
+        return true;
       case 'request:get':
         return {id:item.id,origin:item.origin,...item.request,digest:item.digest};
       case 'request:begin':
@@ -160,7 +164,7 @@ export function createBridge(chrome) {
           item.digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)), byte => byte.toString(16).padStart(2,'0')).join('');
         }
         if (!alive || !coordinator.get(item.id)) return;
-        const win = await chrome.windows.create({url:root + 'index.html?request=' + item.id,type:'popup',width:480,height:720});
+        const win = await chrome.windows.create({url:root + 'index.html?request=' + item.id,type:'popup',width:480,height:520});
         item.windowId = win.id;
         item.chooserTabId = win.tabs?.[0]?.id;
         if (!Number.isInteger(item.chooserTabId)) throw Error('Could not identify the chooser tab');

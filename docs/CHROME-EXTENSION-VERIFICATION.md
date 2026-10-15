@@ -1,6 +1,6 @@
 # Chrome extension verification
 
-Recorded for extension 0.1.1 on 2026-10-15. These are the results of the implementation
+Recorded for extension 0.1.2 on 2026-10-15. These are the results of the implementation
 checks, not a claim that every platform or administration workflow is supported.
 Commands and installation instructions are in [CHROME-EXTENSION.md](CHROME-EXTENSION.md).
 The implementation is described in [CHROME-EXTENSION-DESIGN.md](CHROME-EXTENSION-DESIGN.md).
@@ -15,17 +15,21 @@ disposable profile, an OpenSSL-generated PKCS#12 and local test documents.
 
 | Command | Recorded result |
 |---|---|
-| `pnpm test` | 221 passed, 2 skipped |
+| `pnpm test --maxWorkers=2` | 226 passed, 2 skipped |
 | `pnpm check` | 0 errors, 0 warnings |
 | `pnpm build` | Passed, with the existing bundle-size warning |
 | `pnpm build:extension` | Passed, with the existing bundle-size warning |
-| `pnpm test:extension:unit` | 26 passed |
+| `pnpm test:extension:unit` | 27 passed |
 | `pnpm test:extension:artifacts` | 15 passed |
 | `pnpm test:extension:browser` | Passed |
 
 The unmodified upstream baseline had 197 passing tests and two skipped. The suite
 includes the existing CMS, XML, PDF, stamp, ZIP and PKCS#12 checks. The extension
 adds chooser, certificate eligibility, TSA permission and site-access coverage.
+The compact chooser tests also cover collapsed details, SHA-256 clipboard success
+and failure, exclusion of the selected identity, and resizing when painting is
+paused. A separate bridge test checks that only the bound chooser can resize its
+window and that resizing never authorizes a signature.
 
 The bridge tests cover default capture without a site entry, independence from
 the old enabled-site list, persisted disabled origins, host revocation, sender
@@ -38,9 +42,10 @@ assets, inline executable scripts, dynamic code execution, PWA registration and
 reduced feature bundles. They follow reachable module imports.
 
 `bash test/fixtures/verify-fixtures.sh` also passed the positive and tampered
-CAdES, XML and canonicalization checks during integration. An application run with
-`--maxWorkers=2` was used on the memory-constrained integration machine; the final
-0.1.1 run used the plain `pnpm test` command shown above.
+CAdES, XML and canonicalization checks during integration. Application runs with
+`--maxWorkers=2` keep memory use bounded. Version 0.1.1 also passed a plain
+`pnpm test` run. The final tooltip cleanup passed all 12 focused chooser tests,
+type checking, both builds and the full Chromium workflow.
 
 ## 3. Unpacked Chromium extension
 
@@ -53,8 +58,17 @@ Observed results:
 
 - The actual `App.svelte` mounts under the extension origin. `CertPicker` imports
   the generated PKCS#12 and seals it in the existing identity store.
-- The full app fits 320px, 420px and 1280px viewport widths. The inline chooser fits
-  320px and 420px widths and keeps the website beside the saved choices.
+- The full app fits 320px, 420px and 1280px viewport widths. The chooser fits
+  320px and 420px in ES and EN, including expanded certificate details. The header
+  stays below 70px, the site section below 55px, the three signing actions are
+  40px high, and the add button remains to the right of the saved-choice heading.
+- A real pointer hover shows the SHA-256 tooltip, and a real click writes to the
+  clipboard without an added clipboard permission. The selected certificate is
+  absent from saved choices. A closed tooltip is removed immediately so its old
+  position cannot cause horizontal overflow after a viewport change.
+- The native chooser window fits its content, grows when request details expand
+  and shrinks when they close. Height is capped by the available screen height;
+  overflow scrolls. DOM observation also handles updates when painting is paused.
 - The PDF stamp controls sign a two-document batch. The app saves both outputs,
   downloads a ZIP that passes `unzip -t`, and reports passing PDF structure and
   signature checks. OpenSSL verifies both signatures against the test certificate.

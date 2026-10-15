@@ -24,6 +24,7 @@
 	interface Props {
 		/** Compact extension chooser trigger and identity rows. */
 		compact?: boolean;
+		detailsLabel?: string;
 		copy: Copy;
 		/** Selected certificate, or null while nothing is loaded. */
 		cert: SignerCert | null;
@@ -32,7 +33,7 @@
 		onpick: (cert: SignerCert | null, chain: readonly SignerCert[]) => void;
 	}
 
-	let { copy, cert, vault, onpick, compact = false }: Props = $props();
+	let { copy, cert, vault, onpick, compact = false, detailsLabel = 'Certificate details' }: Props = $props();
 
 	let file = $state<File | null>(null);
 	// A picked file already counts as a chosen signature: the dotted dim look is only the empty state.
@@ -41,6 +42,7 @@
 	let pickedName = $state('');
 	let pickerOpen = $state(false);
 	let identities = $state<IdentityMeta[]>([]);
+	const visibleIdentities = $derived(compact ? identities.filter(entry => entry.id !== usedId) : identities);
 	// `vault.persistent` is a plain getter: the store can fall back to memory at any moment, and
 	// only a state of our own makes the notice appear when it does.
 	let persistent = $state(true);
@@ -138,6 +140,7 @@
 	}
 
 	function picked(next: File | null) {
+		if (compact) openId = null;
 		file = next;
 		pickedName = next?.name ?? '';
 		if (next) console.debug('[autofirme:picker] file picked', next.name, next.size);
@@ -219,8 +222,22 @@
 	<!-- The trigger is a file-shaped target: dashed and dim until a sign is loaded, then solid. -->
 	{#if compact}
 		{#if cert}
-			<div id="pkcs12-selection" class="border-primary/60 flex min-w-0 flex-col items-center gap-2 rounded-lg border p-3 text-center">
-				{@render certificateSummary()}
+			<div id="pkcs12-selection" class="border-primary/60 grid min-w-0 gap-1 rounded-lg border p-2.5">
+				<div class="flex min-w-0 items-center gap-2">
+					<FileIcon class="text-primary size-4 shrink-0"/>
+					<div class="min-w-0">
+						<p class="truncate text-sm font-medium">{cert.commonName}</p>
+						{#if pickedName && pickedName!==cert.commonName}<p class="text-muted-foreground truncate text-xs">{pickedName}</p>{/if}
+					</div>
+				</div>
+				<details id="selected-certificate-details" class="text-xs">
+					<summary class="text-muted-foreground cursor-pointer py-1">{detailsLabel}</summary>
+					<div class="text-muted-foreground grid gap-1 pt-1">
+						<p class="break-words">{cert.subject}</p>
+						<p class="break-words">{copy.signIssuer}: {cert.issuer}</p>
+						<p class="tnum">{copy.signValidity}: {dateFormat.format(cert.notBefore)} → {dateFormat.format(cert.notAfter)}</p>
+					</div>
+				</details>
 			</div>
 		{/if}
 	{:else}
@@ -266,7 +283,10 @@
 	{/if}
 	{#if compact}
 		<section id="pkcs12-choices" aria-label={copy.storeTitle} class="grid min-w-0 gap-3">
-			<h2 class="text-sm font-medium">{copy.storeTitle}</h2>
+			<div id="pkcs12-choices-header" class="flex min-w-0 items-center justify-between gap-2">
+				<h2 class="min-w-0 text-sm font-medium">{copy.storeTitle}</h2>
+				<Button size="sm" variant="outline" class="h-8 shrink-0 gap-1 text-xs" onclick={()=>fileInput?.click()}><PlusIcon class="size-3.5"/>{copy.addSign}</Button>
+			</div>
 			{@render identityContent()}
 		</section>
 	{/if}
@@ -342,7 +362,7 @@
 		</div>
 	{:else}
 	<!-- Four columns, four rows tall, the rest scrolls. -->
-	<div class={cn("grid max-h-80 gap-3 overflow-y-auto pr-1", compact ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-4")}>
+	<div class={cn("grid max-h-80 gap-3 overflow-y-auto pr-1", compact ? "max-h-52 grid-cols-1 gap-2" : "grid-cols-2 sm:grid-cols-4")}>
 		{#if pending}
 			<!-- The sign sitting in memory: first cell, and no button — there is nothing to re-pick. -->
 			<div class="relative rounded-lg border">
@@ -353,7 +373,7 @@
 			</div>
 		{/if}
 
-		{#each identities as identity (identity.id)}
+		{#each visibleIdentities as identity (identity.id)}
 			<div class="relative rounded-lg border">
 				<Button
 					variant="ghost"
@@ -373,9 +393,10 @@
 					aria-expanded={openId === identity.id}
 					onclick={() => select(identity)}
 				>
-					<FileIcon class="text-muted-foreground size-5" />
-					<span class="w-full truncate font-medium">{identity.label}</span>
+					{#if !compact}<FileIcon class="text-muted-foreground size-5" />{/if}
+					<span class="w-full truncate pr-5 font-medium">{identity.label}</span>
 					<span class="text-muted-foreground w-full truncate">{identity.commonName}</span>
+					{#if !compact}
 					<span
 						class={cn(
 							'tnum w-full truncate',
@@ -386,6 +407,7 @@
 					>
 						{copy.storeExpiry}: {dateFormat.format(new Date(identity.notAfter))}
 					</span>
+					{/if}
 					{#if identity.id === usedId}
 						<Badge variant="secondary" class="self-start">{copy.storeCurrent}</Badge>
 					{/if}
@@ -393,6 +415,7 @@
 			</div>
 		{/each}
 
+		{#if !compact}
 		<button
 			type="button"
 			class="hover:border-primary/50 hover:text-foreground text-muted-foreground flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-xs transition-colors"
@@ -401,6 +424,7 @@
 			<PlusIcon class="size-5" />
 			{copy.addSign}
 		</button>
+		{/if}
 	</div>
 
 	{#if pending}

@@ -144,12 +144,43 @@ try {
   for (const mode of ['implicit','explicit']) {
     await set(page.session,'#mode',mode);
     const chooser=await picker('#sign');
+    if(mode==='implicit') {
+      await cdp.wait(chooser.session,'Boolean(document.querySelector("#request-details"))');
+      assert.equal(await cdp.evaluate(chooser.session,'document.querySelector("#request-details").open'),false);
+      assert.equal(await cdp.evaluate(chooser.session,'Boolean(document.querySelector("header h1"))'),true);
+      await cdp.wait(chooser.session,'document.querySelector("#request-chooser").getBoundingClientRect().height <= window.innerHeight+2');
+      const digestButton=await cdp.evaluate(chooser.session,`(()=>{const b=document.querySelector('#request-copy-digest').getBoundingClientRect();return {x:b.x+b.width/2,y:b.y+b.height/2};})()`);
+      await cdp.send('Input.dispatchMouseEvent',{type:'mouseMoved',...digestButton},chooser.session);
+      await cdp.wait(chooser.session,`Boolean([...document.querySelectorAll('[data-slot=tooltip-content]')].find(el=>el.textContent.includes('Copiar SHA256')))`);
+      await cdp.send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...digestButton},chooser.session);
+      await cdp.send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...digestButton},chooser.session);
+      await cdp.wait(chooser.session,`Boolean([...document.querySelectorAll('[role=status]')].find(el=>el.textContent.includes('SHA256 copiado')))`);
+      await cdp.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:1,y:1},chooser.session);
+      const compactHeight=await cdp.evaluate(chooser.session,'window.outerHeight');
+      await click(chooser.session,'#request-details summary');
+      await cdp.wait(chooser.session,`window.outerHeight > ${compactHeight}+20`);
+      await cdp.wait(chooser.session,'document.querySelector("#request-chooser").getBoundingClientRect().height <= window.innerHeight+2 || window.outerHeight >= screen.availHeight-2');
+      await click(chooser.session,'#request-details summary');
+      await cdp.wait(chooser.session,`window.outerHeight <= ${compactHeight}+2`);
+      process.stdout.write('PASS: chooser fits its content, grows when details expand, and shrinks when they close.\n');
+    }
     await unlockChooser(chooser);
     if(mode==='implicit') {
+      assert.equal(await cdp.evaluate(chooser.session,'document.querySelector("#pkcs12-choices button[aria-expanded]")'),null,'selected certificate must not appear twice');
+      assert.equal(await cdp.evaluate(chooser.session,'document.querySelector("#selected-certificate-details").open'),false);
       for(const width of [320,420]) {
         await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false},chooser.session);
         await cdp.wait(chooser.session,`window.innerWidth===${width}`);
-        assert.ok(await cdp.evaluate(chooser.session,'document.documentElement.scrollWidth<=window.innerWidth+1'),`chooser overflows at ${width}px`);
+        const overflow=await cdp.evaluate(chooser.session,`({width:innerWidth,scroll:document.documentElement.scrollWidth,elements:[...document.querySelectorAll('body *')].filter(el=>{const r=el.getBoundingClientRect();return r.width && (r.right>innerWidth+1 || r.left<0);}).map(el=>({tag:el.tagName,id:el.id,slot:el.getAttribute('data-slot'),class:el.className,left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right})).slice(0,12)})`);
+        assert.ok(overflow.scroll<=overflow.width+1,`chooser overflows at ${width}px: ${JSON.stringify(overflow)}`);
+        for(const language of ['en','es']) {
+          await cdp.evaluate(chooser.session,`[...document.querySelectorAll('header button')].find(b=>b.textContent.trim()===${JSON.stringify(language.toUpperCase())}).click()`);
+          const layout=await cdp.evaluate(chooser.session,`(()=>{const box=id=>document.querySelector(id).getBoundingClientRect();return {buttons:['#request-confirm','#request-cancel','#request-fallback'].map(id=>box(id).height),header:box('header').height,site:box('#request-site').height,overflow:document.documentElement.scrollWidth>window.innerWidth+1,addOnRight:box('#pkcs12-choices-header button').left>box('#pkcs12-choices-header h2').right};})()`);
+          assert.deepEqual(layout.buttons,[40,40,40]);assert.ok(layout.header<70);assert.ok(layout.site<55);assert.equal(layout.overflow,false);assert.equal(layout.addOnRight,true);
+          await click(chooser.session,'#selected-certificate-details summary');
+          assert.ok(await cdp.evaluate(chooser.session,'document.documentElement.scrollWidth<=window.innerWidth+1'),'expanded certificate details must wrap');
+          await click(chooser.session,'#selected-certificate-details summary');
+        }
       }
       await cdp.send('Emulation.clearDeviceMetricsOverride',{},chooser.session);
     }

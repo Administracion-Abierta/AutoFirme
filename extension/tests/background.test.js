@@ -4,12 +4,12 @@ import {createBridge} from '../background.js';
 
 const event = () => ({listeners:[],addListener(fn){this.listeners.push(fn);},async emit(...args){return Promise.all(this.listeners.map(fn=>fn(...args)));}});
 function browser() {
-  const state={disabled:[],enabled:[],granted:new Set(),registered:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'}};
+  const state={disabled:[],enabled:[],granted:new Set(),registered:[],resized:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'}};
   const chrome={runtime:{id:'extension',getURL:path=>'chrome-extension://extension/'+path,onInstalled:event(),onStartup:event(),onMessage:event(),onConnect:event()},
     storage:{local:{async get(){return {enabledOrigins:state.enabled,disabledOrigins:state.disabled};},async set(v){if(v.disabledOrigins)state.disabled=v.disabledOrigins;},async setAccessLevel(){}}},
     permissions:{async getAll(){return {origins:[...state.granted]};},async contains({origins}){return origins.every(x=>state.granted.has(x)||state.granted.has(new URL(x).protocol+'//*/*'));},onAdded:event(),onRemoved:event()},
     scripting:{async getRegisteredContentScripts(){return state.registered;},async unregisterContentScripts(){state.registered=[];},async registerContentScripts(v){state.registered=v;}},
-    windows:{async create(options){const win={id:20+state.windows.length,tabs:[{id:15+state.windows.length}]};state.windows.push({...win,...options});return win;},async remove(id){state.removed.push(id);},onRemoved:event()},
+    windows:{async update(id,options){state.resized.push({id,...options});return {id,...options};},async create(options){const win={id:20+state.windows.length,tabs:[{id:15+state.windows.length}]};state.windows.push({...win,...options});return win;},async remove(id){state.removed.push(id);},onRemoved:event()},
     tabs:{async create(options){state.windows.push(options);},onRemoved:event()},
     webNavigation:{async getFrame(){return state.frame;},onCommitted:event()},action:{onClicked:event()}};
   return {chrome,state};
@@ -149,4 +149,15 @@ test('revocation terminates existing waiting and signing requests while later ca
   await signing.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
   assert.deepEqual(signing.replies.map(reply=>reply.response.kind),['error','fallback']);
   assert.equal(env.bridge.coordinator.requests.size,0);assert.equal(env.state.windows.length,windowCount);
+});
+
+
+test('only the bound chooser can resize its window without authorizing signing',async()=>{
+ const env=setup();await env.bridge.ready;const {item,replies}=await capture(env);
+ await assert.rejects(env.bridge.handleMessage({type:'request:resize',id:item.id,height:640},app()),/authorized/i);
+ for(const height of [640,420])await env.bridge.handleMessage({type:'request:resize',id:item.id,height},chooser(item));
+ assert.deepEqual(env.state.resized,[{id:item.windowId,height:640},{id:item.windowId,height:420}]);
+ for(const height of [null,'640',NaN,Infinity,-1,2000])await assert.rejects(env.bridge.handleMessage({type:'request:resize',id:item.id,height},chooser(item)),/height/i);
+ assert.deepEqual(replies,[]);assert.equal(item.lifecycle.state,'waiting');
+ await env.bridge.handleMessage({type:'request:cancel',id:item.id},chooser(item));
 });
