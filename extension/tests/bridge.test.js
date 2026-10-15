@@ -47,6 +47,15 @@ test('the global in-flight cap rejects with AtCapacity and frees on every termin
   c.finish(oldest.id,{kind:'cancel'});
   const freed=c.capture(sender('overflow'),sign,()=>{});
   c.finish(freed.id,{kind:'fallback'});
+  const accepted=c.capture(sender('accepted'),sign,r=>r);
+  assert.ok(c.start(accepted.id));
+  assert.equal(c.requests.size,MAX_GLOBAL_REQUESTS);
+  assert.ok(c.finish(accepted.id,{kind:'result'}));
+  assert.equal(c.requests.size,MAX_GLOBAL_REQUESTS-1);
+  const closed=c.capture(sender('closed'),sign,r=>r);
+  assert.equal(c.requests.size,MAX_GLOBAL_REQUESTS);
+  c.abandon(closed.id);
+  assert.equal(c.requests.size,MAX_GLOBAL_REQUESTS-1);
   now+=300001;
   for(const id of [...c.requests.keys()]) c.get(id);
   assert.equal(c.requests.size,0);
