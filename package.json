@@ -12,7 +12,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run && node --test extension/tests/*.test.js && node --test scripts/check-extension.test.mjs",
     "verify:zip": "node scripts/verify-batch-zip.mjs",
     "verify:real": "bash scripts/smoke-real.sh",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
