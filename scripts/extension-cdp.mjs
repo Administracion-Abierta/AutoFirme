@@ -22,7 +22,7 @@ export class CDP {
   async attach(targetId){const {sessionId}=await this.send('Target.attachToTarget',{targetId,flatten:true});await this.send('Runtime.enable',{},sessionId);await this.send('Page.enable',{},sessionId);return sessionId;}
   async evaluate(session,expression){
     const response=await this.send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true},session);
-    if(response.exceptionDetails)throw Error('Test page evaluation failed: '+response.exceptionDetails.exception?.description || response.exceptionDetails.text);
+    if(response.exceptionDetails)throw Error('Test page evaluation failed: '+(response.exceptionDetails.exception?.description || response.exceptionDetails.text));
     return response.result.value;
   }
   async wait(session,expression){

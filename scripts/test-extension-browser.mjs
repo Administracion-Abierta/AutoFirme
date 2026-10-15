@@ -129,13 +129,14 @@ try {
     for (let i=0;i<200;i++) {
       const {targetInfos}=await cdp.send('Target.getTargets');
       const target=targetInfos.find(t=>t.type==='page'&&t.url.startsWith(appURL+'?request='));
-      if (target) {const item={targetId:target.targetId,session:await cdp.attach(target.targetId)}; await cdp.wait(item.session,"document.querySelector('#request-origin')"); return item;}
+      if (target) {const item={targetId:target.targetId,session:await cdp.attach(target.targetId)}; await cdp.wait(item.session,`document.querySelector('#request-origin')?.textContent.trim()===${JSON.stringify(origin)}`); return item;}
       await new Promise(resolve=>setTimeout(resolve,100));
     }
     throw Error('No certificate chooser opened');
   }
   async function unlockChooser(chooser) {
-    if (!await cdp.evaluate(chooser.session, 'Boolean(document.querySelector("[role=dialog][data-state=open]"))')) await click(chooser.session, '#pkcs12-picker');
+    await cdp.wait(chooser.session, 'Boolean(document.querySelector("#pkcs12-choices") || document.querySelector("#pkcs12-picker"))');
+    if (!await cdp.evaluate(chooser.session, 'Boolean(document.querySelector("#pkcs12-choices"))')) await click(chooser.session, '#pkcs12-picker');
     await cdp.wait(chooser.session, `Boolean([...document.querySelectorAll('button[aria-expanded]')].find(b=>b.textContent.includes('AutoFirme Browser Test')))`);
     await cdp.evaluate(chooser.session, `[...document.querySelectorAll('button[aria-expanded]')].find(b=>b.textContent.includes('AutoFirme Browser Test')).click()`);
     await cdp.wait(chooser.session, 'Boolean(document.querySelector("#store-pin"))');
@@ -147,6 +148,14 @@ try {
     await set(page.session,'#mode',mode);
     const chooser=await picker('#sign');
     await unlockChooser(chooser);
+    if(mode==='implicit') {
+      for(const width of [320,420]) {
+        await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false},chooser.session);
+        await cdp.wait(chooser.session,`window.innerWidth===${width}`);
+        assert.ok(await cdp.evaluate(chooser.session,'document.documentElement.scrollWidth<=window.innerWidth+1'),`chooser overflows at ${width}px`);
+      }
+      await cdp.send('Emulation.clearDeviceMetricsOverride',{},chooser.session);
+    }
     assert.equal(await cdp.evaluate(page.session,'window.fixture.results.length'),0,'selection alone cannot sign');
     await click(chooser.session,'#request-confirm');
     await cdp.wait(page.session,'Array.isArray(window.fixture.results.at(-1))');
@@ -180,6 +189,39 @@ try {
   assert.equal(await cdp.evaluate(page.session,'window.fixture.fallbackCalls'),2);
   await click(page.session, '#unsupported');
   assert.equal(await cdp.evaluate(page.session, 'window.fixture.fallbackCalls'), 3);
+  const chooserTargets=async()=>(await cdp.send('Target.getTargets')).targetInfos.filter(t=>t.type==='page'&&t.url.startsWith(appURL+'?request='));
+  async function waitChoosers(count){for(let i=0;i<200;i++){const items=await chooserTargets();if(items.length===count)return items;await new Promise(r=>setTimeout(r,50));}throw Error('Unexpected pending chooser count '+count);}
+  await waitChoosers(0);
+  await cdp.evaluate(page.session,'window.fixture.results=[]');
+  await set(page.session,'#document','Concurrent request A');await click(page.session,'#sign');
+  await set(page.session,'#document','Concurrent request B');await click(page.session,'#sign');
+  const concurrent=await waitChoosers(2);
+  const requests=[];
+  for(const target of concurrent){const item={targetId:target.targetId,session:await cdp.attach(target.targetId)};await cdp.wait(item.session,'Boolean(document.querySelector("#request-origin"))');const value=await cdp.evaluate(item.session,`chrome.runtime.sendMessage({type:'request:get',id:new URLSearchParams(location.search).get('request')})`);assert.equal(value.ok,true);requests.push({...item,data:Buffer.from(value.value.data,'base64').toString()});}
+  const first=requests.find(r=>r.data==='Concurrent request A'), secondRequest=requests.find(r=>r.data==='Concurrent request B');
+  assert.ok(first && secondRequest);
+  const leaked=await cdp.evaluate(main.session,`chrome.runtime.sendMessage({type:'request:get',id:${JSON.stringify(new URL(concurrent[0].url).searchParams.get('request'))}})`);
+  assert.equal(leaked.ok,false,'other app tab cannot retrieve chooser request');
+  await click(first.session,'#request-cancel');await waitChoosers(1);
+  await unlockChooser(secondRequest);await click(secondRequest.session,'#request-confirm');
+  await cdp.wait(page.session,'window.fixture.results.length===2');
+  const isolated=await cdp.evaluate(page.session,'window.fixture.results');
+  assert.equal(isolated[0].type,'es.gob.afirma.core.AOCancelledOperationException');assert.ok(Array.isArray(isolated[1]));
+  await writeFile(join(directory,'concurrent.der'),Buffer.from(isolated[1][0],'base64'));
+  await writeFile(join(directory,'concurrent-content'),'Concurrent request B');
+  openssl(['cms','-verify','-cades','-binary','-inform','DER','-in',join(directory,'concurrent.der'),'-content',join(directory,'concurrent-content'),'-CAfile',fixtureCert,'-purpose','any','-out',join(directory,'concurrent-verified')]);
+  await waitChoosers(0);
+  await picker('#sign');
+  await cdp.send('Page.navigate',{url:origin+'?fresh=1'},page.session);
+  await cdp.wait(page.session, 'location.search==="?fresh=1" && Boolean(window.fixture)');
+  await waitChoosers(0);
+  assert.equal(await cdp.evaluate(page.session,'window.fixture.results.length'),0,'navigation cannot deliver old results');
+  assert.equal(await cdp.evaluate(page.session,'window.fixture.fallbackCalls'),0,'navigation cannot replay');
+  const disabled=await cdp.evaluate(main.session,`chrome.runtime.sendMessage({type:'sites:set',origin:${JSON.stringify(origin)},enabled:false})`);assert.equal(disabled.ok,true);
+  await click(page.session,'#sign');
+  await cdp.wait(page.session,'window.fixture.fallbackCalls===1');
+  assert.equal((await chooserTargets()).length,0,'disabled existing page must bypass chooser');
+  process.stdout.write('PASS: concurrent payloads isolated, other app tabs rejected, stale navigation drops requests, revocation restores native fallback.\n');
   process.stdout.write('PASS: real bundled AutoFirme app, origin-bound chooser, dismissal once and unsupported pass-through.\n');
 } catch(error) {
   if(cdp && mainSession) {try {process.stderr.write('App state: '+await cdp.evaluate(mainSession,'document.body.innerText.slice(0,5000)')+'\n');process.stderr.write('Browser errors: '+JSON.stringify(cdp.errors)+'\n');}catch{}}

@@ -14,6 +14,9 @@ pnpm install --frozen-lockfile
 pnpm build:extension
 ```
 
+Disable the earlier SuperFirma extension before using this implementation, so two
+extensions do not intercept the same signing call.
+
 In `chrome://extensions`, enable Developer mode and choose Load unpacked, then
 select `dist/extension`. Pin AutoFirme to the toolbar. Clicking it opens the
 responsive full app in a separate resizable window that remains open when focus
@@ -101,7 +104,9 @@ pnpm build
 pnpm test:extension:unit
 pnpm build:extension
 pnpm check:extension
+pnpm test:extension:artifacts
 pnpm test:extension:browser
+pnpm package:extension
 bash test/fixtures/verify-fixtures.sh
 ```
 
@@ -112,3 +117,7 @@ Chromium using Playwright's browser installer (the script can discover its Linux
 cache). Only the temporary test manifest pregrants localhost; production has no
 default host grants. Chrome's native grant prompts and actual desktop AutoFirma
 launch need separate manual checks.
+
+See the [verification record](chrome-extension-verification.md) for executed checks
+and remaining manual/environment-specific checks. `pnpm package:extension` packages
+the existing verified build; rebuild first after making source changes.

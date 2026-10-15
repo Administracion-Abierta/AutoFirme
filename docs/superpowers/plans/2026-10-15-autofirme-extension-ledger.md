@@ -16,3 +16,13 @@
 - Stable artifact suite: 15 passed. Both normal web and full-app MV3 builds pass.
 - Real Chromium baseline integration passes: full-app PKCS#12 import, responsive320/420/1280, actual sender authorization, real saved identity unlock, both CAdES modes OpenSSL-cades, certificate selection, cancellation, explicit/dismissal fallback once, unsupported PDF pass-through.
 - Expanded PDF stamp/batch/download/verification browser test and whole-branch review are in progress.
+- Expanded Chrome flow passed real PDF visible stamp signing of two PDFs, saved outputs, ZIP download (`unzip -t`), in-app PDF cryptographic verification, and independent OpenSSL verification of both PDFs.
+- Integration found main-app SPA query changes invalidated management auth; fixed e313bae with both own-index URL checks and strict chooser URL binding retained.
+- Final review found existing loaded documents errored after site disable; fixed065fd1a, definitive pre-capture denial falls back once; pending/signing revocation remains terminal.25 Node tests pass.
+- Expanded Chrome flow also passed distinct concurrent payload isolation with independent OpenSSL check, other-app-tab request rejection, stale navigation cleanup, and site disable without reload.
+- Whole-branch review zero open important findings after fixes. Actual worker process restart remains unit-covered, not a real Chrome claim.
+- Ruling: render compact CertPicker contents inline to keep website and saved choices visible together; normal app modal and shared store logic retained. This is the approved chooser interaction, not a separate replacement UI.
+- Inline chooser31164c5 passed focused review. Final fresh suite222 application tests passed /2 skipped; type checkclean, webbuild and extensionbuild pass; bridge25 and artifact15 pass.
+- Final fresh realChrome browser rerun passes all six check groups with inline saved choices; chooser horizontal bounds tested320/420px, fullapp320/420/1280px.
+- Optional headless screenshot capture timed out and was removed from the test; functional assertions and viewport measurements pass without relying on compositor screenshots.
+- Retain the user-requested separate clone and feature branch locally; AGENTS.md says commit but do not push. No merge, push or publication is requested.
