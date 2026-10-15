@@ -23,3 +23,7 @@ decompiled-configurador/
 .p12pass
 
 bun.lock
+
+# Extension build output and browser test artifacts.
+dist/
+test-results/

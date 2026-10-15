@@ -22,6 +22,9 @@
 	import XIcon from '@lucide/svelte/icons/x';
 
 	interface Props {
+		/** Compact extension chooser trigger and identity rows. */
+		compact?: boolean;
+		detailsLabel?: string;
 		copy: Copy;
 		/** Selected certificate, or null while nothing is loaded. */
 		cert: SignerCert | null;
@@ -30,7 +33,7 @@
 		onpick: (cert: SignerCert | null, chain: readonly SignerCert[]) => void;
 	}
 
-	let { copy, cert, vault, onpick }: Props = $props();
+	let { copy, cert, vault, onpick, compact = false, detailsLabel = 'Certificate details' }: Props = $props();
 
 	let file = $state<File | null>(null);
 	// A picked file already counts as a chosen signature: the dotted dim look is only the empty state.
@@ -39,6 +42,7 @@
 	let pickedName = $state('');
 	let pickerOpen = $state(false);
 	let identities = $state<IdentityMeta[]>([]);
+	const visibleIdentities = $derived(compact ? identities.filter(entry => entry.id !== usedId) : identities);
 	// `vault.persistent` is a plain getter: the store can fall back to memory at any moment, and
 	// only a state of our own makes the notice appear when it does.
 	let persistent = $state(true);
@@ -75,7 +79,7 @@
 			})
 	);
 
-	// The grid is what the browser kept from previous visits; loading it is the point of the modal.
+	// Load the same saved identities for the full-app modal and compact request chooser.
 	$effect(() => {
 		void refresh();
 	});
@@ -136,6 +140,7 @@
 	}
 
 	function picked(next: File | null) {
+		if (compact) openId = null;
 		file = next;
 		pickedName = next?.name ?? '';
 		if (next) console.debug('[autofirme:picker] file picked', next.name, next.size);
@@ -215,49 +220,45 @@
 
 <div class="flex flex-col gap-3">
 	<!-- The trigger is a file-shaped target: dashed and dim until a sign is loaded, then solid. -->
-	<Button
-		id="pkcs12-picker"
-		variant="outline"
-		class={cn(
-			'min-h-28 h-auto w-full flex-col gap-2 px-4 py-4 text-center',
-			chosen
-				? 'border-primary/60'
-				: 'border-2 border-dashed border-muted-foreground/40 text-muted-foreground/70'
-		)}
-		aria-haspopup="dialog"
-		onclick={() => {
-			pickerOpen = true;
-			console.debug('[autofirme:picker] modal opened');
-		}}
-	>
-		<FileIcon
-			class={cn('size-12 shrink-0', chosen ? 'text-primary' : 'text-muted-foreground/70')}
-			stroke-width={1.25}
-		/>
-		<span
-			class={cn(
-				'max-w-full truncate',
-				chosen
-					? 'text-foreground font-medium'
-					: 'underline decoration-dotted decoration-from-font'
-			)}>{pickedName || copy.selectSign}</span
-		>
+	{#if compact}
 		{#if cert}
-			<span class="text-muted-foreground max-w-full truncate text-xs">{cert.commonName}</span>
-			<!-- The sign at a glance: who issued it and how long the certificate holds. -->
-			<span class="text-muted-foreground flex w-full flex-col gap-0.5 text-xs">
-				<span class="max-w-full truncate">{copy.signIssuer}: {cert.issuer}</span>
-				<span
-					class={cn(
-						'tnum max-w-full truncate',
-						cert.expired && 'text-amber-700 dark:text-amber-400'
-					)}
-					>
-					{copy.signValidity}: {dateFormat.format(cert.notBefore)} → {dateFormat.format(cert.notAfter)}
-				</span>
-			</span>
+			<div id="pkcs12-selection" class="border-primary/60 grid min-w-0 gap-1 rounded-lg border p-2.5">
+				<div class="flex min-w-0 items-center gap-2">
+					<FileIcon class="text-primary size-4 shrink-0"/>
+					<div class="min-w-0">
+						<p class="truncate text-sm font-medium">{cert.commonName}</p>
+						{#if pickedName && pickedName!==cert.commonName}<p class="text-muted-foreground truncate text-xs">{pickedName}</p>{/if}
+					</div>
+				</div>
+				<details id="selected-certificate-details" class="text-xs">
+					<summary class="text-muted-foreground cursor-pointer py-1">{detailsLabel}</summary>
+					<div class="text-muted-foreground grid gap-1 pt-1">
+						<p class="break-words">{cert.subject}</p>
+						<p class="break-words">{copy.signIssuer}: {cert.issuer}</p>
+						<p class="tnum">{copy.signValidity}: {dateFormat.format(cert.notBefore)} → {dateFormat.format(cert.notAfter)}</p>
+					</div>
+				</details>
+			</div>
 		{/if}
-	</Button>
+	{:else}
+		<Button
+			id="pkcs12-picker"
+			variant="outline"
+			class={cn(
+				'min-h-28 h-auto w-full flex-col gap-2 px-4 py-4 text-center',
+				chosen
+					? 'border-primary/60'
+					: 'border-2 border-dashed border-muted-foreground/40 text-muted-foreground/70'
+			)}
+			aria-haspopup="dialog"
+			onclick={() => {
+				pickerOpen = true;
+				console.debug('[autofirme:picker] modal opened');
+			}}
+		>
+			{@render certificateSummary()}
+		</Button>
+	{/if}
 
 	<input
 		bind:this={fileInput}
@@ -280,156 +281,206 @@
 	{#if cert?.notYetValid}
 		<p class="text-destructive text-sm" role="alert">{copy.certNotYetValid}</p>
 	{/if}
+	{#if compact}
+		<section id="pkcs12-choices" aria-label={copy.storeTitle} class="grid min-w-0 gap-3">
+			<div id="pkcs12-choices-header" class="flex min-w-0 items-center justify-between gap-2">
+				<h2 class="min-w-0 text-sm font-medium">{copy.storeTitle}</h2>
+				<Button size="sm" variant="outline" class="h-8 shrink-0 gap-1 text-xs" onclick={()=>fileInput?.click()}><PlusIcon class="size-3.5"/>{copy.addSign}</Button>
+			</div>
+			{@render identityContent()}
+		</section>
+	{/if}
 </div>
 
-<Dialog bind:open={pickerOpen}>
-	<DialogContent class="sm:max-w-2xl">
-		<DialogHeader>
-			<DialogTitle>{copy.storeTitle}</DialogTitle>
-			<DialogDescription>{copy.storeHint}</DialogDescription>
-		</DialogHeader>
+{#if !compact}
+	<Dialog bind:open={pickerOpen}>
+		<DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+			<DialogHeader>
+				<DialogTitle>{copy.storeTitle}</DialogTitle>
+				<DialogDescription>{copy.storeHint}</DialogDescription>
+			</DialogHeader>
 
-		{#if !persistent}
-			<!-- No usable database: say it, and let the user throw the broken one away. -->
-			<div class="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
-				<p class="text-sm text-amber-700 dark:text-amber-400" role="alert">{copy.storeEphemeral}</p>
-				<Button variant="outline" size="sm" class="self-start" onclick={() => vault.reset()}
-					>{copy.storeReset}</Button
-				>
-			</div>
-		{/if}
+			{@render identityContent()}
+		</DialogContent>
+	</Dialog>
+{/if}
 
-		{#if identities.length === 0 && !pending}
-			<!-- Only when the grid has nothing at all: the in-memory sign is a cell of its own. -->
-			<p class="text-muted-foreground text-sm">{copy.storeEmpty}</p>
-		{/if}
 
-		{#if openId}
-			{@const target = identities.find((entry) => entry.id === openId)}
-			<!-- One signature clicked: ask for its PIN alone, then select it and get out of the way. -->
-			<div class="flex flex-col gap-3 rounded-lg border p-3">
-				<div class="flex items-center gap-2">
-					<FileIcon class="text-muted-foreground size-5 shrink-0" />
-					<span class="min-w-0">
-						<span class="block truncate text-sm font-medium">{target?.label ?? ''}</span>
-						<span class="text-muted-foreground block truncate text-xs">{target?.commonName ?? ''}</span>
-					</span>
-				</div>
-				<label class="flex flex-col gap-1 text-xs" for="store-pin">
-					{copy.storePin}
-					<Input
-						id="store-pin"
-						type="password"
-						autocomplete="off"
-						bind:value={storePin}
-						onkeydown={(event) => {
-							if (event.key === 'Enter') void unlock(openId!);
-						}}
-					/>
-				</label>
-				<div class="flex items-center gap-2">
-					<Button size="sm" class="h-9" onclick={() => unlock(openId!)}
-						>{copy.storeOpen}</Button
-					>
-					<Button
-						variant="ghost"
-						size="sm"
-						class="h-9"
-						onclick={() => {
-							openId = null;
-							storePin = '';
-						}}>{copy.storeBack}</Button
-					>
-				</div>
-			</div>
-		{:else}
-		<!-- Four columns, four rows tall, the rest scrolls. -->
-		<div class="grid max-h-80 grid-cols-4 gap-3 overflow-y-auto pr-1">
-			{#if pending}
-				<!-- The sign sitting in memory: first cell, and no button — there is nothing to re-pick. -->
-				<div class="relative rounded-lg border">
-					<div class="flex h-full w-full flex-col gap-1 p-3 text-left text-xs">
-						<FileIcon class="text-muted-foreground size-5" />
-						<span class="w-full truncate font-medium">{file?.name}</span>
-					</div>
-				</div>
-			{/if}
-
-			{#each identities as identity (identity.id)}
-				<div class="relative rounded-lg border">
-					<Button
-						variant="ghost"
-						size="icon"
-						class="absolute end-1 top-1 size-6"
-						aria-label={copy.remove}
-						onclick={() => forget(identity.id)}
-					>
-						<XIcon class="size-3.5" />
-					</Button>
-					<button
-						type="button"
-						class={cn(
-							'hover:bg-accent/50 flex h-full w-full flex-col gap-1 rounded-lg p-3 text-left text-xs transition-colors',
-							identity.id === usedId && 'border-primary/60 border'
-						)}
-						aria-expanded={openId === identity.id}
-						onclick={() => select(identity)}
-					>
-						<FileIcon class="text-muted-foreground size-5" />
-						<span class="w-full truncate font-medium">{identity.label}</span>
-						<span class="text-muted-foreground w-full truncate">{identity.commonName}</span>
-						<span
-							class={cn(
-								'tnum w-full truncate',
-								new Date(identity.notAfter).getTime() < Date.now()
-									? 'text-amber-700 dark:text-amber-400'
-									: 'text-muted-foreground'
-							)}
-						>
-							{copy.storeExpiry}: {dateFormat.format(new Date(identity.notAfter))}
-						</span>
-						{#if identity.id === usedId}
-							<Badge variant="secondary" class="self-start">{copy.storeCurrent}</Badge>
-						{/if}
-					</button>
-				</div>
-			{/each}
-
-			<button
-				type="button"
-				class="hover:border-primary/50 hover:text-foreground text-muted-foreground flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-xs transition-colors"
-				onclick={() => fileInput?.click()}
+{#snippet identityContent()}
+	{#if !persistent}
+		<!-- No usable database: say it, and let the user throw the broken one away. -->
+		<div class="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+			<p class="text-sm text-amber-700 dark:text-amber-400" role="alert">{copy.storeEphemeral}</p>
+			<Button variant="outline" size="sm" class="self-start" onclick={() => vault.reset()}
+				>{copy.storeReset}</Button
 			>
-				<PlusIcon class="size-5" />
-				{copy.addSign}
-			</button>
 		</div>
+	{/if}
 
-		{#if pending}
-			<!-- File added from the modal and not sealed yet: its PIN opens it and stores it at once. -->
-			<div class="flex flex-wrap items-end gap-2 rounded-lg border p-3">
-				<label class="flex min-w-40 flex-1 flex-col gap-1 text-xs" for="add-pin">
-					{copy.storePin}
-					<Input
-						id="add-pin"
-						type="password"
-						autocomplete="off"
-						bind:value={addPin}
-						onkeydown={(event) => {
-							if (event.key === 'Enter') void saveAdded();
-						}}
-					/>
-				</label>
-				<Button size="sm" class="h-9" disabled={adding || addPin === ''} onclick={saveAdded}
-					>{adding ? copy.certLoading : copy.storeSave}</Button
+	{#if identities.length === 0 && !pending}
+		<!-- Only when the grid has nothing at all: the in-memory sign is a cell of its own. -->
+		<p class="text-muted-foreground text-sm">{copy.storeEmpty}</p>
+	{/if}
+
+	{#if openId}
+		{@const target = identities.find((entry) => entry.id === openId)}
+		<!-- One signature clicked: ask for its PIN alone, then select it and get out of the way. -->
+		<div class="flex flex-col gap-3 rounded-lg border p-3">
+			<div class="flex items-center gap-2">
+				<FileIcon class="text-muted-foreground size-5 shrink-0" />
+				<span class="min-w-0">
+					<span class="block truncate text-sm font-medium">{target?.label ?? ''}</span>
+					<span class="text-muted-foreground block truncate text-xs">{target?.commonName ?? ''}</span>
+				</span>
+			</div>
+			<label class="flex flex-col gap-1 text-xs" for="store-pin">
+				{copy.storePin}
+				<Input
+					id="store-pin"
+					type="password"
+					autocomplete="off"
+					bind:value={storePin}
+					onkeydown={(event) => {
+						if (event.key === 'Enter') void unlock(openId!);
+					}}
+				/>
+			</label>
+			<div class="flex items-center gap-2">
+				<Button size="sm" class="h-9" onclick={() => unlock(openId!)}
+					>{copy.storeOpen}</Button
 				>
+				<Button
+					variant="ghost"
+					size="sm"
+					class="h-9"
+					onclick={() => {
+						openId = null;
+						storePin = '';
+					}}>{copy.storeBack}</Button
+				>
+			</div>
+		</div>
+	{:else}
+	<!-- Four columns, four rows tall, the rest scrolls. -->
+	<div class={cn("grid max-h-80 gap-3 overflow-y-auto pr-1", compact ? "max-h-52 grid-cols-1 gap-2" : "grid-cols-2 sm:grid-cols-4")}>
+		{#if pending}
+			<!-- The sign sitting in memory: first cell, and no button — there is nothing to re-pick. -->
+			<div class="relative rounded-lg border">
+				<div class="flex h-full w-full flex-col gap-1 p-3 text-left text-xs">
+					<FileIcon class="text-muted-foreground size-5" />
+					<span class="w-full truncate font-medium">{file?.name}</span>
+				</div>
 			</div>
 		{/if}
 
-		{/if}
+		{#each visibleIdentities as identity (identity.id)}
+			<div class="relative rounded-lg border">
+				<Button
+					variant="ghost"
+					size="icon"
+					class="absolute end-1 top-1 size-6"
+					aria-label={copy.remove}
+					onclick={() => forget(identity.id)}
+				>
+					<XIcon class="size-3.5" />
+				</Button>
+				<button
+					type="button"
+					class={cn(
+						'hover:bg-accent/50 flex h-full w-full flex-col gap-1 rounded-lg p-3 text-left text-xs transition-colors',
+						identity.id === usedId && 'border-primary/60 border'
+					)}
+					aria-expanded={openId === identity.id}
+					onclick={() => select(identity)}
+				>
+					{#if !compact}<FileIcon class="text-muted-foreground size-5" />{/if}
+					<span class="w-full truncate pr-5 font-medium">{identity.label}</span>
+					<span class="text-muted-foreground w-full truncate">{identity.commonName}</span>
+					{#if !compact}
+					<span
+						class={cn(
+							'tnum w-full truncate',
+							new Date(identity.notAfter).getTime() < Date.now()
+								? 'text-amber-700 dark:text-amber-400'
+								: 'text-muted-foreground'
+						)}
+					>
+						{copy.storeExpiry}: {dateFormat.format(new Date(identity.notAfter))}
+					</span>
+					{/if}
+					{#if identity.id === usedId}
+						<Badge variant="secondary" class="self-start">{copy.storeCurrent}</Badge>
+					{/if}
+				</button>
+			</div>
+		{/each}
 
-		{#if storeError}
-			<p class="text-destructive text-sm" role="alert">{storeError}</p>
+		{#if !compact}
+		<button
+			type="button"
+			class="hover:border-primary/50 hover:text-foreground text-muted-foreground flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-xs transition-colors"
+			onclick={() => fileInput?.click()}
+		>
+			<PlusIcon class="size-5" />
+			{copy.addSign}
+		</button>
 		{/if}
-	</DialogContent>
-</Dialog>
+	</div>
+
+	{#if pending}
+		<!-- File added from the modal and not sealed yet: its PIN opens it and stores it at once. -->
+		<div class="flex flex-wrap items-end gap-2 rounded-lg border p-3">
+			<label class="flex min-w-40 flex-1 flex-col gap-1 text-xs" for="add-pin">
+				{copy.storePin}
+				<Input
+					id="add-pin"
+					type="password"
+					autocomplete="off"
+					bind:value={addPin}
+					onkeydown={(event) => {
+						if (event.key === 'Enter') void saveAdded();
+					}}
+				/>
+			</label>
+			<Button size="sm" class="h-9" disabled={adding || addPin === ''} onclick={saveAdded}
+				>{adding ? copy.certLoading : copy.storeSave}</Button
+			>
+		</div>
+	{/if}
+
+	{/if}
+
+	{#if storeError}
+		<p class="text-destructive text-sm" role="alert">{storeError}</p>
+	{/if}
+{/snippet}
+
+{#snippet certificateSummary()}
+	<FileIcon
+		class={cn(compact ? 'size-6 shrink-0' : 'size-12 shrink-0', chosen ? 'text-primary' : 'text-muted-foreground/70')}
+		stroke-width={1.25}
+	/>
+	<span
+		class={cn(
+			'max-w-full truncate',
+			chosen
+				? 'text-foreground font-medium'
+				: 'underline decoration-dotted decoration-from-font'
+		)}>{pickedName || copy.selectSign}</span
+	>
+	{#if cert}
+		<span class="text-muted-foreground max-w-full truncate text-xs">{cert.commonName}</span>
+		<!-- The sign at a glance: who issued it and how long the certificate holds. -->
+		<span class="text-muted-foreground flex w-full flex-col gap-0.5 text-xs">
+			<span class="max-w-full truncate">{copy.signIssuer}: {cert.issuer}</span>
+			<span
+				class={cn(
+					'tnum max-w-full truncate',
+					cert.expired && 'text-amber-700 dark:text-amber-400'
+				)}
+				>
+				{copy.signValidity}: {dateFormat.format(cert.notBefore)} → {dateFormat.format(cert.notAfter)}
+			</span>
+		</span>
+	{/if}
+{/snippet}

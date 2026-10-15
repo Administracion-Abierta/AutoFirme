@@ -201,3 +201,17 @@ describe('golden vector (generated once by OpenSSL, test/fixtures/cades/)', () =
 		expect(verify(golden, tampered, join(GOLDEN_DIR, 'ca.pem'))).toMatch(/failure/i);
 	});
 });
+
+
+describe('extension CAdES content and certificate chain', () => {
+ it('embeds implicit content and the certificate chain, independently verified by OpenSSL', async () => {
+  const session = await loadSignerSession(fixtures.p12, FIXTURE_PIN);
+  const signature = await signCadesDetached(session.signer, fixtures.content, { attached: true, chain: session.certificates });
+  expect(signedData(signature).children[2].children).toHaveLength(2);
+  expect(signedData(signature).children[3].children).toHaveLength(session.certificates.length);
+  const path = join(fixtures.dir, 'attached.csig');
+  writeFileSync(path, signature);
+  execFileSync('openssl', ['cms', '-verify', '-inform', 'DER', '-in', path, '-CAfile', fixtures.caPath, '-purpose', 'any', '-binary', '-cades', '-out', join(fixtures.dir, 'attached.bin')], { stdio: 'pipe' });
+  expect(new Uint8Array(readFileSync(join(fixtures.dir, 'attached.bin')))).toEqual(fixtures.content);
+ });
+});

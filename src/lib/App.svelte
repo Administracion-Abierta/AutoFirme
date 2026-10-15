@@ -64,6 +64,7 @@
 	import { onMount, type Snippet } from 'svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 
+	let { extensionControls }: { extensionControls?: Snippet<[Lang]> } = $props();
 	let lang = $state<Lang>('es');
 	const t = $derived<Copy>(copy[lang]);
 	// http away from localhost: the browser withholds WebCrypto from insecure contexts, so no
@@ -365,20 +366,21 @@
 
 <TooltipProvider>
 	<div
-		class="mx-auto flex h-dvh max-w-7xl flex-col gap-6 px-5 py-6 [--panel-offset:7.5rem] max-lg:h-auto max-lg:min-h-dvh"
+		class="mx-auto flex h-dvh max-w-7xl flex-col gap-6 px-3 py-4 sm:px-5 sm:py-6 [--panel-offset:7.5rem] max-lg:h-auto max-lg:min-h-dvh"
 	>
 		<header class="flex flex-wrap items-start justify-between gap-4">
-			<div class="flex items-center gap-4">
+			<div class="flex min-w-0 items-center gap-3 sm:gap-4">
 				{@render seal(44)}
 				<div>
-					<h1 class="font-display text-3xl font-semibold tracking-tight text-balance">
+					<h1 class="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
 						{t.brand}
 					</h1>
 					<p class="text-muted-foreground mt-1">{t.tagline}</p>
 				</div>
 			</div>
-			<div class="flex flex-col items-end gap-2 text-sm">
+			<div class="flex min-w-0 max-w-full flex-col items-end gap-2 text-sm">
 				<div class="flex flex-wrap items-center justify-end gap-2">
+					{@render extensionControls?.(lang)}
 					<PwaControls copy={t} />
 					<DownloadsDialog copy={t} {vault} />
 					<div

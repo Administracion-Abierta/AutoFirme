@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "AutoFirme",
+  "version": "0.1.2",
+  "description": "AutoFirme: firma y verifica documentos localmente con tus certificados.",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "storage",
+    "scripting",
+    "webNavigation"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Abrir AutoFirme"
+  },
+  "options_page": "index.html",
+  "icons": {
+    "192": "icon-192.png",
+    "512": "icon-512.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ]
+}
