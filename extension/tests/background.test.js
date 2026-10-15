@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createBridge} from '../background.js';
+import {MAX_GLOBAL_REQUESTS} from '../core/coordinator.js';
 
 const event = () => ({listeners:[],addListener(fn){this.listeners.push(fn);},async emit(...args){return Promise.all(this.listeners.map(fn=>fn(...args)));}});
 function browser() {
@@ -160,4 +161,32 @@ test('only the bound chooser can resize its window without authorizing signing',
  for(const height of [null,'640',NaN,Infinity,-1,2000])await assert.rejects(env.bridge.handleMessage({type:'request:resize',id:item.id,height},chooser(item)),/height/i);
  assert.deepEqual(replies,[]);assert.equal(item.lifecycle.state,'waiting');
  await env.bridge.handleMessage({type:'request:cancel',id:item.id},chooser(item));
+});
+
+test('the global cap degrades new port requests to fallback without opening another window, and releases on completion',async()=>{
+  const env=setup();await env.bridge.ready;env.state.granted.add('https://site.test/*');
+  env.chrome.webNavigation.getFrame=async({frameId})=>({documentId:`doc-${frameId}`,url:'https://site.test/form'});
+  const openPort=frameId=>{
+    const sender={...source(),frameId,documentId:`doc-${frameId}`};
+    const replies=[];const port={name:'autofirme-page',sender,onMessage:event(),onDisconnect:event(),postMessage(m){replies.push(m);},disconnect(){}};
+    return {port,replies};
+  };
+  const ports=[openPort(0),openPort(1),openPort(2)];
+  for(const p of ports) await env.chrome.runtime.onConnect.emit(p.port);
+  for(let i=0;i<MAX_GLOBAL_REQUESTS;i++) await ports[i%2].port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
+  assert.equal(env.bridge.coordinator.requests.size,MAX_GLOBAL_REQUESTS);
+  assert.equal(env.state.windows.length,MAX_GLOBAL_REQUESTS);
+  const overflowId=crypto.randomUUID();
+  await ports[2].port.onMessage.emit({id:overflowId,request:{operation:'selectCertificate'}});
+  assert.deepEqual(ports[2].replies.at(-1),{id:overflowId,response:{kind:'fallback'}});
+  assert.equal(env.state.windows.length,MAX_GLOBAL_REQUESTS);
+  assert.equal(env.bridge.coordinator.requests.size,MAX_GLOBAL_REQUESTS);
+  const [oldest]=env.bridge.coordinator.requests.values();
+  await env.bridge.handleMessage({type:'request:cancel',id:oldest.id},chooser(oldest));
+  assert.deepEqual(ports[0].replies.at(-1).response,{kind:'cancel'});
+  const nextId=crypto.randomUUID();
+  await ports[2].port.onMessage.emit({id:nextId,request:{operation:'selectCertificate'}});
+  assert.equal(env.bridge.coordinator.requests.size,MAX_GLOBAL_REQUESTS);
+  assert.equal(env.state.windows.length,MAX_GLOBAL_REQUESTS+1);
+  assert.ok(!ports[2].replies.some(reply=>reply.id===nextId),'the accepted request stays pending');
 });
