@@ -1,5 +1,5 @@
-import {Coordinator, normalizeOrigin, trustedApp, trustedChooser, REQUEST_TIMEOUT_MS} from './core/coordinator.js';
-import {publicResult} from './core/contract.js';
+import {Coordinator, normalizeOrigin, trustedApp, trustedChooser} from './core/coordinator.js';
+import {publicResult, REQUEST_TIMEOUT_MS} from './core/contract.js';
 
 const SCRIPT_IDS = ['autofirme-content', 'autofirme-page'];
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;

@@ -1,7 +1,6 @@
-import {validateRequest} from './contract.js';
+import {validateRequest, REQUEST_TIMEOUT_MS} from './contract.js';
 import {RequestState} from './lifecycle.js';
 
-export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 export const MAX_DOCUMENT_REQUESTS = 8;
 export function normalizeOrigin(value) {
   if (typeof value !== 'string') throw Error('Invalid website origin');

@@ -1,3 +1,4 @@
+export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 export const MAX_DATA_BYTES = 4 * 1024 * 1024;
 export const MAX_BASE64 = 4 * Math.ceil(MAX_DATA_BYTES / 3);
 export function validBase64(value, max = MAX_BASE64) {
