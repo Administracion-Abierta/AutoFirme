@@ -43,7 +43,7 @@ test('host grants alone never activate interception and enabling requires existi
 
 test('request reception checks enabled origin, validates payload and authenticates exact chooser tab',async()=>{
   const env=setup();await env.bridge.ready;
-  const unenabled=await connect(env.chrome);await unenabled.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});assert.equal(unenabled.replies[0].response.kind,'error');
+  const unenabled=await connect(env.chrome);await unenabled.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});assert.equal(unenabled.replies[0].response.kind,'fallback');
   const {item}=await capture(env);assert.ok(item);assert.equal(env.state.windows[0].width,480);
   await assert.rejects(env.bridge.handleMessage({type:'request:get',id:item.id},app()),/authorized/i);
   await assert.rejects(env.bridge.handleMessage({type:'request:get',id:item.id},{...chooser(item),tab:{id:99,url:chooser(item).url}}),/authorized/i);
@@ -116,4 +116,28 @@ test('site management accepts main app after history replaces its search paramet
   const navigated={...app(),tab:{id:9,url:'chrome-extension://extension/index.html?tab=verificar'}};
   assert.equal(await env.bridge.handleMessage({type:'sites:set',origin:'https://site.test',enabled:true},navigated),true);
   assert.deepEqual(env.state.enabled,['https://site.test']);
+});
+
+test('new calls from an already loaded disabled site delegate exactly once without capture or chooser',async()=>{
+  const env=setup();await env.bridge.ready;const {item,port,replies}=await capture(env);
+  await env.bridge.handleMessage({type:'request:cancel',id:item.id},chooser(item));
+  await env.bridge.handleMessage({type:'sites:set',origin:'https://site.test',enabled:false},app());
+  const windowCount=env.state.windows.length;const id=crypto.randomUUID();
+  await port.onMessage.emit({id,request:{operation:'selectCertificate'}});
+  await port.onMessage.emit({id,request:{operation:'selectCertificate'}});
+  assert.deepEqual(replies.map(reply=>reply.response.kind),['cancel','fallback']);
+  assert.equal(env.bridge.coordinator.requests.size,0);assert.equal(env.state.windows.length,windowCount);
+});
+
+test('revocation terminates existing waiting and signing requests while later calls delegate',async()=>{
+  const env=setup();await env.bridge.ready;const signing=await capture(env);const waiting=await capture(env);
+  await env.bridge.handleMessage({type:'request:begin',id:signing.item.id},chooser(signing.item));
+  env.state.granted.delete('https://site.test/*');await env.chrome.permissions.onRemoved.emit({origins:['https://site.test/*']});
+  assert.deepEqual(signing.replies.map(reply=>reply.response.kind),['error']);
+  assert.deepEqual(waiting.replies.map(reply=>reply.response.kind),['error']);
+  await assert.rejects(env.bridge.handleMessage({type:'request:complete',id:signing.item.id,result:{certificate:'YQ=='}},chooser(signing.item)),/expired/i);
+  const windowCount=env.state.windows.length;
+  await signing.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
+  assert.deepEqual(signing.replies.map(reply=>reply.response.kind),['error','fallback']);
+  assert.equal(env.bridge.coordinator.requests.size,0);assert.equal(env.state.windows.length,windowCount);
 });

@@ -137,7 +137,12 @@ export function createBridge(chrome) {
       let item;
       try {
         const origin = new URL(port.sender.url).origin;
-        if (!await permitted(origin)) throw Error('Website interception is not enabled');
+        if (!await permitted(origin)) {
+          // Existing document wrappers remain after unregistering future scripts.
+          // This call has not been captured or started, so original AutoFirma is safe.
+          if (alive) port.postMessage({id:message.id,response:{kind:'fallback'}});
+          return;
+        }
         if (!alive) return;
         item = coordinator.capture(port.sender,message.request,response => {
           ids.delete(item.id);
