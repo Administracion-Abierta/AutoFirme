@@ -28,8 +28,10 @@ jobs:
       - name: Toolchain
         run: |
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends git openssl unzip python3 ca-certificates
+          apt-get install -y -qq --no-install-recommends git openssl unzip python3 ca-certificates xmlsec1 libxml2-utils
           openssl version
+          xmlsec1 --version
+          xmllint --version
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
