@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>AutoFirme extension integration fixture</title>
+<body><h1>Local, non-binding extension test</h1><textarea id="document">AutoFirme extension test. No legal effect.</textarea>
+<select id="mode"><option>implicit</option><option>explicit</option></select>
+<button id="sign">Request signature</button><button id="select">Select certificate</button><button id="unsupported">Unsupported PDF request</button>
+<script>
+window.fixture={fallbackCalls:0,results:[]};
+const success=(...args)=>window.fixture.results.push(args);
+const failure=(type,message)=>window.fixture.results.push({type,message});
+window.AutoScript={sign(){window.fixture.fallbackCalls++},selectCertificate(){window.fixture.fallbackCalls++}};
+document.querySelector('#sign').onclick=()=>AutoScript.sign(btoa(document.querySelector('#document').value),'SHA256withRSA','CAdES','mode='+document.querySelector('#mode').value,success,failure);
+document.querySelector('#select').onclick=()=>AutoScript.selectCertificate(null,success,failure);
+document.querySelector('#unsupported').onclick=()=>AutoScript.sign(btoa('test'),'SHA256withRSA','PAdES',null,success,failure);
+</script></body></html>

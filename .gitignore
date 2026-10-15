@@ -23,3 +23,8 @@ decompiled-configurador/
 .p12pass
 
 bun.lock
+
+# Extension build output and agent execution scratch.
+dist/
+.superpowers/
+test-results/
