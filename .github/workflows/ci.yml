@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
+    branches: [main, develop]
   workflow_dispatch:
 
 concurrency:
@@ -27,6 +28,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+      # package.json and extension/manifest.json must agree before anything is packaged.
+      - run: pnpm check:versions
       # Webapp plus extension suites; the extension tests need no build output.
       - run: pnpm test
       - run: pnpm build

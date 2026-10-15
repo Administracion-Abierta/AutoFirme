@@ -56,9 +56,16 @@ Build/test from the repo root (pnpm is canonical; the lockfile and `Containerfil
 
 ## Agent workflow
 
+- Branches: `develop` is the integration branch (PRs target it), `main` is what gets
+  released; `main` only receives merges from `develop`.
 - Work on branches; `Refs #N` only in commits (never closing keywords).
-- Issues on Forgejo (git.eduard3v.com/EduarD3V/AutoFirme) drive the fleet (bullet).
-  Big problems get split into ≤~400-line deliverables per issue.
+- Issues on GitHub (github.com/Administracion-Abierta/AutoFirme) drive the fleet (bullet).
+- Big problems get split into ≤~400-line deliverables per issue.
+- Versioning is automatic: conventional commits merged into `main` produce a Release Please
+  PR that bumps the single product version in `package.json` **and**
+  `extension/manifest.json` (Chrome reads the manifest one) plus `CHANGELOG.md`. Never edit
+  those versions by hand; `pnpm check:versions` (in CI) fails when they drift or when a
+  release tag does not match.
 - Crypto code MUST ship with a verification check (e.g. generated signature verified
   by `openssl cms -verify` in a script/test) before the issue can move to review.
 - UI: clean, modern, accessible; ES/EN copy. Prettier than AutoFirma is a requirement,
