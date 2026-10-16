@@ -9,6 +9,9 @@ project re-thinks its signing core (`afirma-core`, the `AOSigner` family) as a b
 TypeScript app. See [docs/architecture.md](docs/architecture.md) for the map of the Java signing
 core this rewrite follows, and [AGENTS.md](AGENTS.md) for the repo rules.
 
+One engine, three shells: the SPA above, a Manifest V3 browser extension, and a Node MCP server.
+[docs/PIVOT-STUDY.md](docs/PIVOT-STUDY.md) compares those product surfaces and a desktop app.
+
 The app lives at the repo root; from the root:
 
 ```bash
