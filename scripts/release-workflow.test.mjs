@@ -32,8 +32,18 @@ function job(name) {
 }
 
 test('release runs on the published release, never on a bare tag push (finding 1)', () => {
-	assert.match(workflow, /^on:\n {2}release:\n {4}types: \[published\]\n/m);
-	assert.doesNotMatch(workflow, /^ {2}tags:/m, 'tag trigger must not come back');
+	// Exact pin of the whole trigger block: `release: published` must be the only
+	// trigger. A loose `tags:` check misses e.g. `push: tags: [v*]` added next to
+	// `release:` (both live at different indents), which would silently re-enable
+	// the obsolete tag pipeline the issue forbids.
+	const onStart = workflow.indexOf('\non:\n');
+	assert.ok(onStart >= 0, 'on: block missing');
+	const onEnd = workflow.indexOf('\npermissions:', onStart);
+	assert.ok(onEnd > onStart, 'permissions: must follow on:');
+	assert.equal(
+		workflow.slice(onStart + 1, onEnd),
+		'on:\n  release:\n    types: [published]\n'
+	);
 });
 
 test('the artifacts job builds twice and diffs SHA256SUMS before uploading (finding 3)', () => {
