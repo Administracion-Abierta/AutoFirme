@@ -173,7 +173,7 @@ test('real onMessage listener keeps return true and answers through the ok envel
   assert.equal(listener({type:'sites:list'},{...app(),id:'other'},respond),true);
   await flush();assert.equal(calls.at(-1)[0].ok,false);assert.match(calls.at(-1)[0].error,/authorized/i);
   listener({type:'app:open'},source(),respond);
-  await flush();assert.equal(calls.at(-1)[0].ok,false,'a non-extension sender is rejected');
+  await flush();assert.equal(calls.at(-1)[0].ok,false,'a web-page sender under the extension id is rejected');
 });
 
 test('real onConnect listener rejects wrong port name, foreign sender id, and tabless senders',async()=>{
@@ -189,9 +189,11 @@ test('real onConnect listener rejects wrong port name, foreign sender id, and ta
   assert.equal(env.bridge.coordinator.requests.size,1);
   const base=source();
   for(const bad of [{...base,name:'autofirme-other'},{...base,id:'foreign-extension'},{...base,tab:undefined}]){
-    const port={name:bad.name??'autofirme-page',sender:bad,onMessage:event(),onDisconnect:event(),postMessage(){},disconnect(){}};
+    const replies=[];
+    const port={name:bad.name??'autofirme-page',sender:bad,onMessage:event(),onDisconnect:event(),postMessage(m){replies.push(m);},disconnect(){}};
     await opened[0](port);
     await port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
+    assert.deepEqual(replies,[],'a rejected port never responds');
   }
   assert.equal(env.bridge.coordinator.requests.size,1,'foreign, tabless, or nameless ports never capture');
 });
