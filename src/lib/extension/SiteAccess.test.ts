@@ -30,3 +30,11 @@ it('grants TSA network permission without changing site exceptions',async()=>{
  await fireEvent.click(screen.getByRole('button',{name:'Authorize TSA'}));
  await waitFor(()=>expect(events).toEqual([{origins:['https://tsa.example.com/*']} ]));
 });
+it('translates the origin validation error in the Spanish panel',async()=>{
+ vi.stubGlobal('location',{protocol:'chrome-extension:'});
+ vi.stubGlobal('chrome',{runtime:{},permissions:{request:async()=>true}});
+ render(SiteAccess,{props:{lang:'es',send:async(message:{type:string})=>{if(message.type==='sites:list')return {disabledOrigins:[],suggestedOrigin:'https://example.com'};return true;}}});
+ await fireEvent.input(screen.getByLabelText('Origen del sitio'),{target:{value:'ftp://example.com'}});
+ await fireEvent.click(screen.getByRole('button',{name:'Deshabilitar sitio'}));
+ expect((await screen.findByRole('alert')).textContent).toBe('Usa un origen HTTP o HTTPS.');
+});

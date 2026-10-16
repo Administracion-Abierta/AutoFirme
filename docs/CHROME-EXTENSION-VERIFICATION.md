@@ -7,8 +7,9 @@ The implementation is described in [CHROME-EXTENSION-DESIGN.md](CHROME-EXTENSION
 
 ## 1. Environment
 
-Fedora Linux x86-64, Node 24.19.0, pnpm 11.24.0, headless Chromium, OpenSSL and
-unzip. The extension requires Chrome or Chromium 116+. Browser tests use a
+Fedora Linux x86-64, Node 24.19.0, pnpm 11.24.0, headless Chromium (Chrome for Testing flavour:
+branded Google Chrome 137+ ignores `--load-extension`), OpenSSL, `unzip` and
+`python3` (`pnpm package:extension`). The extension requires Chrome or Chromium 116+. Browser tests use a
 disposable profile, an OpenSSL-generated PKCS#12 and local test documents.
 
 ## 2. Automated checks
