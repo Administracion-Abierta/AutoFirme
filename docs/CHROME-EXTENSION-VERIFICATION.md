@@ -52,11 +52,11 @@ type checking, both builds and the full Chromium workflow.
 
 `scripts/test-extension-browser.mjs` launches a disposable Chromium profile with
 the flags needed to load an unpacked extension. It uses the production manifest,
-which grants no host permissions at installation. On fresh storage the first
-website call keeps the page's original `AutoScript` and opens no chooser; the
-per-origin grant is then recorded in the profile (`chrome.permissions.request`
-needs a visible native prompt headless cannot render), the browser restarts, and
-the full signing workflow runs against the authorized fixture origin.
+whose install-time `host_permissions` wildcard grants interception of every HTTP and
+HTTPS site, so the first website call opens the chooser. The test then disables that
+origin through the Site access panel, restarts the browser and checks that both the
+wildcard grant and the disabled exception survive the restart, and finally re-enables
+the origin and signs.
 
 Observed results:
 
