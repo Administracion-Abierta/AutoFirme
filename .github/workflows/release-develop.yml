@@ -34,14 +34,27 @@ jobs:
       - run: pnpm package:extension
       - name: Pack the static site
         run: tar -czf dist/autofirme-web-dev.tar.gz -C build .
-      - name: Create the pre-release tagged dev-<short-sha>
+      - name: Create the development pre-release tagged dev-<short-sha>
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: |-
+            :construction: **Development build — not for production use.**
+
+            Rolling pre-release of the \`develop\` branch, rebuilt on every push. It can break or change format without notice; signatures are real but the surrounding UX and formats may drift between builds. Use the latest stable release for anything that matters.
+
+            - Commit: ${{ github.sha }}
+            - Extension (Chrome only for now): \`autofirme-extension-*.zip\` — load unpacked or install manually; unsigned, so developer mode is required.
+            - Static site: \`autofirme-web-dev.tar.gz\` — serve the extracted folder with any static host.
+            - Container image: \`ghcr.io/administracion-abierta/autofirme:dev\` and \`:dev-${GITHUB_SHA::7}\`.
+
+            Verify with \`SHA256SUMS\` before installing.
         run: |
           TAG="dev-${GITHUB_SHA::7}"
-          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease --title "$TAG" \
-            --notes "Develop build of $GITHUB_SHA." \
+          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
+            --title "[Development build] $TAG — unstable, for testing only" \
+            --notes "$NOTES" \
             dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-dev.tar.gz
+          echo "release $TAG created"
 
   image:
     name: push dev site image to ghcr.io
