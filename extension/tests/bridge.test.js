@@ -25,7 +25,7 @@ test('adapter preserves original receiver and callbacks and replays fallback exa
 });
 
 test('adapter failures never replay and cancellation uses original error contract', async () => {
-  let originals=0;const errors=[];const api={selectCertificate(){originals++;}};
+  let originals=0;const errors=[];const api={selectCertificate(..._args){originals++;}};
   wrapAutoScript(api,()=>Promise.reject(Error('worker lost')));
   api.selectCertificate('',()=>assert.fail(),(...values)=>errors.push(values));await flush();
   assert.equal(originals,0);assert.equal(errors[0][0],'java.lang.Exception');
@@ -85,7 +85,7 @@ test('expiry and stale document invalidation reject late results without fallbac
   const item=c.capture(sender(),sign,r=>results.push(r));now+=300001;
   assert.equal(c.start(item.id),false);assert.equal(c.get(item.id),undefined);assert.deepEqual(results,[{kind:'error'}]);
   const stale=c.capture(sender(),sign,r=>results.push(r));c.invalidateDocument(4,0,'document-new');
-  assert.equal(c.get(stale.id),undefined);assert.equal(c.finish(stale.id,{kind:'fallback'}),false);assert.equal(results.at(-1).kind,'error');
+  assert.equal(c.get(stale.id),undefined);assert.equal(c.finish(stale.id,{kind:'fallback'}),false);assert.equal(results.at(-1)?.kind,'error');
 });
 
 test('main app management survives SPA search changes while both document and tab remain own app',()=>{

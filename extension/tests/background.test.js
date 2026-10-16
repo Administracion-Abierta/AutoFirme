@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {createBridge} from '../background.js';
 import {MAX_GLOBAL_REQUESTS} from '../core/coordinator.js';
 
-const event = () => ({listeners:[],addListener(fn){this.listeners.push(fn);},async emit(...args){return Promise.all(this.listeners.map(fn=>fn(...args)));}});
+const event = () => ({listeners: /** @type {((...args: any[]) => any)[]} */ ([]),addListener(fn){this.listeners.push(fn);},async emit(...args){return Promise.all(this.listeners.map(fn=>fn(...args)));}});
 function browser() {
+  /** @type {{disabled:string[],enabled:string[],granted:Set<string>,registered:any[],resized:any[],windows:any[],removed:any[],frame:any}} */
   const state={disabled:[],enabled:[],granted:new Set(),registered:[],resized:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'}};
   const chrome={runtime:{id:'extension',getURL:path=>'chrome-extension://extension/'+path,onInstalled:event(),onStartup:event(),onMessage:event(),onConnect:event()},
     storage:{local:{async get(){return {enabledOrigins:state.enabled,disabledOrigins:state.disabled};},async set(v){if(v.disabledOrigins)state.disabled=v.disabledOrigins;},async setAccessLevel(){}}},

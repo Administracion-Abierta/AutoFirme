@@ -1,0 +1,10 @@
+{
+	"extends": "$app/tsconfig",
+	"include": ["extension", "scripts"],
+	"compilerOptions": {
+		"checkJs": true,
+		"strict": true,
+		"noImplicitAny": false,
+		"moduleResolution": "bundler"
+	}
+}

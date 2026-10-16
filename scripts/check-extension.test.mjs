@@ -18,7 +18,7 @@ const good = {
   'assets/app.js': '/* PKCS timestamp CAdES PAdES XAdES */',
   'background.js': '', 'page.js': '', 'content.js': ''
 };
-for (const [name, changes, message] of [
+for (const entry of [
   ['accepts self-contained app', {}, null],
   ['rejects removed app entry with orphan bundle retained', { 'index.html': '<link href="assets/app.css">' }, 'application module entry absent'],
   ['rejects classic script as app entry', { 'index.html': '<script src="assets/app.js"></script>' }, 'application module entry absent'],
@@ -35,6 +35,7 @@ for (const [name, changes, message] of [
   ['rejects missing shared utility styles', { 'assets/app.css': 'body{}' }, 'shared app Tailwind utilities absent'],
   ['rejects remote assets', { 'index.html': '<script src="https://host/app.js"></script>' }, 'remote bootstrap asset']
 ]) {
+  const [name, changes, message] = /** @type {[string, Record<string, string>, (string | null)]} */ (entry);
   test(name, async () => {
     const directory = await mkdtemp(join(tmpdir(), 'autofirme-artifacts-'));
     try {

@@ -12,7 +12,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRef } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFString } from 'pdf-lib';
 
 import { loadSignerSession } from '../src/lib/keystore.ts';
 import { signPdf } from '../src/lib/pades.ts';
@@ -36,6 +36,7 @@ const line = (label, value) => console.log(`${label.padEnd(14)}${value}`);
 const bytes = new Uint8Array(readFileSync(keystorePath));
 const session = await loadSignerSession(bytes, pin);
 const signer = session.signer;
+if (!signer.key || !signer.algorithm) throw Error('signer session has no key/algorithm');
 line('signer', `${signer.commonName} <${signer.subject}>`);
 line('issuer', signer.issuer);
 line('serial', signer.serial);
@@ -75,19 +76,20 @@ line('signed', `${outPath} (${signed.length} B, +${signed.length - source.length
 
 // ── 4. read the signature back the way a viewer would ──────────────────────────────────────────
 const document = await PDFDocument.load(signed);
-const acroEntry = document.catalog.get(PDFName.of('AcroForm'));
-const acroForm =
-	acroEntry instanceof PDFRef ? document.context.lookup(acroEntry, PDFDict) : (acroEntry ?? null);
+const acroForm = document.catalog.lookup(PDFName.of('AcroForm'), PDFDict);
 const fields = acroForm.lookup(PDFName.of('Fields'), PDFArray);
-const field = document.context.lookup(fields.get(0), PDFDict);
-const dictionary = document.context.lookup(field.get(PDFName.of('V')), PDFDict);
-const byteRange = dictionary.lookup(PDFName.of('ByteRange'), PDFArray).asArray().map((n) => n.asNumber());
+const field = fields.lookup(0, PDFDict);
+const dictionary = field.lookup(PDFName.of('V'), PDFDict);
+const byteRange = dictionary
+	.lookup(PDFName.of('ByteRange'), PDFArray)
+	.asArray()
+	.map((n) => /** @type {PDFNumber} */ (n).asNumber());
 const contents = dictionary.lookup(PDFName.of('Contents'), PDFHexString).asBytes();
 const content = new Uint8Array(byteRange[1] + byteRange[3]);
 content.set(signed.subarray(byteRange[0], byteRange[0] + byteRange[1]), 0);
 content.set(signed.subarray(byteRange[2], byteRange[2] + byteRange[3]), byteRange[1]);
 
-line('field', field.lookup(PDFName.of('T')).decodeText());
+line('field', field.lookup(PDFName.of('T'), PDFString).decodeText());
 line('subfilter', dictionary.lookup(PDFName.of('SubFilter'), PDFName).asString());
 line('byterange', `[${byteRange.join(' ')}] → ${content.length} B covered`);
 
@@ -100,8 +102,7 @@ const derEnd = (() => {
 writeFileSync(join(scratch, 'signature.cms'), contents.subarray(0, derEnd));
 writeFileSync(join(scratch, 'content.bin'), content);
 
-// ── 5. the app's own verification path, over the real CMS ──────────────────────────────────────
-const report = await verifyArtifact(contents.subarray(0, derEnd), { detached: content });
+const report = await verifyArtifact(new Uint8Array(contents.subarray(0, derEnd)), { detached: content });
 console.log('\nverify report');
 for (const check of report.checks) {
 	console.log(`  ${check.status.padEnd(5)}${check.id.padEnd(14)}${check.detail}`);

@@ -35,7 +35,7 @@ const moduleEntries = [...html.matchAll(/<script\b([^>]*)>/gi)]
   .map((match) => match[1])
   .filter((attributes) => /\btype=["']module["']/i.test(attributes))
   .map((attributes) => /\bsrc=["']([^"']+)["']/i.exec(attributes)?.[1])
-  .filter(Boolean);
+  .filter((src) => typeof src === 'string');
 assert.ok(moduleEntries.length > 0, 'application module entry absent');
 const reachable = new Map();
 function localModule(specifier, importer) {

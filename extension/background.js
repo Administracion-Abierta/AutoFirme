@@ -59,6 +59,7 @@ export function createBridge(chrome) {
     }
     if (!coordinator.get(item.id)) throw Error('This request has expired');
   }
+  /** @param {boolean} tab @param {string|null} [origin] */
   async function openApp(tab = false, origin = null) {
     const url = root + 'index.html' + (origin ? '?site=' + encodeURIComponent(origin) : '');
     if (tab) await chrome.tabs.create({url});
