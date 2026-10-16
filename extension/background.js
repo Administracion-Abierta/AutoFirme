@@ -1,4 +1,4 @@
-import {Coordinator, normalizeOrigin, trustedApp, trustedChooser, REQUEST_TIMEOUT_MS} from './core/coordinator.js';
+import {Coordinator, AtCapacity, normalizeOrigin, trustedApp, trustedChooser, REQUEST_TIMEOUT_MS} from './core/coordinator.js';
 import {publicResult} from './core/contract.js';
 
 const SCRIPT_IDS = ['autofirme-content', 'autofirme-page'];
@@ -169,9 +169,9 @@ export function createBridge(chrome) {
         item.chooserTabId = win.tabs?.[0]?.id;
         if (!Number.isInteger(item.chooserTabId)) throw Error('Could not identify the chooser tab');
         if (!alive || !coordinator.get(item.id)) closeWindow(item);
-      } catch {
+      } catch (error) {
         if (item && coordinator.get(item.id)) terminate(item,'fallback');
-        else if (!item && alive) port.postMessage({id:message.id,response:{kind:'error'}});
+        else if (!item && alive) port.postMessage({id:message.id,response:{kind:error instanceof AtCapacity ? 'fallback' : 'error'}});
       }
     });
   });

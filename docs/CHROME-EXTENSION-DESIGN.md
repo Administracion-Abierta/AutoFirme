@@ -92,7 +92,9 @@ implementation. The full app retains its broader interactive format support.
 Page ports use the name `autofirme-page`. A request carries `{id, request}`; a
 reply carries `{id, response}`. The background uses Chrome's sender metadata to
 bind the request to its tab, frame, document and origin. It allows at most eight
-pending requests per document and gives each a five-minute deadline.
+pending requests per document and at most sixteen in flight across the whole
+extension; a request beyond that global cap is answered `fallback` immediately and
+never opens a chooser window. Each accepted request gets a five-minute deadline.
 
 Extension UI messages use `chrome.runtime.sendMessage`. Replies are
 `{ok: true, value}` or `{ok: false, error}`.

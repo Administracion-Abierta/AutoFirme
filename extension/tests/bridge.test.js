@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {parseCall, validateRequest, publicResult} from '../core/contract.js';
 import {wrapAutoScript} from '../core/adapter.js';
-import {Coordinator, trustedApp, trustedChooser} from '../core/coordinator.js';
+import {Coordinator, AtCapacity, MAX_GLOBAL_REQUESTS, trustedApp, trustedChooser} from '../core/coordinator.js';
 
 const sender = (documentId='document-a', frameId=0) => ({id:'extension',url:'https://site.test/form',tab:{id:4},frameId,documentId});
 const sign = {operation:'sign',data:'YQ==',algorithm:'SHA256withRSA',format:'CAdES',mode:'implicit'};
@@ -37,6 +37,29 @@ test('capture derives origin and document identity from sender and enforces per-
   for(let i=0;i<8;i++){const item=c.capture(sender(),sign,()=>{});assert.equal(item.origin,'https://site.test');}
   assert.throws(()=>c.capture(sender(),sign,()=>{}),/pending/i);
   assert.ok(c.capture(sender('document-b'),sign,()=>{}));
+});
+
+test('the global in-flight cap rejects with AtCapacity and frees on every terminal path',()=>{
+  let now=100;const c=new Coordinator({now:()=>now});
+  for(let i=0;i<MAX_GLOBAL_REQUESTS;i++) c.capture(sender(`document-${i}`),sign,r=>r);
+  assert.throws(()=>c.capture(sender('overflow'),sign,()=>{}),AtCapacity);
+  const [oldest]=c.requests.values();
+  c.finish(oldest.id,{kind:'cancel'});
+  const freed=c.capture(sender('overflow'),sign,()=>{});
+  c.finish(freed.id,{kind:'fallback'});
+  const accepted=c.capture(sender('accepted'),sign,r=>r);
+  assert.ok(c.start(accepted.id));
+  assert.equal(c.requests.size,MAX_GLOBAL_REQUESTS);
+  assert.ok(c.finish(accepted.id,{kind:'result'}));
+  assert.equal(c.requests.size,MAX_GLOBAL_REQUESTS-1);
+  const closed=c.capture(sender('closed'),sign,r=>r);
+  assert.equal(c.requests.size,MAX_GLOBAL_REQUESTS);
+  c.abandon(closed.id);
+  assert.equal(c.requests.size,MAX_GLOBAL_REQUESTS-1);
+  now+=300001;
+  for(const id of [...c.requests.keys()]) c.get(id);
+  assert.equal(c.requests.size,0);
+  assert.ok(c.capture(sender('after-expiry'),sign,()=>{}));
 });
 
 test('chooser authorization binds exact own URL, request and recorded tab',()=>{
