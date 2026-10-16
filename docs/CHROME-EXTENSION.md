@@ -134,6 +134,9 @@ driver scripts are plain JS whose tests hand-write stubs, and typing every
 `chrome.*` stub would add noise without catching API misuse. JSDoc casts went
 only where real type errors hid (optional regex matches, `Array.at(-1)`,
 PDFObject lookups). A new type error in either directory fails `pnpm check`.
+To tighten later: flip `noImplicitAny` to `true` (optionally with
+`@types/chrome`) once the JSDoc coverage justifies it — the project file is
+the single knob.
 
 The extension browser workflow uses a disposable unpacked Chromium profile, local
 non-binding website fixture and freshly generated OpenSSL test certificate. It
