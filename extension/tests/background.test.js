@@ -32,13 +32,15 @@ async function capture(env) {
 }
 function setup(){const env=browser();env.bridge=createBridge(env.chrome);return env;}
 
-test('a clean install registers nothing and delegates every website call',async()=>{
-  const env=setup();await env.bridge.ready;
-  assert.deepEqual(env.state.registered,[]);
+test('a clean install registers the wildcard bridge and captures website calls',async()=>{
+  const env=setup();env.state.granted.add('http://*/*');env.state.granted.add('https://*/*');await env.bridge.ready;
+  assert.deepEqual(env.state.registered[0].matches,['http://*/*','https://*/*']);
   const list=await env.bridge.handleMessage({type:'sites:list'},app());
-  assert.equal(list.allSites,false);assert.deepEqual(list.grantedOrigins,[]);
-  const connected=await connect(env.chrome);await connected.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
-  assert.deepEqual(connected.replies.map(reply=>reply.response.kind),['fallback']);
+  assert.equal(list.allSites,true);assert.deepEqual(list.grantedOrigins,[]);
+  const connected=await connect(env.chrome);
+  await connected.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
+  const item=[...env.bridge.coordinator.requests.values()][0];assert.ok(item);
+  await env.bridge.handleMessage({type:'request:cancel',id:item.id},chooser(item));
 });
 
 test('sites:list reports per-origin grants and the all-sites wildcard separately',async()=>{

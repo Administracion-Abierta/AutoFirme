@@ -88,12 +88,12 @@ Observed results:
   site restores its original call on the loaded document without opening a chooser.
 - Main-app management works after SPA query changes. Chooser actions still require
   the exact request URL and actual chooser tab.
-- On fresh storage the fixture page keeps its original `AutoScript`: the first
-  sign call runs the local fallback, no `AutoScript` setter wrapper exists and no
-  chooser opens — a clean install injects nothing.
-- After the grant is recorded and the browser restarts, `sites:list` reports only
-  the fixture origin, `allSites` stays false, the sealed identity is still
-  usable, and the first post-reload website request opens the chooser and signs.
+- On a fresh install the fixture page is intercepted at `document_start`: the first
+  sign call opens the chooser with no prior setup, and the panel's Disable site
+  excludes the origin.
+- After the browser restarts, `sites:list` reports `allSites` true with the fixture
+  origin in `disabledOrigins`, the sealed identity is still usable, and re-enabling
+  the site makes its first post-reload request open the chooser and sign.
 
 The test certificate is self-issued, not an FNMT trust anchor. Successful signature
 verification does not imply that all certificate-trust checks pass.
@@ -106,7 +106,7 @@ chooser in a separate live-site check. The page's `MiniApplet` alias refers to
 `AutoScript`, so the existing adapter captures its CAdES request. The automated
 check cancelled the chooser without signing or launching desktop AutoFirma.
 The user also confirmed capture after enabling and reloading the site in 0.1.0;
-under the 0.1.3 opt-in model that site needs a fresh authorization in Site access.
+the install-time wildcard grant covers that site without any further authorization.
 
 ## 5. Remaining manual checks
 
@@ -119,9 +119,9 @@ under the 0.1.3 opt-in model that site needs a fresh authorization in Site acces
 | Live public TSA | Permission tests and timestamp oracles pass; no live TSA was used in the extension browser test |
 | Administration signing transaction | DGSFP capture was checked; no personal certificate or legally binding signature was submitted |
 
-After an update, reload the extension and already-open websites. Turning on
-Intercept all websites asks Chrome for the wildcard grant. No external security
-audit has been performed.
+After an update, reload the extension and already-open websites. Site access starts
+enabled everywhere; disable the origins you do not want intercepted. No external
+security audit has been performed.
 
 ## 6. Package provenance
 

@@ -37,13 +37,3 @@ export function exactOrigin(input: string): string {
 export function requestOriginPermission(input: string): Promise<boolean> {
  return api().permissions.request({ origins: [`${exactOrigin(input)}/*`] });
 }
-export const ALL_SITES_ORIGINS = ['http://*/*', 'https://*/*'];
-export function requestAllSitesPermission(): Promise<boolean> {
- return api().permissions.request({ origins: ALL_SITES_ORIGINS });
-}
-export function removeAllSitesPermission(): Promise<boolean> {
- return api().permissions.remove({ origins: ALL_SITES_ORIGINS });
-}
-export function removeOriginPermission(input: string): Promise<boolean> {
- return api().permissions.remove({ origins: [`${exactOrigin(input)}/*`] });
-}

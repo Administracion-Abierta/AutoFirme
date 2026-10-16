@@ -9,6 +9,10 @@
     "scripting",
     "webNavigation"
   ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -23,9 +27,5 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"
-  },
-  "optional_host_permissions": [
-    "http://*/*",
-    "https://*/*"
-  ]
+  }
 }

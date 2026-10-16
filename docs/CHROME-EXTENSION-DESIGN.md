@@ -63,12 +63,12 @@ uses imported PKCS#12 identities and does not access the operating-system store.
 
 ## 3. Website access
 
-The manifest declares no install-time host permissions. It offers `http://*/*` and
-`https://*/*` as `optional_host_permissions` (Chrome 116+), so a fresh install
-injects nothing. Users authorize one origin at a time from the site-access panel,
-which calls `chrome.permissions.request` on user activation; that key also allows
-narrower per-origin grants. Interception of every site stays an explicit opt-in.
-Users can additionally restrict access in Chrome or disable an exact origin.
+The manifest declares `http://*/*` and `https://*/*` as install-time
+`host_permissions` (Chrome 116+): a fresh install intercepts every HTTP(S) site with
+no prompt. The site-access panel is the exception list, not an allow list: users
+disable an exact origin there, and the panel can re-request a per-origin grant
+(`chrome.permissions.request` on user activation) when Chrome's own site-access
+settings withheld it.
 
 The worker stores exceptions in `disabledOrigins`. It registers MAIN and ISOLATED
 scripts at `document_start` in all matching frames, excluding disabled origins.

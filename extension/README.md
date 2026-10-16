@@ -11,9 +11,10 @@ store and settings. `pnpm build` remains the ordinary SvelteKit web/PWA build.
 The standalone extension target avoids SvelteKit's inline bootstrap and never
 registers the webapp service worker. Scripts, fonts and styles are bundled locally.
 
-The toolbar opens a persistent, resizable app window. A fresh install grants no
-website access and injects nothing: authorize each site in Site access (reload it
-after granting) or opt into all HTTP(S) websites explicitly. Every signature requires explicit confirmation.
+The toolbar opens a persistent, resizable app window. The extension intercepts every
+HTTP(S) website from installation: disable individual origins in Site access (reload
+them after disabling) if you want a site to keep its original AutoFirma integration.
+Every signature requires explicit confirmation.
 TSA access requires permission for the configured HTTP(S) TSA origin; timestamping checks that grant
 before sending the digest. Imported identities belong to the extension origin;
 webapp identities are not automatically copied.
