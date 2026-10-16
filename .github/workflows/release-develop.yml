@@ -64,7 +64,7 @@ jobs:
         with:
           file: Containerfile
           push: true
-          tags: ghcr.io/${{ steps.repo.outputs.lower }}/autofirme:dev,ghcr.io/${{ steps.repo.outputs.lower }}/autofirme:dev-${{ github.sha }}
+          tags: ghcr.io/${{ steps.repo.outputs.lower }}:dev,ghcr.io/${{ steps.repo.outputs.lower }}:dev-${{ github.sha }}
           # self-host (k3s) es x86_64; anyadir platforms aqui si aparece destino arm.
           platforms: linux/amd64
           cache-from: type=gha
