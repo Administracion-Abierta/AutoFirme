@@ -8,10 +8,7 @@ work/
 *.rpm
 *.exe
 *.jar
-.bullet/state/
-.bullet/meta/
-.bullet/worktrees/
-.bullet/logs/
+.bullet/
 node_modules/
 .svelte-kit/
 build/
@@ -20,7 +17,6 @@ build/
 decompiled/
 decompiled-configurador/
 
-.p12pass
 
 bun.lock
 
