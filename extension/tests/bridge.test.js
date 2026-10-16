@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {parseCall, validateRequest, publicResult} from '../core/contract.js';
+import {parseCall, validateRequest, publicResult, REQUEST_TIMEOUT_MS, MAX_DATA_BYTES} from '../core/contract.js';
 import {wrapAutoScript} from '../core/adapter.js';
 import {Coordinator, trustedApp, trustedChooser} from '../core/coordinator.js';
 
@@ -51,10 +51,16 @@ test('requests remain isolated and signing permits only one terminal result',()=
   const a=c.capture(sender(),sign,r=>resultsA.push(r));const b=c.capture(sender(),{operation:'selectCertificate'},r=>resultsB.push(r));
   assert.equal(c.finish(a.id,{kind:'result',certificate:'YQ==',signature:'Yg=='}),false);
   assert.equal(c.start(a.id),true);assert.equal(c.start(a.id),false);
-  assert.equal(c.finish(a.id,{kind:'fallback'}),false);assert.equal(c.finish(a.id,{kind:'cancel'}),false);
+  assert.equal(c.finish(a.id,{kind:'fallback'}),false);
   assert.equal(c.finish(b.id,{kind:'fallback'}),true);assert.equal(c.finish(b.id,{kind:'fallback'}),false);
   assert.equal(c.finish(a.id,{kind:'result',certificate:'YQ==',signature:'Yg=='}),true);
-  assert.equal(resultsA.length,1);assert.deepEqual(resultsB,[{kind:'fallback'}]);
+  // Cancel stays valid from signing (reloaded-chooser exit); fallback stays forbidden there.
+  const d=c.capture(sender(),{operation:'selectCertificate'},r=>resultsB.push(r));
+  assert.equal(c.start(d.id),true);
+  assert.equal(c.finish(d.id,{kind:'fallback'}),false);
+  assert.equal(c.finish(d.id,{kind:'cancel'}),true);
+  assert.equal(c.finish(d.id,{kind:'result',certificate:'YQ=='}),false);
+  assert.equal(resultsA.length,1);assert.deepEqual(resultsB,[{kind:'fallback'},{kind:'cancel'}]);
 });
 
 test('expiry and stale document invalidation reject late results without fallback',()=>{
@@ -86,4 +92,62 @@ test('chooser tab URL must still exactly match its request after main app query 
   for(const url of [root+'index.html',root+'index.html?request='+item.id+'&tab=verificar',root+'index.html?request='+crypto.randomUUID()]){
     assert.equal(trustedChooser({...ui(item.id),tab:{id:15,url}},item,'extension',root),false,url);
   }
+});
+
+test('sticky signatory or custom keystore disables interception exactly once and restores it',async()=>{
+  let transport=0;const originals=[];const delivered=[];
+  const failToBridge=()=>assert.fail('bridge must not touch a bypassed call');
+  const api={
+    setStickySignatory(v){originals.push(['sticky',v]);return 'native';},
+    setKeyStore(v){originals.push(['store',v]);return 'native';},
+    sign(...a){originals.push(['sign',a]);return 'native';},
+    selectCertificate(...a){originals.push(['select',a]);return 'native';},
+  };
+  wrapAutoScript(api,()=>{transport++;return Promise.resolve({kind:'cancel'});});
+  const signArgs=()=>['YQ==','SHA256withRSA','CAdES','',failToBridge,(...r)=>delivered.push(r)];
+  const selectArgs=()=>['',failToBridge,(...r)=>delivered.push(r)];
+  assert.equal(api.setStickySignatory(12),'native');
+  assert.equal(api.sign(...signArgs()),'native');
+  assert.equal(api.selectCertificate(...selectArgs()),'native');
+  assert.equal(transport,0,'sticky requests never reach the bridge, not even postMessage');
+  assert.deepEqual(originals.map(entry=>entry[0]),['sticky','sign','select']);
+  await flush();assert.deepEqual(delivered,[],'no bridge callback fires while bypassed');
+  assert.equal(api.setStickySignatory(null),'native');
+  assert.equal(api.sign(...signArgs()),undefined);
+  await flush();
+  assert.equal(transport,1,'interception returns after clearing sticky');
+  assert.equal(delivered[0][0],'es.gob.afirma.core.AOCancelledOperationException');
+  assert.equal(api.setKeyStore(3),'native');
+  assert.equal(api.sign(...signArgs()),'native');
+  assert.equal(transport,1,'a custom keystore bypasses interception');
+  assert.equal(api.setKeyStore(null),'native');
+  assert.equal(api.selectCertificate(...selectArgs()),undefined);
+  await flush();
+  assert.equal(transport,2,'interception returns after clearing the keystore');
+  assert.equal(originals.filter(entry=>entry[0]==='sign').length,2,'the original signs only for the two bypassed calls');
+});
+
+test('the 4 MiB payload ceiling is enforced at exactly 4 MiB plus one byte',()=>{
+  const exact=Buffer.alloc(MAX_DATA_BYTES,97).toString('base64');
+  assert.equal(Buffer.from(exact,'base64').length,MAX_DATA_BYTES,'fixture decodes to exactly 4 MiB');
+  assert.ok(parseCall('sign',[exact,'SHA256withRSA','CAdES','',()=>{},()=>{}]),'4 MiB exactly is still intercepted');
+  const over=Buffer.alloc(MAX_DATA_BYTES+1,97).toString('base64');
+  assert.equal(parseCall('sign',[over,'SHA256withRSA','CAdES','',()=>{},()=>{}]),null);
+  assert.throws(()=>validateRequest({operation:'sign',data:over,algorithm:'SHA256withRSA',format:'CAdES',mode:'implicit'}),/Unsupported/);
+});
+
+test('publicResult rejects non-canonical, oversized, and signature-less provider results',()=>{
+  assert.deepEqual(publicResult({certificate:'YQ==',signature:'Yg=='},'sign'),{kind:'result',certificate:'YQ==',signature:'Yg=='});
+  assert.throws(()=>publicResult({certificate:'not base64!',signature:'Yg=='},'sign'),/invalid result/);
+  assert.throws(()=>publicResult({certificate:'A'.repeat(65540),signature:'Yg=='},'sign'),/invalid result/,'certificates are capped at 64 KiB of base64');
+  assert.throws(()=>publicResult({certificate:'YR==',signature:'Yg=='},'sign'),/invalid result/,'canonical padding only');
+  assert.throws(()=>publicResult({certificate:'YQ=='},'sign'),/invalid result/,'sign without a signature is never a result');
+  assert.deepEqual(publicResult({certificate:'YQ=='},'selectCertificate'),{kind:'result',certificate:'YQ=='});
+});
+
+test('coordinator deadline and contract expose one shared 5-minute timeout',()=>{
+  assert.equal(REQUEST_TIMEOUT_MS,5*60*1000);
+  let now=1000;const c=new Coordinator({now:()=>now});
+  const item=c.capture(sender(),{operation:'selectCertificate'},()=>{});
+  assert.equal(item.deadline-now,REQUEST_TIMEOUT_MS,'page timer must never be shorter than this deadline (asserted in transport.test.js)');
 });

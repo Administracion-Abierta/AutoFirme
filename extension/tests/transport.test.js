@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {installPage} from '../page.js';
 import {installContent} from '../content.js';
+import {REQUEST_TIMEOUT_MS} from '../core/contract.js';
 
 function win() {
-  const listeners=new Map();const sent=[];const intervals=new Map();let sequence=0;
+  const listeners=new Map();const sent=[];const intervals=new Map();const timers=new Map();let sequence=0;
   return {location:{origin:'https://site.test'},sent,intervals,addEventListener(name,fn,options={}){const handlers=listeners.get(name)||[];handlers.push({fn,once:options.once});listeners.set(name,handlers);},
-    emit(name,event){for(const handler of [...listeners.get(name)||[]]){if(handler.once)listeners.set(name,listeners.get(name).filter(value=>value!==handler));handler.fn(event);}},postMessage(message,origin){sent.push({message,origin});},setInterval(fn){const id=++sequence;intervals.set(id,fn);return id;},clearInterval(id){intervals.delete(id);},setTimeout(){return 2;},clearTimeout(){}};
+    emit(name,event){for(const handler of [...listeners.get(name)||[]]){if(handler.once)listeners.set(name,listeners.get(name).filter(value=>value!==handler));handler.fn(event);}},postMessage(message,origin){sent.push({message,origin});},setInterval(fn){const id=++sequence;intervals.set(id,fn);return id;},clearInterval(id){intervals.delete(id);},timers,setTimeout(fn,delay){const id=++sequence;timers.set(id,{fn,delay});return id;},clearTimeout(id){timers.delete(id);},fireTimers(){for(const [id,t] of [...timers]){if(t.delay>=REQUEST_TIMEOUT_MS){timers.delete(id);t.fn();}}}};
 }
 const event=()=>({listeners:[],addListener(fn){this.listeners.push(fn);},emit(value){this.listeners.forEach(fn=>fn(value));}});
 
@@ -53,4 +54,34 @@ test('adapter polling resumes after each cached-document restoration',async()=>{
     window.AutoScript.selectCertificate('',()=>{},()=>{});await Promise.resolve();
   }
   assert.equal(window.sent.length,2);
+});
+
+test('the ninth concurrent page call falls back in the content script and never posts to the port',()=>{
+  const window=win();const port={onMessage:event(),onDisconnect:event(),messages:[],postMessage(m){this.messages.push(m);},disconnect(){this.disconnected=true;}};
+  installContent(window,{runtime:{connect:()=>port}});
+  const call=()=>{const id=crypto.randomUUID();window.emit('message',{source:window,origin:window.location.origin,data:{channel:'autofirme-v1-request',id,request:{operation:'selectCertificate'}}});return id;};
+  const ids=Array.from({length:8},call);
+  assert.equal(port.messages.length,8);
+  const ninth=call();
+  assert.equal(port.messages.length,8,'the over-limit call is never forwarded');
+  const overflow=window.sent.find(entry=>entry.message.id===ninth);
+  assert.deepEqual(overflow?.message,{channel:'autofirme-v1-result',id:ninth,response:{kind:'fallback'}});
+  for(const id of ids)port.onMessage.emit({id,response:{kind:'cancel'}});
+});
+
+test('the page terminal timer is exactly the shared contract limit and resolves error once',async()=>{
+  const window=win();const responses=[];
+  window.AutoScript={sign(data,algorithm,format,params,success,error){this.done=success;this.fail=(...v)=>responses.push(v);}};
+  installPage(window);
+  window.AutoScript.sign('YQ==','SHA256withRSA','CAdES','',()=>{},(...v)=>responses.push(v));
+  await Promise.resolve();
+  assert.equal(window.timers.size,1);
+  const [timer]=[...window.timers.values()];
+  assert.equal(timer.delay,REQUEST_TIMEOUT_MS,'the page timer must equal, never fall below, the coordinator limit');
+  window.fireTimers();
+  const sign=window.sent[0].message;
+  window.emit('message',{source:window,origin:window.location.origin,data:{channel:'autofirme-v1-result',id:sign.id,response:{kind:'result',signature:'Yg==',certificate:'YQ=='}}});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(responses.length,1,'the timeout is terminal: a late result cannot re-resolve');
+  assert.equal(responses[0][0],'java.lang.Exception');
 });
