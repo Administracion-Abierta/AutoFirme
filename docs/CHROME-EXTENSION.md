@@ -6,7 +6,8 @@ with the ordinary web build.
 
 See [CHROME-EXTENSION-DESIGN.md](CHROME-EXTENSION-DESIGN.md) for the implementation
 and request protocol, and [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md)
-for the recorded checks and remaining manual tests.
+for the recorded checks and remaining manual tests. En español: las funciones de la
+extensión están en [LEEME.md](LEEME.md) (sección «Extensión Chrome»).
 
 ## 1. Build and install
 

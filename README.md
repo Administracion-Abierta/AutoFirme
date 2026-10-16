@@ -3,6 +3,8 @@
 Client-side-rendered SPA: sign and verify documents with X.509 certificates, entirely in the
 browser. No backend, no key material leaving the client.
 
+> **En español:** [docs/LEEME.md](docs/LEEME.md) — qué tiene la aplicación, conciso y completo.
+
 The reference implementation is [AutoFirma](https://github.com/ctt-gob-es/clienteafirma)
 (`ctt-gob-es/clienteafirma`, the Spanish government's signing client, GPL-2+/EUPL-1.1): this
 project re-thinks its signing core (`afirma-core`, the `AOSigner` family) as a browser-native

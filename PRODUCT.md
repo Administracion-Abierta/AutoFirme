@@ -1,6 +1,7 @@
 # Product
 
 <!-- impeccable:product-schema 1 -->
+<!-- Resumen en español de lo que la app ya tiene: docs/LEEME.md. -->
 
 ## Platform
 

@@ -4,7 +4,8 @@
 stays the primary surface and users who want a standalone app **install the PWA**, and DNIe /
 smartcard support moved to
 [README → Possible improvements](../README.md#possible-improvements). The analysis below stays as
-the reasoning behind those calls. Every claim cites the repo.
+the reasoning behind those calls. Every claim cites the repo. En español: el resumen de las
+funciones está en [LEEME.md](LEEME.md).
 
 ---
 
@@ -166,7 +167,7 @@ down: `docs/architecture.md:285` — "offer a native helper (out-of-band, no key
   (`src/lib/App.svelte:81`), and the bundle is dominated by `pdf-lib` + `fflate` + the engine, not by
   the verify UI. A real sign-only page is a component split plus a second route target — a refactor,
   not a build flag. Measured: `build/` 1.6 MB total, 980 KB of it JS.
-- **Verification is a real second persona.** `PRODUCT.md:15` lists people checking received
+- **Verification is a real second persona.** `PRODUCT.md §Users` lists people checking received
   `.csig`/`.xsig`/signed PDFs; deleting verify deletes that user. Sign-only as *the product*
   is a downgrade; sign-only as *a mode* is free.
 - **Secure-context dependency stays.** `crypto.subtle` is withheld on insecure origins

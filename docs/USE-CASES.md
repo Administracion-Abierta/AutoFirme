@@ -57,12 +57,12 @@ cross-reading: <https://github.com/ctt-gob-es/clienteafirma>.
 
 | Format | 1.9 implementing class | Registered as | Our engine | Status | Prio |
 |---|---|---|---|---|---|
-| CAdES (detached CMS) | `signers/cades/AOCAdESSigner.java` | `AOSignConstants.SIGN_FORMAT_CADES` `core/signers/AOSignConstants.java:13` | `src/lib/cms.ts` (#6) | `DONE` (BES level) | — |
+| CAdES (detached CMS) | `signers/cades/AOCAdESSigner.java` | `AOSignConstants.SIGN_FORMAT_CADES` `core/signers/AOSignConstants.java:13` | `src/lib/cms.ts` (#6), with TSA support for CAdES-T (#43) | `DONE` (BES + T) | — |
 | CMS/PKCS#7 (no CAdES attrs) | `signers/cms/AOCMSSigner.java` | `core/signers/AOSignConstants.java:10` | — | `MISSING` | P2 |
 | Raw PKCS#1 | `core/signers/AOPkcs1Signer.java` | `NONE`/`PKCS1`/`PKCS#1` `core/signers/AOSignConstants.java:15-17` | — | `MISSING` | P2 |
-| XAdES (enveloped / enveloping / detached / externally detached) | `signers/xades/AOXAdESSigner.java` | `core/signers/AOSignConstants.java:21-25` | `src/lib/xades.ts` (#7) — **enveloped only** | `PARTIAL` | P1 |
+| XAdES (enveloped / enveloping / detached / externally detached) | `signers/xades/AOXAdESSigner.java` | `core/signers/AOSignConstants.java:21-25` | `src/lib/xades.ts` (#7) — **enveloped only**; XAdES-T still needed (#43) | `PARTIAL` (XAdES-T outstanding) | P1 |
 | XMLDSig (no XAdES properties) | `signers/xmldsig/AOXMLDSigSigner.java` | `core/signers/AOSignConstants.java:31` | — | `MISSING` | P2 |
-| PAdES | `signers/pades/AOPDFSigner.java` | `core/signers/AOSignConstants.java:38` | `src/lib/pades.ts` (#11), not wired into the picker (`src/lib/sign.ts`) | `PARTIAL` | P0 |
+| PAdES | `signers/pades/AOPDFSigner.java` | `core/signers/AOSignConstants.java:38` | `src/lib/pades.ts` (#11), wired into the picker (B-B + B-T) plus visible signatures (#45) | `DONE` | — |
 | ODF (`.odt/.ods/.odp`) | `signers/odf/AOODFSigner.java` | `core/signers/AOSignConstants.java:34-35` | — | `MISSING` | P0 |
 | OOXML (`.docx/.xlsx/.pptx`) | `signers/ooxml/AOOOXMLSigner.java` | `core/signers/AOSignConstants.java:32-33` | `src/lib/ooxml.ts` (#10), not wired | `PARTIAL` | P0 |
 | FacturaE | `signers/xades/AOFacturaESigner.java` | `core/signers/AOSignConstants.java:41-43` | — | `MISSING` | P0 |
@@ -90,7 +90,7 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 
 | Feature | 1.9 evidence | Our status | Prio |
 |---|---|---|---|
-| Visible signature: page, X/Y, width/height, text layers, font family/size/colour, upload of an image (rubric), rotation | `standalone/ui/pdf/SignPdfUiPanelStamp.java:231,251-281,301,323,401-403` (page/X-Y/W-H, image); `standalone/ui/pdf/SignPdfUiPanelPreview.java:565-574` (text layer, font family/size/style/colour, rotation); prefs `PREFERENCE_PADES_VISIBLE`, `PREFERENCE_PDF_SIGN_LAYER2*`, `PREFERENCE_PDF_SIGN_SIGNATUREROTATION`, `PREFERENCE_PDF_SIGN_IMAGE`; entry dialog `standalone/ui/pdf/SignPdfDialog.java:26` | `PARTIAL` — `src/lib/pades.ts` draws a box+text from `visible.rect`; no UI, no image, no font/rotation, one text layer | P0 (UI), P1 (image/2 layers) |
+| Visible signature: page, X/Y, width/height, text layers, font family/size/colour, upload of an image (rubric), rotation | `standalone/ui/pdf/SignPdfUiPanelStamp.java:231,251-281,301,323,401-403` (page/X-Y/W-H, image); `standalone/ui/pdf/SignPdfUiPanelPreview.java:565-574` (text layer, font family/size/style/colour, rotation); prefs `PREFERENCE_PADES_VISIBLE`, `PREFERENCE_PDF_SIGN_LAYER2*`, `PREFERENCE_PDF_SIGN_SIGNATUREROTATION`, `PREFERENCE_PDF_SIGN_IMAGE`; entry dialog `standalone/ui/pdf/SignPdfDialog.java:26` | `DONE` (core) — `src/lib/pades-visible.ts` + sign panel toggle off-by-default (`App.svelte:134-137`) — image (PNG/JPEG, `/SMask`), CN + date lines, per page/corner or coords; P2 (font/rotation depth) |
 | Sign an existing **empty signature field** chosen from the form | `standalone/ui/pdf/PdfEmptySignatureFieldsChooserDialog.java:72-76` | `MISSING` | P1 |
 | PDF **certification** level (author/…); preference for the default level | `PREFERENCE_PADES_DEFAULT_CERTIFICATION_LEVEL`; `standalone/ui/ExtraParamsHelper.java:176` (`ALLOW_SIGNING_CERTIFIED_PDFS`) | `MISSING` | P1 |
 | Co-sign PDFs carrying **unregistered** signatures | `standalone/ui/ExtraParamsHelper.java:180` (`ALLOW_COSIGNING_UNREGISTERED_SIGNATURES`) | `MISSING` | P1 |
@@ -134,7 +134,7 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 | Format-specific signature details (policy, commitment, data objects, timestamp chains) | `standalone/signdetails/{CAdES,XAdES,PAdES,FacturaE}SignAnalyzer.java`, `standalone/signdetails/SignDetailsFormatter.java:14` | `MISSING` | P1 |
 | Validity verdict + machine-readable error codes | `signvalidation/SignValiderFactory.java:20`; `signvalidation/SignValidity.java:19-44` (`CRL_PROBLEM`, `CERTIFICATE_EXPIRED`, `CA_NOT_SUPPORTED`, `MODIFIED_FORM`, `OVERLAPPING_SIGNATURE`, `SUSPECTED_SIGNATURE`, `CERTIFIED_SIGN_REVISION`, …) | `PARTIAL` (structure, integrity, signature, refs, cert validity, chain to the bundled root, signing time — `src/lib/verify/`) | P1 |
 | CAdES / XAdES validation | `signvalidation/ValidateBinarySignature.java`, `signvalidation/ValidateXMLSignature.java` | `DONE` | — |
-| **PDF / PAdES validation** (byte range, `PDFSignatureDictionary`, revision checks) | `signvalidation/ValidatePdfSignature.java`, `signvalidation/PDFSignatureDictionary.java` | `MISSING` (detected, then reported as unsupported — `src/lib/verify/index.ts:29`, #11) | **P0** |
+| **PDF / PAdES validation** (byte range, signature, chain) | `signvalidation/ValidatePdfSignature.java`, `signvalidation/PDFSignatureDictionary.java` | `DONE` for structure/digest/chain (`src/lib/verify/pades.ts`); form-modification and shadow-attack depth still `MISSING` (#11) | P0 (depth only) |
 | Revocation / trust depth (CRL/OCSP, unsupported CA) | `SignValidity.VALIDITY_ERROR.CRL_PROBLEM` (`signvalidation/SignValidity.java:30`), `CA_NOT_SUPPORTED` `:29` | `MISSING` (no OCSP/CRL, no AIA walk) | **P0** |
 | ODF / OOXML validation | 1.9 reports them as `ODF_UNKOWN_VALIDITY` / `OOXML_UNKOWN_VALIDITY` (`signvalidation/SignValidity.java:31-33`) — i.e. **also unsupported in 1.9** | `MISSING` (parity: 1.9 does not validate them either) | P2 |
 | Signature policy / profile check | `signvalidation/SignValidity.java:40` (`SIGN_PROFILE_NOT_CHECKED`) | `MISSING` | P1 |
@@ -200,17 +200,17 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 
 **P0 — required for a full replacement**
 
-1. **RFC 3161 timestamping** (generate in CAdES/XAdES/PAdES; display existing ones) — §4.3. AGE-style
-   policies require `T`; `tsaURL` is the only 1.9 entry point and it is trivially mirrorable.
-2. **PDF/PAdES verification** — §5: byte range, DSS strings, revision/modification checks
-   (`src/lib/verify/index.ts:29` currently reports PDF as unsupported; #11).
+1. **PAdES verification depth** — §5: form-modification and shadow-attack (PSA) checks; byte range,
+   digest and chain already ship (`src/lib/verify/pades.ts`).
+2. **Co-signature and counter-signature** (leafs/tree) for CAdES/XAdES/PDF — §3.
 3. **Revocation and trust depth** in the verify engine: OCSP/CRL, `CA_NOT_SUPPORTED`
    reporting, trust beyond the bundled FNMT root — §5. CORS is the known constraint.
-4. **Co-signature and counter-signature** (leafs/tree) for CAdES/XAdES/PDF — §3.
-5. **PAdES in the UI end to end**: wire the engine into the picker and build the visible-signature
-   UI (page, position, size, text) — §2 PAdES + §4.1.
-6. **OOXML in the UI** (engine exists, unused) and **ODF signing** (missing entirely) — §2.
-7. **FacturaE profile** (XAdES with policy, role, production place) — §2.
+4. **OOXML in the UI** (engine exists, unused) and **ODF signing** (missing entirely) — §2.
+5. **FacturaE profile** (XAdES with policy, role, production place) — §2.
+6. **XAdES-T** (generate `SignatureTimeStamp`) and display of received timestamps — §4.3
+   (CAdES-T and PAdES B-T generation already ship, #43).
+7. **DNIe / smartcard path** — a no-key-export PKCS#11 helper decision (`README.md`
+   "Possible improvements"); desktop route discarded (`docs/PIVOT-STUDY.md` §5).
 8. **Embeddable API for a calling web page** (`postMessage`/iframe), i.e. what replaces `afirma://sign`
    for forms — §8.
 
