@@ -232,7 +232,7 @@
 	<!-- The trigger is a file-shaped target: dashed and dim until a sign is loaded, then solid. -->
 	{#if compact}
 		{#if cert}
-		<div id="pkcs12-selection" tabindex="-1" class="border-primary/60 grid min-w-0 gap-1 rounded-lg border p-2.5">
+			<div id="pkcs12-selection" tabindex="-1" class="border-primary/60 grid min-w-0 gap-1 rounded-lg border p-2.5">
 				<div class="flex min-w-0 items-center gap-2">
 					<FileIcon class="text-primary size-4 shrink-0"/>
 					<div class="min-w-0">
