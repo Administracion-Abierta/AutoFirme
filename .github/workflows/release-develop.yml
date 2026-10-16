@@ -39,14 +39,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="dev-${GITHUB_SHA::7}"
-          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease --title "$TAG" --notes "Develop build of $GITHUB_SHA." --clobber
-          gh release upload "$TAG" dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-dev.tar.gz --clobber
+          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease --title "$TAG" \
+            --notes "Develop build of $GITHUB_SHA." \
+            dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-dev.tar.gz
 
   image:
-    name: push dev site image to ghcr.io
-    needs: artifacts
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
