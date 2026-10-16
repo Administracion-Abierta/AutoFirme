@@ -5,6 +5,8 @@ Run `pnpm install`, `pnpm check` and `pnpm build:extension` from the repository 
 (Chrome 116 or later). `pnpm check:extension` repeats the artifact checks; run
 `pnpm test:extension:unit` for the website bridge tests.
 
+En español: las funciones de la extensión están en [../docs/LEEME.md](../docs/LEEME.md).
+
 **Chrome only for now.** Firefox support is deferred and studied in
 [issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18): the
 MAIN-world bridge needs the FF 128+ `userScripts` API instead of Chrome's

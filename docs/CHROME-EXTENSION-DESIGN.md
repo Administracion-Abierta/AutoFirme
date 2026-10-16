@@ -3,6 +3,7 @@
 Status: implemented in extension 0.1.2. This document describes the current code.
 Installation and supported calls are in [CHROME-EXTENSION.md](CHROME-EXTENSION.md).
 Recorded checks are in [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md).
+En español: las funciones de la extensión están en [LEEME.md](LEEME.md).
 
 ## 1. Shared app, separate build target
 
