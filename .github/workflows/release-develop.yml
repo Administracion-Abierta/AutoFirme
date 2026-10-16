@@ -44,6 +44,10 @@ jobs:
             dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-dev.tar.gz
 
   image:
+    name: push dev site image to ghcr.io
+    needs: artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
