@@ -45,15 +45,19 @@ not provide operating-system certificate-store access or a native helper.
 
 ## 3. Signing requests from websites
 
-Interception is enabled on all HTTP and HTTPS websites by default. Chrome requests
-website access when the extension is installed or updated. Reload already-open
-websites after installing or updating. You no longer need to add individual sites.
+A fresh install grants no website access and injects nothing. Authorize one site
+in Site access: enter its origin and select Authorize site. Chrome asks for access
+to that website only; reload the site and its AutoScript calls open the chooser.
+Signing then works on the first request.
 
-Site access lists disabled origins: enter a website to disable interception there,
-or re-enable a listed website and reload it. Existing enabled-site lists from
-0.1.0 do not restrict the new default. Chrome's own site-access settings can still
-withhold host access; AutoFirme respects those restrictions. Restricted browser
-pages such as chrome:// pages cannot be intercepted.
+The panel also lists authorized sites, lets you remove their access and, under
+Intercept all websites, offers an explicit opt-in to `http://*/*` and
+`https://*/*` for trusted environments only. Turning that off returns to per-site
+authorization. Origins you disable in AutoFirme stay bypassed even with the
+all-sites grant. Chrome's own site-access settings can still withhold host
+access; AutoFirme respects those restrictions. Restricted browser pages such as
+chrome:// pages cannot be intercepted. Timestamping needs its own grant for the
+configured TSA origin.
 
 A supported AutoScript request opens a compact certificate chooser inspired by
 Bitwarden's passkey-selection interaction. It uses AutoFirme's real certificate
@@ -91,8 +95,9 @@ narrower than the full app's interactive feature set.
 
 ## 4. Security boundaries and limits
 
-HTTP/HTTPS websites with Chrome host access get MAIN/isolated-world bridge scripts,
-except origins disabled in AutoFirme. Chrome supplies the requesting tab, frame
+Only HTTP/HTTPS websites the user authorized (or, explicitly, all of them through
+the opt-in) get MAIN/isolated-world bridge scripts, and origins disabled in
+AutoFirme never do. Chrome supplies the requesting tab, frame
 and document identity. The bridge does not accept an origin
 supplied by the website. An opaque ID is bound to the actual chooser
 tab. Other app tabs cannot confirm or retrieve that chooser's payload. Private
@@ -130,10 +135,11 @@ The extension browser workflow uses a disposable unpacked Chromium profile, loca
 non-binding website fixture and freshly generated OpenSSL test certificate. It
 requires OpenSSL and Chrome/Chromium. Set `CHROME_PATH` to its executable, or install
 Chromium using Playwright's browser installer (the script can discover its Linux
-cache). The browser test loads the production all-sites manifest and checks the
-first request with fresh storage, without enabling the fixture origin. Chrome's
-native grant prompts and actual desktop AutoFirma launch need separate manual
-checks.
+cache). The browser test loads the production manifest with no install-time host
+permissions: it checks that a fresh profile injects nothing, then authorizes the
+fixture origin through the Site access panel with a trusted click and signs on the
+first request after a reload. Chrome's actual installation prompts and desktop
+AutoFirma launch need separate manual checks.
 
 See the [verification record](CHROME-EXTENSION-VERIFICATION.md) for executed checks
 and remaining manual/environment-specific checks. `pnpm package:extension` packages
