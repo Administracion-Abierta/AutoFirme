@@ -12,7 +12,8 @@ assert.equal(manifest.content_security_policy.extension_pages, "script-src 'self
 assert.equal(manifest.action.default_popup, undefined, 'signing must survive focus loss');
 assert.equal(manifest.options_page, 'index.html');
 assert.equal(manifest.host_permissions, undefined, 'no host access at installation time');
-assert.deepEqual(manifest.optional_permissions, ['http://*/*', 'https://*/*'], 'all-sites access stays an explicit opt-in');
+assert.equal(manifest.optional_permissions, undefined, 'site access is requested as host patterns, not API permissions');
+assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*'], 'all-sites access stays an explicit opt-in and per-origin grants stay possible');
 const html = await read('index.html');
 assert.ok(!/<script\b(?![^>]*\bsrc=)[^>]*>\s*\S/i.test(html), 'inline executable script');
 assert.ok(!/\son\w+\s*=/i.test(html), 'inline event handler');
