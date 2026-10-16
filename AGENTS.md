@@ -60,7 +60,9 @@ Build/test from the repo root (pnpm is canonical; the lockfile and `Containerfil
   released; `main` only receives merges from `develop`.
 - Work on branches; `Refs #N` only in commits (never closing keywords).
 - Issues on GitHub (github.com/Administracion-Abierta/AutoFirme) drive the fleet (bullet).
-- Big problems get split into ≤~400-line deliverables per issue.
+- Big problems get split into ≤~400-line deliverables per issue; PRs to `main` need CI green
+  (`checks`, `e2e`, `secret-scan`, `dependency-audit`), 1 review, and `CODEOWNERS` sign-off on
+  the crypto paths.
 - Versioning is automatic: conventional commits merged into `main` produce a Release Please
   PR that bumps the single product version in `package.json` **and**
   `extension/manifest.json` (Chrome reads the manifest one) plus `CHANGELOG.md`. Never edit

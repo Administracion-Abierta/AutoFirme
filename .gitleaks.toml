@@ -1,0 +1,13 @@
+# gitleaks: keep upstream defaults, allowlist committed throwaway test-PKI keys.
+# These fixtures exist to sign/verify in tests (see test/fixtures/README.md:
+# "no real (FNMT or otherwise) key material"). Anything else that looks like a
+# private key still fails the scan.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "generated test-PKI signer keys committed as signing fixtures"
+paths = [
+  '''test/fixtures/pades-signer\.key''',
+  '''test/fixtures/pades-signer-ec\.key''',
+]
