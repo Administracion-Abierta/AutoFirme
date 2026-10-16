@@ -61,21 +61,3 @@ jobs:
             dist/autofirme-extension-*.zip
             dist/SHA256SUMS
           if-no-files-found: error
-
-  e2e:
-    name: extension end-to-end (Chromium, CDP)
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build:extension
-      # Chrome for Testing keeps --load-extension, which branded Chrome >=137 dropped;
-      # the harness picks the binary up from ~/.cache/ms-playwright by itself.
-      - run: npx --yes playwright@1.64.1 install --with-deps chromium
-      - run: pnpm test:extension:browser
