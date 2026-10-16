@@ -1,0 +1,69 @@
+name: Develop release
+
+# Every push to develop ships a pre-release tagged dev-<short-sha>: the rolling
+# test channel for the extension zip, the static site and the container image.
+# Production releases keep coming from release-please on main (release.yml).
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: develop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  artifacts:
+    name: build and publish dev-<commit> release
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm build:extension
+      - run: pnpm package:extension
+      - name: Pack the static site
+        run: tar -czf dist/autofirme-web-dev.tar.gz -C build .
+      - name: Create the pre-release tagged dev-<short-sha>
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="dev-${GITHUB_SHA::7}"
+          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease --title "$TAG" --notes "Develop build of $GITHUB_SHA." --clobber
+          gh release upload "$TAG" dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-dev.tar.gz --clobber
+
+  image:
+    name: push dev site image to ghcr.io
+    needs: artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          file: Containerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}:dev,ghcr.io/${{ github.repository }}:dev-${{ github.sha }}
+          # self-host (k3s) es x86_64; anyadir platforms aqui si aparece destino arm.
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
