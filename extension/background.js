@@ -18,6 +18,16 @@ export function createBridge(chrome) {
   }
   const hostGranted = origin => chrome.permissions.contains({origins:[origin + '/*']});
   async function permitted(origin) { return !(await disabledOrigins()).includes(origin) && await hostGranted(origin); }
+  async function siteState() {
+    const {origins = []} = await chrome.permissions.getAll();
+    const http = origins.filter(pattern => /^https?:\/\//.test(pattern));
+    const wildcards = ['http://*/*', 'https://*/*'];
+    const granted = [];
+    for (const pattern of http.filter(pattern => !wildcards.includes(pattern))) {
+      try { granted.push(normalizeOrigin(pattern.slice(0, -2))); } catch { /* Not an exact-origin pattern. */ }
+    }
+    return {allSites: wildcards.some(pattern => http.includes(pattern)), grantedOrigins: [...new Set(granted)]};
+  }
   async function syncScripts() {
     const {origins = []} = await chrome.permissions.getAll();
     const matches = origins.filter(pattern => /^https?:\/\//.test(pattern));
@@ -72,7 +82,7 @@ export function createBridge(chrome) {
     if (message.type === 'sites:list') {
       let suggestedOrigin = null;
       try { suggestedOrigin = normalizeOrigin(new URL(sender.url).searchParams.get('site')); } catch { /* No website was supplied. */ }
-      return {disabledOrigins:await disabledOrigins(),suggestedOrigin};
+      return {disabledOrigins:await disabledOrigins(),suggestedOrigin,...await siteState()};
     }
     if (message.type === 'sites:set') {
       const origin = normalizeOrigin(message.origin);

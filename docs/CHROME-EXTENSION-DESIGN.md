@@ -63,9 +63,12 @@ uses imported PKCS#12 identities and does not access the operating-system store.
 
 ## 3. Website access
 
-The manifest requests `http://*/*` and `https://*/*` host permissions. Interception
-is enabled by default wherever Chrome grants access. Users can restrict that
-access in Chrome or disable an exact origin in AutoFirme.
+The manifest declares no install-time host permissions. It offers `http://*/*` and
+`https://*/*` as `optional_host_permissions` (Chrome 116+), so a fresh install
+injects nothing. Users authorize one origin at a time from the site-access panel,
+which calls `chrome.permissions.request` on user activation; that key also allows
+narrower per-origin grants. Interception of every site stays an explicit opt-in.
+Users can additionally restrict access in Chrome or disable an exact origin.
 
 The worker stores exceptions in `disabledOrigins`. It registers MAIN and ISOLATED
 scripts at `document_start` in all matching frames, excluding disabled origins.
@@ -109,7 +112,7 @@ Extension UI messages use `chrome.runtime.sendMessage`. Replies are
 | `request:cancel`, `id` | Cancel a waiting request |
 | `request:fallback`, `id` | Resume the original call before signing begins |
 | `app:open`, optional `tab` | Open the full app without resolving the request |
-| `sites:list` | Return `disabledOrigins` and `suggestedOrigin` |
+| `sites:list` | Return `disabledOrigins`, `suggestedOrigin`, `grantedOrigins` and `allSites` |
 | `sites:set`, `origin`, `enabled` | Remove or add a disabled-origin exception |
 
 The chooser URL is `index.html?request=<UUID>`. The worker records its actual tab
