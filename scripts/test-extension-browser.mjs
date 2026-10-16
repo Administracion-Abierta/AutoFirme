@@ -12,14 +12,15 @@ import {CDP} from './extension-cdp.mjs';
 const root = resolve('dist/extension');
 await access(join(root, 'index.html')); // A web build alone does not satisfy this test.
 const directory = await mkdtemp(join(tmpdir(), 'autofirme-browser-'));
-let processHandle, cdp, server, mainSession;
+let processHandle, cdp, server, mainSession, main;
 try {
   const extension = join(directory, 'extension');
   await cp(root, extension, {recursive: true});
   const manifest = JSON.parse(await readFile(join(extension, 'manifest.json'), 'utf8'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.action.default_popup, undefined, 'app must survive focus changes');
-  assert.deepEqual(manifest.host_permissions, ['http://*/*','https://*/*'], 'all websites enabled on installation');
+  assert.equal(manifest.host_permissions, undefined, 'clean install grants no website access');
+  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*','https://*/*'], 'all-sites interception stays opt-in');
   let executable = process.env.CHROME_PATH;
   if (!executable) {
     const cache = join(homedir(), '.cache/ms-playwright');
@@ -37,11 +38,15 @@ try {
   server = createServer((request, response) => {response.writeHead(200, {'content-type': 'text/html; charset=utf-8'}); response.end(fixture);});
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  processHandle = spawn(executable, ['--headless=new','--no-proxy-server','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${join(directory,'profile')}`,`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'about:blank'], {stdio:'ignore'});
-  let endpoint;
-  for (let i=0;i<100;i++) {try {const [port,path]=(await readFile(join(directory,'profile/DevToolsActivePort'),'utf8')).trim().split('\n'); endpoint=`ws://127.0.0.1:${port}${path}`; break;} catch {await new Promise(resolve=>setTimeout(resolve,100));}}
-  if (!endpoint) throw Error('Chromium did not start');
-  cdp = await CDP.connect(endpoint);
+  const profileDir = join(directory, 'profile');
+  const launch = async () => {
+    const handle = spawn(executable, ['--headless=new','--no-proxy-server','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${profileDir}`,`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'about:blank'], {stdio:'ignore'});
+    let endpoint;
+    for (let i=0;i<300;i++) {try {const [port,path]=(await readFile(join(profileDir,'DevToolsActivePort'),'utf8')).trim().split('\n'); endpoint=`ws://127.0.0.1:${port}${path}`; break;} catch {await new Promise(resolve=>setTimeout(resolve,100));}}
+    if (!endpoint) throw Error('Chromium did not start');
+    return {processHandle: handle, cdp: await CDP.connect(endpoint)};
+  };
+  ({processHandle, cdp} = await launch());
   const id = createHash('sha256').update(extension).digest('hex').slice(0,32).replace(/[0-9a-f]/g,c=>String.fromCharCode(97+parseInt(c,16)));
   const appURL = `chrome-extension://${id}/index.html`;
   const open = async url => {const {targetId}=await cdp.send('Target.createTarget',{url}); return {targetId,session:await cdp.attach(targetId)};};
@@ -49,7 +54,7 @@ try {
   const openssl = args => {const result=spawnSync('openssl',args); assert.equal(result.status,0,result.stderr.toString()); return result;};
   openssl(['req','-x509','-newkey','rsa:2048','-nodes','-sha256','-days','2','-subj','/C=ES/O=Local non-production fixture/CN=AutoFirme Browser Test','-addext','basicConstraints=critical,CA:FALSE','-addext','keyUsage=critical,digitalSignature,nonRepudiation','-keyout',fixtureKey,'-out',fixtureCert]);
   openssl(['pkcs12','-export','-inkey',fixtureKey,'-in',fixtureCert,'-passout','pass:fixture-password','-out',p12]);
-  const main = await open(appURL); mainSession=main.session;
+  main = await open(appURL); mainSession=main.session;
   await cdp.wait(main.session, `document.querySelector('h1')?.textContent.includes('AutoFirma')`);
   assert.equal(await cdp.evaluate(main.session, 'location.protocol'), 'chrome-extension:');
   assert.ok(await cdp.evaluate(main.session, "document.body.textContent.includes('CAdES')"));
@@ -118,9 +123,44 @@ try {
   await cdp.wait(main.session, 'document.querySelector("[data-check=signature]")?.dataset.status==="pass"');
   assert.equal(await cdp.evaluate(main.session,'document.querySelector("[data-check=structure]").dataset.status'),'pass');
   process.stdout.write('PASS: full app PDF stamps, two-document batch signing, saved outputs, valid ZIP and PDF verification; OpenSSL checks both signatures.\n');
-  // No sites:set: the first website request must work with fresh storage.
+  // Clean install: no host grants yet, so the fixture page must stay untouched.
+  const cold = await open(origin);
+  await cdp.wait(cold.session, 'Boolean(window.fixture)');
+  await click(cold.session, '#sign');
+  assert.equal(await cdp.evaluate(cold.session,'window.fixture.fallbackCalls'), 1, 'unauthorized site must keep the original AutoScript');
+  assert.equal(await cdp.evaluate(cold.session, "Object.getOwnPropertyDescriptor(window,'AutoScript')?.set"), undefined, 'no wrapper before any grant');
+  // The SiteAccess panel is wired: the authorize button enables for a typed origin.
+  await click(main.session, '#site-access-open');
+  await cdp.wait(main.session, 'Boolean(document.querySelector("#site-access-panel"))');
+  await set(main.session, '#site-origin', origin);
+  await cdp.wait(main.session, "document.querySelector('#authorize-site')?.disabled===false");
+  await cdp.evaluate(main.session, "document.querySelector('[role=dialog] [data-dialog-close]')?.click()");
+  await cdp.send('Target.closeTarget', {targetId: cold.targetId});
+  process.stdout.write('PASS: a clean install injects nothing until the site is authorized.\n');
+  // Headless Chrome cannot render the native grant bubble, so record the user's
+  // answer (origin in explicit_host), restart, and verify the post-grant flow;
+  // the prompt itself stays a documented manual check.
+  cdp.close();
+  await new Promise(resolve => {
+    const timer = setTimeout(() => {processHandle.kill('SIGKILL'); resolve();}, 5000);
+    processHandle.once('exit', () => {clearTimeout(timer); resolve();});
+    processHandle.kill('SIGTERM');
+  });
+  const preferences = JSON.parse(await readFile(join(profileDir, 'Default', 'Preferences'), 'utf8'));
+  preferences.extensions.settings[id].active_permissions.explicit_host = [`${origin}/*`];
+  await writeFile(join(profileDir, 'Default', 'Preferences'), JSON.stringify(preferences));
+  await rm(join(profileDir, 'DevToolsActivePort'), {force: true});
+  ({processHandle, cdp} = await launch());
+  main = await open(appURL); mainSession = main.session;
+  await cdp.wait(main.session, `chrome.runtime.sendMessage({type:'sites:list'}).then(r=>r.value.grantedOrigins.length===1)`);
+  const granted = await cdp.evaluate(main.session, `chrome.runtime.sendMessage({type:'sites:list'}).then(r=>r.value)`);
+  assert.deepEqual(granted.grantedOrigins, [origin], 'only the authorized site holds host access after restart');
+  assert.equal(granted.allSites, false, 'all-sites interception stays off');
+  process.stdout.write('PASS: the grant and the sealed identity survive the restart; only the authorized origin has access.\n');
   const page = await open(origin);
   await cdp.wait(page.session, 'Boolean(window.fixture)');
+  // document_start scripts register from the stored grant; signing works first try.
+  await cdp.wait(page.session, "Boolean(window.AutoScript && Object.getOwnPropertyDescriptor(window,'AutoScript').set)");
   async function picker(selector) {
     await click(page.session, selector);
     for (let i=0;i<200;i++) {
@@ -257,5 +297,5 @@ try {
 } finally {
   cdp?.close(); processHandle?.kill('SIGKILL');
   if (server) await new Promise(resolve=>server.close(resolve));
-  await rm(directory,{recursive:true,force:true});
+  await rm(directory,{recursive:true,force:true,maxRetries:10,retryDelay:200});
 }
