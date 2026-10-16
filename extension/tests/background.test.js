@@ -5,13 +5,14 @@ import {MAX_GLOBAL_REQUESTS} from '../core/coordinator.js';
 
 const event = () => ({listeners: /** @type {((...args: any[]) => any)[]} */ ([]),addListener(fn){this.listeners.push(fn);},async emit(...args){return Promise.all(this.listeners.map(fn=>fn(...args)));}});
 function browser() {
-  /** @type {{disabled:string[],enabled:string[],granted:Set<string>,registered:any[],resized:any[],windows:any[],removed:any[],frame:any}} */
-  const state={disabled:[],enabled:[],granted:new Set(),registered:[],resized:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'}};
+  /** @type {{disabled:string[],enabled:string[],granted:Set<string>,registered:any[],registrations:number,resized:any[],windows:any[],removed:any[],frame:any,windowDiesOnCreate:boolean}} */
+  const state={disabled:[],enabled:[],granted:new Set(),registered:[],registrations:0,resized:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'},windowDiesOnCreate:false};
+  const live=new Set();
   const chrome={runtime:{id:'extension',getURL:path=>'chrome-extension://extension/'+path,onInstalled:event(),onStartup:event(),onMessage:event(),onConnect:event()},
     storage:{local:{async get(){return {enabledOrigins:state.enabled,disabledOrigins:state.disabled};},async set(v){if(v.disabledOrigins)state.disabled=v.disabledOrigins;},async setAccessLevel(){}}},
     permissions:{async getAll(){return {origins:[...state.granted]};},async contains({origins}){return origins.every(x=>state.granted.has(x)||state.granted.has(new URL(x).protocol+'//*/*'));},onAdded:event(),onRemoved:event()},
-    scripting:{async getRegisteredContentScripts(){return state.registered;},async unregisterContentScripts(){state.registered=[];},async registerContentScripts(v){state.registered=v;}},
-    windows:{async update(id,options){state.resized.push({id,...options});return {id,...options};},async create(options){const win={id:20+state.windows.length,tabs:[{id:15+state.windows.length}]};state.windows.push({...win,...options});return win;},async remove(id){state.removed.push(id);},onRemoved:event()},
+    scripting:{async getRegisteredContentScripts(){return state.registered;},async unregisterContentScripts(){state.registered=[];},async registerContentScripts(v){state.registered=v;state.registrations++;}},
+    windows:{async update(id,options){state.resized.push({id,...options});return {id,...options};},async create(options){const win={id:20+state.windows.length,tabs:[{id:15+state.windows.length}]};state.windows.push({...win,...options});if(state.windowDiesOnCreate){chrome.windows.onRemoved.emit(win.id);}else live.add(win.id);return win;},async get(id){if(!live.has(id))throw Error('No window with id: '+id);return {id};},async remove(id){live.delete(id);state.removed.push(id);},onRemoved:event()},
     tabs:{async create(options){state.windows.push(options);},onRemoved:event()},
     webNavigation:{async getFrame(){return state.frame;},onCommitted:event()},action:{onClicked:event()}};
   return {chrome,state};
@@ -86,7 +87,7 @@ test('begin gates completion and chooser closure after signing never falls back'
   await assert.rejects(env.bridge.handleMessage({type:'request:complete',id:item.id,result:{certificate:'YQ=='}},chooser(item)),/signing/i);
   assert.equal(await env.bridge.handleMessage({type:'request:begin',id:item.id},chooser(item)),true);
   await assert.rejects(env.bridge.handleMessage({type:'request:fallback',id:item.id},chooser(item)),/state/i);
-  await env.chrome.windows.onRemoved.emit(item.windowId);assert.equal(replies.length,1);assert.equal(replies[0].response.kind,'error');
+  await env.chrome.windows.onRemoved.emit(item.windowId);assert.equal(replies.length,1);assert.equal(replies[0].response.kind,'cancel');
   await env.chrome.windows.onRemoved.emit(item.windowId);assert.equal(replies.length,1);
 });
 
@@ -209,4 +210,88 @@ test('the global cap degrades new port requests to fallback without opening anot
   assert.equal(env.bridge.coordinator.requests.size,MAX_GLOBAL_REQUESTS);
   assert.equal(env.state.windows.length,MAX_GLOBAL_REQUESTS+1);
   assert.ok(!ports[2].replies.some(reply=>reply.id===nextId),'the accepted request stays pending');
+});
+
+test('real onMessage listener keeps return true and answers through the ok envelope',async()=>{
+  const env=setup();await env.bridge.ready;
+  const listener=env.chrome.runtime.onMessage.listeners[0];
+  const calls=[];const respond=(...args)=>calls.push(args);
+  const flush=()=>new Promise(resolve=>setImmediate(resolve));
+  assert.equal(listener({type:'app:open'},app(),respond),true,'the async reply requires return true');
+  await flush();assert.deepEqual(calls.at(-1),[{ok:true,value:true}]);
+  assert.equal(listener({type:'sites:list'},{...app(),id:'other'},respond),true);
+  await flush();assert.equal(calls.at(-1)[0].ok,false);assert.match(calls.at(-1)[0].error,/authorized/i);
+  listener({type:'app:open'},source(),respond);
+  await flush();assert.equal(calls.at(-1)[0].ok,false,'a web-page sender under the extension id is rejected');
+});
+
+test('real onConnect listener rejects wrong port name, foreign sender id, and tabless senders',async()=>{
+  const env=setup();await env.bridge.ready;env.state.granted.add('https://site.test/*');
+  const opened=[...env.chrome.runtime.onConnect.listeners];assert.equal(opened.length,1);
+  const attempt=async sender=>{
+    const replies=[];const port={name:'autofirme-page',sender,onMessage:event(),onDisconnect:event(),postMessage(m){replies.push(m);},disconnect(){this.disconnected=true;}};
+    await opened[0](port);
+    await port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
+    return replies;
+  };
+  assert.equal((await attempt(source())).length,0,'a valid capture stays pending without a spurious reply');
+  assert.equal(env.bridge.coordinator.requests.size,1);
+  const base=source();
+  for(const bad of /** @type {any[]} */ ([{...base,name:'autofirme-other'},{...base,id:'foreign-extension'},{...base,tab:undefined}])){
+    const replies=[];
+    const port={name:bad.name??'autofirme-page',sender:bad,onMessage:event(),onDisconnect:event(),postMessage(m){replies.push(m);},disconnect(){}};
+    await opened[0](port);
+    await port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
+    assert.deepEqual(replies,[],'a rejected port never responds');
+  }
+  assert.equal(env.bridge.coordinator.requests.size,1,'foreign, tabless, or nameless ports never capture');
+});
+
+test('sites:set rejects invalid origins and non-boolean enabled and terminating loop ends in-flight requests',async()=>{
+  const env=setup();await env.bridge.ready;
+  for(const bad of [{origin:'https://site.test/path',enabled:false},{origin:'https://evil.test#x',enabled:false},{origin:'ftp://site.test',enabled:false},{origin:42,enabled:false},{origin:'https://site.test'}]){
+    await assert.rejects(env.bridge.handleMessage({type:'sites:set',...bad},app()),/origin|setting/i,String(bad.origin));
+  }
+  await assert.rejects(env.bridge.handleMessage({type:'sites:set',origin:'https://site.test',enabled:'false'},app()),/setting/i);
+  assert.deepEqual(env.state.disabled,[],'a rejected change persists nothing');
+  const {item,replies}=await capture(env);
+  await env.bridge.handleMessage({type:'sites:set',origin:'https://site.test',enabled:false},app());
+  assert.deepEqual(replies.map(r=>r.response.kind),['error'],'disabling the site terminates its in-flight request');
+  assert.equal(env.bridge.coordinator.requests.size,0);
+  assert.ok(env.state.removed.includes(item.windowId),'the orphaned chooser window is closed');
+});
+
+test('a chooser window dying during creation resolves fallback instead of idling until timeout',async()=>{
+  const env=setup();await env.bridge.ready;
+  env.state.granted.add('https://site.test/*');env.state.windowDiesOnCreate=true;
+  const {port,replies}=await connect(env.chrome);
+  const id=crypto.randomUUID();
+  await port.onMessage.emit({id,request:{operation:'selectCertificate'}});
+  assert.deepEqual(replies,[{id,response:{kind:'fallback'}}],'windowId race resolves immediately, not after REQUEST_TIMEOUT_MS');
+  assert.equal(env.bridge.coordinator.requests.size,0);
+});
+
+test('post-install host grants never widen the interception matches',async()=>{
+  const env=setup();env.state.granted.add('http://*/*');env.state.granted.add('https://*/*');await env.bridge.ready;
+  assert.deepEqual(env.state.registered[0].matches,['http://*/*','https://*/*']);
+  env.state.granted.add('https://tsa.example.com/*');
+  await env.chrome.permissions.onAdded.emit({origins:['https://tsa.example.com/*']});
+  assert.ok(env.state.registrations>1,'the onAdded grant did trigger a re-sync');
+  for(const script of env.state.registered)assert.deepEqual(script.matches,['http://*/*','https://*/*'],'the TSA grant must not add hosts to the bridge');
+  env.state.granted.delete('https://*/*');
+  await env.chrome.permissions.onRemoved.emit({origins:['https://*/*']});
+  for(const script of env.state.registered)assert.ok(script.matches.includes('https://tsa.example.com/*'),'without the wildcard the explicit grant still registers');
+});
+
+test('a chooser reloaded mid-signing exits through cancel and stays dead exactly once',async()=>{
+  const env=setup();await env.bridge.ready;const {item,replies}=await capture(env);
+  await env.bridge.handleMessage({type:'request:begin',id:item.id},chooser(item));
+  const reloaded={...chooser(item)};
+  await env.bridge.handleMessage({type:'request:get',id:item.id},reloaded);
+  await assert.rejects(env.bridge.handleMessage({type:'request:begin',id:item.id},reloaded),/waiting/i);
+  await assert.rejects(env.bridge.handleMessage({type:'request:fallback',id:item.id},reloaded),/state/i);
+  assert.equal(await env.bridge.handleMessage({type:'request:cancel',id:item.id},reloaded),true);
+  assert.deepEqual(replies.map(r=>r.response.kind),['cancel']);
+  await assert.rejects(env.bridge.handleMessage({type:'request:cancel',id:item.id},reloaded),/expired/i);
+  assert.equal(env.state.removed.includes(item.windowId),true,'the resolved request closed its own chooser window');
 });

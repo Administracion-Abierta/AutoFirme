@@ -1,5 +1,5 @@
-import {Coordinator, AtCapacity, normalizeOrigin, trustedApp, trustedChooser, REQUEST_TIMEOUT_MS} from './core/coordinator.js';
-import {publicResult} from './core/contract.js';
+import {Coordinator, AtCapacity, normalizeOrigin, trustedApp, trustedChooser} from './core/coordinator.js';
+import {publicResult, REQUEST_TIMEOUT_MS} from './core/contract.js';
 
 const SCRIPT_IDS = ['autofirme-content', 'autofirme-page'];
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -30,7 +30,14 @@ export function createBridge(chrome) {
   }
   async function syncScripts() {
     const {origins = []} = await chrome.permissions.getAll();
-    const matches = origins.filter(pattern => /^https?:\/\//.test(pattern));
+    const granted = origins.filter(pattern => /^https?:\/\//.test(pattern));
+    // Interception follows the installed wildcard policy only: host grants requested later
+    // (e.g. the TSA origin) must never widen where the bridge gets injected.
+    const wildcards = new Set(granted.filter(pattern => /^[a-z][a-z0-9+.-]*:\/\/\*\/\*$/i.test(pattern)));
+    const matches = [...new Set(granted.filter(pattern => {
+      const scheme = pattern.slice(0, pattern.indexOf('://') + 3);
+      return wildcards.has(pattern) || !wildcards.has(`${scheme}*/*`);
+    }))];
     const excludeMatches = (await disabledOrigins()).map(origin => origin + '/*');
     const current = await chrome.scripting.getRegisteredContentScripts();
     const ids = current.filter(script => SCRIPT_IDS.includes(script.id)).map(script => script.id);
@@ -179,6 +186,11 @@ export function createBridge(chrome) {
         item.windowId = win.id;
         item.chooserTabId = win.tabs?.[0]?.id;
         if (!Number.isInteger(item.chooserTabId)) throw Error('Could not identify the chooser tab');
+        // onRemoved can fire before windowId is assigned above, so the removal listener never
+        // saw this window. Confirm it is still alive; otherwise the page request would idle
+        // until REQUEST_TIMEOUT_MS instead of resolving now.
+        try { await chrome.windows.get(item.windowId); }
+        catch { if (coordinator.get(item.id)) terminate(item, item.lifecycle.state === 'signing' ? 'cancel' : 'fallback'); }
         if (!alive || !coordinator.get(item.id)) closeWindow(item);
       } catch (error) {
         if (item && coordinator.get(item.id)) terminate(item,'fallback');
@@ -187,7 +199,9 @@ export function createBridge(chrome) {
     });
   });
   chrome.windows.onRemoved.addListener(windowId => {
-    for (const item of coordinator.requests.values()) if (item.windowId === windowId) terminate(item,item.lifecycle.state === 'waiting' ? 'fallback' : 'error');
+    // A chooser closed while signing reports the user's cancellation, not a generic error;
+    // cancel is terminal in the adapter and never replays the original call.
+    for (const item of coordinator.requests.values()) if (item.windowId === windowId) terminate(item,item.lifecycle.state === 'waiting' ? 'fallback' : 'cancel');
   });
   chrome.webNavigation.onCommitted.addListener(({tabId,frameId,documentId}) => coordinator.invalidateDocument(tabId,frameId,documentId));
   chrome.tabs.onRemoved.addListener(tabId => {

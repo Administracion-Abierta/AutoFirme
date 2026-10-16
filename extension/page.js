@@ -1,4 +1,6 @@
 import {installAdapter} from './core/adapter.js';
+import {REQUEST_TIMEOUT_MS} from './core/contract.js';
+
 const installation = Symbol.for('autofirme.page.v1');
 
 export function installPage(win) {
@@ -23,7 +25,7 @@ export function installPage(win) {
     // No response can mean worker loss after signing; timeout is always terminal.
     const timer = win.setTimeout(() => {
       if (pending.delete(id)) resolve({kind:'error'});
-    }, 5 * 60 * 1000);
+    }, REQUEST_TIMEOUT_MS);
     pending.set(id,{resolve,timer});
     win.postMessage({channel:'autofirme-v1-request',id,request},win.location.origin);
   }));
