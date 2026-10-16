@@ -450,3 +450,19 @@ OOXML signing (#10) exists as a library (`src/lib/ooxml.ts`): it adds
 `_xmlsignatures/sig-<uuid>.xml` (XAdES v1.3.2 EPES with MDSSI `SignatureTime`), the
 `origin.sigs` origin part and its relationships, and leaves every other part byte-identical.
 The UI does not call it yet — that wiring needs the certificate flow from #5.
+
+## Possible improvements
+
+Open-ended work, ordered by user impact. Decisions about the product surfaces themselves are in
+[docs/PIVOT-STUDY.md](docs/PIVOT-STUDY.md): the web app stays the primary surface, users who want a
+standalone app install the PWA (#47), and the desktop build is discarded for now.
+
+- **DNIe / CERES smartcard signing.** Today a card-holder cannot sign: the browser exposes no
+  PKCS#11 or PC/SC path, so `docs/PARITY.md` rows for `Windows-MY`, macOS Keychain, the NSS profile
+  store and DNIe/CERES/CardOS are all `missing` + `browser-moot` (`docs/PARITY.md:107-112`), and the
+  only route is exporting the certificate to a `.p12` file. The replacement is a scoped native
+  helper — a PKCS#11/PC-SC bridge that keeps the key non-exportable (`docs/architecture.md:285`),
+  most plausibly as a second consumer of the engine next to `mcp/`, never a desktop repackage or an
+  `afirma://` reimplementation. Needs a product decision first: is card support in scope?
+- Everything else already tracked as a gap lives in `docs/PARITY.md` §G (P0/P1/P2) and in the open
+  issues; some of its rows are stale against `src/lib` and are corrected as issues close.

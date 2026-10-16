@@ -1,7 +1,10 @@
 # Product-surface study: extension, desktop app, sign-only page
 
-**Status:** study, not a decision. Three candidate surfaces for AutoFirme/AutoFirma Web, with
-what each one actually costs. Every claim cites the repo.
+**Status:** decisions recorded 2026-10-16 — the desktop app is **discarded for now**, the web app
+stays the primary surface and users who want a standalone app **install the PWA**, and DNIe /
+smartcard support moved to
+[README → Possible improvements](../README.md#possible-improvements). The analysis below stays as
+the reasoning behind those calls. Every claim cites the repo.
 
 ---
 
@@ -64,7 +67,7 @@ needed a desktop install: the `afirma://` handler and the localhost:63117 socket
 - **Chrome-only until issue #18 lands.** Firefox is the browser where AutoFirma historically
   lived (NSS store, `/etc/firefox/pref/Autofirma.js`, `docs/REVERSING-NOTES.md:63`); the MAIN-world
   bridge needs the FF 128 `userScripts` API + a user-managed about:addons toggle
-  (`extension/README.md:7-10`).
+  (`extension/README.md:8-11`).
 - **Publish is blocked on licensing, not code.** Upstream revision `d6dfa43` declared no
   application license (`extension/README.md:27-28`); today it loads unpacked in developer mode
   only. Self-hosting the zip is fine; the Web Store is not.
@@ -85,7 +88,7 @@ needed a desktop install: the `afirma://` handler and the localhost:63117 socket
 ## 2. Desktop app (does not exist)
 
 There is no Electron/Tauri/anything-desktop reference anywhere in the repo (grep
-`Electron|Tauri` = zero). The only prior consideration is `docs/MCP-DESIGN.md:48-55`, which rejects
+`Electron|Tauri` = zero). The only prior consideration is `docs/MCP-DESIGN.md:48-54`, which rejects
 a headless-browser harness for signing ("drags a browser runtime and its GPU/font sandbox into a
 signing daemon … breaks on every UI refactor") and rejects re-porting to Java.
 
@@ -163,7 +166,7 @@ down: `docs/architecture.md:285` — "offer a native helper (out-of-band, no key
   (`src/lib/App.svelte:81`), and the bundle is dominated by `pdf-lib` + `fflate` + the engine, not by
   the verify UI. A real sign-only page is a component split plus a second route target — a refactor,
   not a build flag. Measured: `build/` 1.6 MB total, 980 KB of it JS.
-- **Verification is a real second persona.** `PRODUCT.md:13-16` lists people checking received
+- **Verification is a real second persona.** `PRODUCT.md:15` lists people checking received
   `.csig`/`.xsig`/signed PDFs; deleting verify deletes that user. Sign-only as *the product*
   is a downgrade; sign-only as *a mode* is free.
 - **Secure-context dependency stays.** `crypto.subtle` is withheld on insecure origins
@@ -191,24 +194,29 @@ down: `docs/architecture.md:285` — "offer a native helper (out-of-band, no key
 
 ---
 
-## 5. Recommendation
+## 5. Decision (recorded 2026-10-16)
 
-- **Do not pivot to three products. Keep one engine, treat surfaces as build targets.** That is
-  already the architecture; the risk is treating each target as a separate codebase.
-- **Primary surface stays the web app.** Cheapest to distribute, matches `AGENTS.md`, and "just
-  sign" is satisfied by shipping `?tab=firmar` as a documented mode plus closing the P0 embed API
-  gap (`docs/USE-CASES.md:51`) — which is also the true replacement for `afirma://`.
-- **Extension remains the integration surface**, with Firefox (#18) as the one thing that decides
-  whether "works in the browser" is honest.
-- **Desktop app: no, until the DNIe/smartcard decision is made.** Its entire value is native
-  keystore access (`docs/PARITY.md:110`, `:161-162`) — a scoped, native, no-key-export helper, not a
-  repackaged GUI, and not before the upstream license question is settled. If the answer becomes
-  "yes, card users matter", the deliverable is a PKCS#11/PC-SC bridge (extend `mcp/`), not an
-  Electron app.
-- **Blocked first step for any published binary or extension:** resolve the application license at
-  upstream (`extension/README.md:27-28`).
-
-### Decisions this study cannot make
-1. Is Spanish DNIe/smartcard support in scope? (Determines whether a native helper exists at all.)
-2. Which keystore is authoritative, and how do identities move between surfaces without exporting keys?
-3. Do we publish binaries before the upstream license is clarified? (Current docs: no.)
+- **One engine, three build targets — not three products.** The SPA is the product; the extension
+  and the MCP server are targets of the same `src/lib` engine. Nothing forks the engine.
+- **Primary surface: the web app, installed as a PWA when the user wants a standalone app.** No
+  desktop build. `pnpm build` already emits `manifest.webmanifest` + `service-worker.js`
+  (README "Installable app (PWA)" — #47), the header shows **Install app** when the browser fires
+  `beforeinstallprompt`, and signing works offline once the shell is cached — "install it" needs
+  no new artifact, only the prompt the user already gets. Two limits to keep honest: install
+  requires HTTPS (same README section), and a PWA cannot intercept website calls, so the
+  extension stays the only surface that answers a portal's `AutoScript` request.
+- **Desktop app: discarded for now.** Its only unique value was native keystore access; the
+  licensing and per-OS packaging costs (§2 Cons) outweigh it while the browser surfaces cover the
+  flow. Revisit only if the DNIe/smartcard improvement is taken up — and then as a scoped
+  PKCS#11/PC-SC helper extending `mcp/` (`docs/architecture.md:285`: out-of-band, no key export),
+  never as an Electron repackage or an `afirma://` reimplementation.
+- **Sign-only stays a mode, not a product:** `?tab=firmar` (`src/lib/App.svelte:73-90`) plus the
+  P0 embed API gap (`docs/USE-CASES.md:51`), which is the true replacement for `afirma://`.
+- **DNIe / smartcard support moves to possible improvements**
+  (README → "Possible improvements"), replacing the "no issue" note on gap 4 of
+  `docs/PARITY.md:161-162`.
+- **Extension remains the integration surface**, with Firefox (#18) still deciding whether "works
+  in the browser" is honest.
+- **Still blocked before any store/binary publication:** resolve the application license at
+  upstream (`extension/README.md:27-28`). Self-hosting the webapp and loading the extension zip
+  are unaffected.

@@ -158,9 +158,11 @@ Each line is issue-sized. `P0` breaks the "drop-in replacement" promise for a no
    (`signvalidation/ValidatePdfSignature.java:64,71,164`). *(New — not covered by an open issue.)*
 3. OOXML signing is written and tested but unreachable from the UI (`src/lib/ooxml.ts`,
    `README.md` "Status"); wire it, with verify-side honesty about the missing validator.
-4. DNIe / CERES smartcard users have no path: `browser-moot` as a *native* driver, but the
-   replacement (a local bridge app or an eID/`dnie-remote` flow) is a product decision that
-   currently has no issue. *(New.)*
+4. DNIe / CERES smartcard users have no path: `browser-moot` as a *native* driver; the replacement
+   (a local bridge app or an eID/`dnie-remote` flow) needs a product decision. Decision recorded
+   2026-10-16: tracked as a possible improvement (`README.md` "Possible improvements"); the
+   desktop-app route is discarded for now (`docs/PIVOT-STUDY.md` §5), so a no-key-export PKCS#11
+   helper stays out of scope until card support is taken up. *(New.)*
 
 **P1**
 
