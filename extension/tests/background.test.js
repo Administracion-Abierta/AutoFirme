@@ -4,12 +4,12 @@ import {createBridge} from '../background.js';
 
 const event = () => ({listeners:[],addListener(fn){this.listeners.push(fn);},async emit(...args){return Promise.all(this.listeners.map(fn=>fn(...args)));}});
 function browser() {
-  const state={disabled:[],enabled:[],granted:new Set(),registered:[],resized:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'},windowDiesOnCreate:false};
+  const state={disabled:[],enabled:[],granted:new Set(),registered:[],registrations:0,resized:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'},windowDiesOnCreate:false};
   const live=new Set();
   const chrome={runtime:{id:'extension',getURL:path=>'chrome-extension://extension/'+path,onInstalled:event(),onStartup:event(),onMessage:event(),onConnect:event()},
     storage:{local:{async get(){return {enabledOrigins:state.enabled,disabledOrigins:state.disabled};},async set(v){if(v.disabledOrigins)state.disabled=v.disabledOrigins;},async setAccessLevel(){}}},
     permissions:{async getAll(){return {origins:[...state.granted]};},async contains({origins}){return origins.every(x=>state.granted.has(x)||state.granted.has(new URL(x).protocol+'//*/*'));},onAdded:event(),onRemoved:event()},
-    scripting:{async getRegisteredContentScripts(){return state.registered;},async unregisterContentScripts(){state.registered=[];},async registerContentScripts(v){state.registered=v;}},
+    scripting:{async getRegisteredContentScripts(){return state.registered;},async unregisterContentScripts(){state.registered=[];},async registerContentScripts(v){state.registered=v;state.registrations++;}},
     windows:{async update(id,options){state.resized.push({id,...options});return {id,...options};},async create(options){const win={id:20+state.windows.length,tabs:[{id:15+state.windows.length}]};state.windows.push({...win,...options});if(state.windowDiesOnCreate){chrome.windows.onRemoved.emit(win.id);}else live.add(win.id);return win;},async get(id){if(!live.has(id))throw Error('No window with id: '+id);return {id};},async remove(id){live.delete(id);state.removed.push(id);},onRemoved:event()},
     tabs:{async create(options){state.windows.push(options);},onRemoved:event()},
     webNavigation:{async getFrame(){return state.frame;},onCommitted:event()},action:{onClicked:event()}};
@@ -227,6 +227,7 @@ test('post-install host grants never widen the interception matches',async()=>{
   assert.deepEqual(env.state.registered[0].matches,['http://*/*','https://*/*']);
   env.state.granted.add('https://tsa.example.com/*');
   await env.chrome.permissions.onAdded.emit({origins:['https://tsa.example.com/*']});
+  assert.ok(env.state.registrations>1,'the onAdded grant did trigger a re-sync');
   for(const script of env.state.registered)assert.deepEqual(script.matches,['http://*/*','https://*/*'],'the TSA grant must not add hosts to the bridge');
   env.state.granted.delete('https://*/*');
   await env.chrome.permissions.onRemoved.emit({origins:['https://*/*']});
