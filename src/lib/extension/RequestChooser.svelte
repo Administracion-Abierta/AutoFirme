@@ -9,8 +9,8 @@
  import type { SignerCert } from '#lib/sign';
  import { applyTheme, readTheme } from '#lib/theme';
  import { rpc, type Rpc, type ExtensionRequest } from './runtime';
+ import { extensionCopy, errorCopy } from './copy';
  import { certificateProblem, confirmRequest, RequestValidationError } from './sign-request';
- import { extensionCopy } from './copy';
  let { id, vault = browserVault(), send = rpc }: { id:string; vault?:Vault; send?:Rpc } = $props();
  let lang = $state<Lang>('es');
  const t = $derived(extensionCopy[lang]);
@@ -63,8 +63,12 @@
   try {await navigator.clipboard.writeText(request.digest);copied=true;}
   catch {error=t.copyFailed;}
  }
+ // The action buttons disable themselves as the phase leaves 'waiting', which would drop the
+ // pressed button and send focus to <body>; park it on the always-enabled open-app button first.
+ function keepFocus() { document.getElementById('request-open-app')?.focus(); }
  async function confirm() {
   if (!waiting || !cert || !request || problem) return;
+  keepFocus();
   phase='signing'; error='';
   try { await confirmRequest(request, cert, chain, send); phase='done'; }
   catch (reason) {
@@ -77,6 +81,7 @@
  }
  async function finish(action: 'cancel' | 'fallback') {
   if (!waiting) return;
+  keepFocus();
   phase='signing';
   try { await send({type:`request:${action}`,id}); phase=action==='cancel' ? 'cancelled' : 'continued'; }
   catch (reason) { error=reason instanceof Error ? reason.message : String(reason); phase='failed'; }
@@ -129,7 +134,7 @@
    {#if problem}<p role="alert" class="text-destructive text-sm">{t[problem]}</p>{/if}
   {/if}
  {/if}
- {#if error}<p id="request-error" role="alert" class="text-destructive break-words text-sm">{error}</p>{/if}
+ {#if error}<p id="request-error" role="alert" class="text-destructive break-words text-sm">{errorCopy(lang,error)}</p>{/if}
  {#if phase!=='waiting'}<p role="status" class="text-sm">{phase==='loading' ? t.loading : phase==='signing' ? t.signing : phase==='done' ? t.done : phase==='cancelled' ? t.cancelled : phase==='continued' ? t.continued : t.failed}</p>{/if}
  <footer class="grid gap-2 border-t pt-3">
   <Button id="request-confirm" class="h-10 w-full whitespace-normal text-center leading-tight" disabled={!waiting || !cert || !!problem} onclick={confirm}>{request?.operation==='selectCertificate' ? t.confirmSelect : t.confirm}</Button>

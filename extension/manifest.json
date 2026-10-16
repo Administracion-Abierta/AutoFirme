@@ -24,7 +24,7 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"
   },
-  "host_permissions": [
+  "optional_host_permissions": [
     "http://*/*",
     "https://*/*"
   ]

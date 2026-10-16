@@ -166,3 +166,36 @@ it('keeps review and fallback available if clipboard access fails',async()=>{
  expect((document.querySelector('#request-fallback') as HTMLButtonElement).disabled).toBe(false);
  expect(document.querySelector('#request-digest')?.textContent).toBe('abcdef');
 });
+
+it('keeps focus on the open-app button after cancelling', async () => {
+ mount();
+ await screen.findByText('https://example.com');
+ await fireEvent.click(document.querySelector('#request-cancel')!);
+ expect(document.activeElement?.id).toBe('request-open-app');
+});
+
+
+it('keeps focus on the open-app button after handing over to AutoFirma', async () => {
+ mount();
+ await screen.findByText('https://example.com');
+ await fireEvent.click(document.querySelector('#request-fallback')!);
+ expect(document.activeElement?.id).toBe('request-open-app');
+});
+
+
+it('keeps keyboard focus on the PIN field and the selection through a compact unlock', async () => {
+ mount();
+ await fireEvent.click(await screen.findByRole('button',{name:/My signing certificate/}));
+ await waitFor(()=>expect(document.activeElement?.id).toBe('store-pin'));
+ await fireEvent.input(document.querySelector('#store-pin')!,{target:{value:FIXTURE_PIN}});
+ await fireEvent.click(screen.getByRole('button',{name:copy.es.storeOpen}));
+ await waitFor(()=>expect(document.activeElement?.id).toBe('pkcs12-selection'),{timeout:15000});
+ await fireEvent.click(document.querySelector('#request-confirm')!);
+ expect(document.activeElement?.id).toBe('request-open-app');
+});
+
+
+it('shows worker failure messages in the default Spanish UI', async () => {
+ render(RequestChooser,{props:{id:'id',vault,send:async()=>{throw new Error('The requesting document has changed');}}});
+ expect((await screen.findByRole('alert')).textContent).toBe('El documento de la página solicitante ha cambiado.');
+});

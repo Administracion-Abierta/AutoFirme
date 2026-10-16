@@ -7,8 +7,9 @@ The implementation is described in [CHROME-EXTENSION-DESIGN.md](CHROME-EXTENSION
 
 ## 1. Environment
 
-Fedora Linux x86-64, Node 24.19.0, pnpm 11.24.0, headless Chromium, OpenSSL and
-unzip. The extension requires Chrome or Chromium 116+. Browser tests use a
+Fedora Linux x86-64, Node 24.19.0, pnpm 11.24.0, headless Chromium (Chrome for Testing flavour:
+branded Google Chrome 137+ ignores `--load-extension`), OpenSSL, `unzip` and
+`python3` (`pnpm package:extension`). The extension requires Chrome or Chromium 116+. Browser tests use a
 disposable profile, an OpenSSL-generated PKCS#12 and local test documents.
 
 ## 2. Automated checks
@@ -50,9 +51,12 @@ type checking, both builds and the full Chromium workflow.
 ## 3. Unpacked Chromium extension
 
 `scripts/test-extension-browser.mjs` launches a disposable Chromium profile with
-the flags needed to load an unpacked extension. It uses the production all-sites
-manifest without modification. Fresh storage contains no enabled-site entry, and
-the test does not call `sites:set` before the first website request.
+the flags needed to load an unpacked extension. It uses the production manifest,
+which grants no host permissions at installation. On fresh storage the first
+website call keeps the page's original `AutoScript` and opens no chooser; the
+per-origin grant is then recorded in the profile (`chrome.permissions.request`
+needs a visible native prompt headless cannot render), the browser restarts, and
+the full signing workflow runs against the authorized fixture origin.
 
 Observed results:
 
@@ -84,6 +88,12 @@ Observed results:
   site restores its original call on the loaded document without opening a chooser.
 - Main-app management works after SPA query changes. Chooser actions still require
   the exact request URL and actual chooser tab.
+- On fresh storage the fixture page keeps its original `AutoScript`: the first
+  sign call runs the local fallback, no `AutoScript` setter wrapper exists and no
+  chooser opens — a clean install injects nothing.
+- After the grant is recorded and the browser restarts, `sites:list` reports only
+  the fixture origin, `allSites` stays false, the sealed identity is still
+  usable, and the first post-reload website request opens the chooser and signs.
 
 The test certificate is self-issued, not an FNMT trust anchor. Successful signature
 verification does not imply that all certificate-trust checks pass.
@@ -95,23 +105,23 @@ The "Firmar" action at
 chooser in a separate live-site check. The page's `MiniApplet` alias refers to
 `AutoScript`, so the existing adapter captures its CAdES request. The automated
 check cancelled the chooser without signing or launching desktop AutoFirma.
-The user also confirmed capture after enabling and reloading the site in 0.1.0.
-The 0.1.1 Chromium fixture test checks the new all-sites default separately.
+The user also confirmed capture after enabling and reloading the site in 0.1.0;
+under the 0.1.3 opt-in model that site needs a fresh authorization in Site access.
 
 ## 5. Remaining manual checks
 
 | Check | Limit of the current evidence |
 |---|---|
-| Chrome installation/update permission dialogs | The unpacked test does not automate the native permission prompt |
+| Chrome installation/update permission dialogs | The unpacked test records the grant in the disposable profile instead of clicking the native bubble; the request-from-UI path is unit-tested in `SiteAccess.test.ts` |
 | Actual desktop AutoFirma launch | Local fallback functions count calls; they do not launch the desktop app |
 | Physical Windows and macOS Chrome | Automated browser checks ran on Linux |
 | MV3 worker process termination/restart | Chrome API fakes cover worker loss; the browser test does not kill the worker |
 | Live public TSA | Permission tests and timestamp oracles pass; no live TSA was used in the extension browser test |
 | Administration signing transaction | DGSFP capture was checked; no personal certificate or legally binding signature was submitted |
 
-After an update, reload the extension and already-open websites. Chrome may require
-accepting the expanded website-access permission. No external security audit has
-been performed.
+After an update, reload the extension and already-open websites. Turning on
+Intercept all websites asks Chrome for the wildcard grant. No external security
+audit has been performed.
 
 ## 6. Package provenance
 
