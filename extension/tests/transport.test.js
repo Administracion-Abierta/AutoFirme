@@ -8,10 +8,10 @@ function win() {
   return {location:{origin:'https://site.test'},sent,intervals,addEventListener(name,fn,options={}){const handlers=listeners.get(name)||[];handlers.push({fn,once:options.once});listeners.set(name,handlers);},
     emit(name,event){for(const handler of [...listeners.get(name)||[]]){if(handler.once)listeners.set(name,listeners.get(name).filter(value=>value!==handler));handler.fn(event);}},postMessage(message,origin){sent.push({message,origin});},setInterval(fn){const id=++sequence;intervals.set(id,fn);return id;},clearInterval(id){intervals.delete(id);},setTimeout(){return 2;},clearTimeout(){}};
 }
-const event=()=>({listeners:[],addListener(fn){this.listeners.push(fn);},emit(value){this.listeners.forEach(fn=>fn(value));}});
+const event=()=>({listeners: /** @type {((value: any) => void)[]} */ ([]),addListener(fn){this.listeners.push(fn);},emit(value){this.listeners.forEach(fn=>fn(value));}});
 
 test('isolated transport checks source and origin; disconnection reports error once without fallback',()=>{
-  const window=win();const port={onMessage:event(),onDisconnect:event(),messages:[],postMessage(m){this.messages.push(m);},disconnect(){this.disconnected=true;}};
+  const window=win();const port={onMessage:event(),onDisconnect:event(),messages: /** @type {any[]} */ ([]),postMessage(m){this.messages.push(m);},disconnect(){this.disconnected=true;}};
   installContent(window,{runtime:{connect:()=>port}});const id=crypto.randomUUID();const data={channel:'autofirme-v1-request',id,request:{operation:'selectCertificate'}};
   window.emit('message',{source:{},origin:window.location.origin,data});window.emit('message',{source:window,origin:'https://other.test',data});assert.equal(port.messages.length,0);
   window.emit('message',{source:window,origin:window.location.origin,data});window.emit('message',{source:window,origin:window.location.origin,data});assert.equal(port.messages.length,1);
@@ -31,7 +31,7 @@ test('page results settle only matching request once and preserve callback argum
 
 test('restored cached documents reconnect for new calls and never replay old pending calls',()=>{
   const window=win();const ports=[];
-  installContent(window,{runtime:{connect(){const port={onMessage:event(),onDisconnect:event(),messages:[],postMessage(m){if(this.disconnected)throw Error('Disconnected port');this.messages.push(m);},disconnect(){this.disconnected=true;}};ports.push(port);return port;}}});
+  installContent(window,{runtime:{connect(){const port={onMessage:event(),onDisconnect:event(),messages: /** @type {any[]} */ ([]),postMessage(m){if(this.disconnected)throw Error('Disconnected port');this.messages.push(m);},disconnect(){this.disconnected=true;}};ports.push(port);return port;}}});
   const request=()=>{const id=crypto.randomUUID();window.emit('message',{source:window,origin:window.location.origin,data:{channel:'autofirme-v1-request',id,request:{operation:'selectCertificate'}}});return id;};
   const first=request();window.emit('pagehide',{});window.emit('pageshow',{persisted:true});
   const second=request();assert.equal(ports.length,2);assert.equal(ports[1].messages[0].id,second);

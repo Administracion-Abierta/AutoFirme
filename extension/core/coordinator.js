@@ -41,7 +41,8 @@ export class Coordinator {
     }
     if (count >= MAX_DOCUMENT_REQUESTS) throw Error('Too many pending requests for this document');
     const item = {id:this.uuid(),request,origin:url.origin,tabId:sender.tab.id,frameId:sender.frameId,
-      documentId:sender.documentId,lifecycle:new RequestState(),deliver,windowId:null,chooserTabId:null,
+      documentId:sender.documentId,lifecycle:new RequestState(),deliver,
+      windowId:/** @type {number|null} */ (null),chooserTabId:/** @type {number|null} */ (null),
       deadline:this.now() + REQUEST_TIMEOUT_MS};
     this.requests.set(item.id, item);
     return item;

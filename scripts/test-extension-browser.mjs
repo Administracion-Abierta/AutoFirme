@@ -36,7 +36,9 @@ try {
   const fixture = await readFile('test/extension-site.html');
   server = createServer((request, response) => {response.writeHead(200, {'content-type': 'text/html; charset=utf-8'}); response.end(fixture);});
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const origin = `http://127.0.0.1:${server.address().port}`;
+  const address = server.address();
+  if (!address || typeof address === 'string') throw Error('fixture server did not bind a TCP port');
+  const origin = `http://127.0.0.1:${address.port}`;
   processHandle = spawn(executable, ['--headless=new','--no-proxy-server','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${join(directory,'profile')}`,`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'about:blank'], {stdio:'ignore'});
   let endpoint;
   for (let i=0;i<100;i++) {try {const [port,path]=(await readFile(join(directory,'profile/DevToolsActivePort'),'utf8')).trim().split('\n'); endpoint=`ws://127.0.0.1:${port}${path}`; break;} catch {await new Promise(resolve=>setTimeout(resolve,100));}}
@@ -99,7 +101,9 @@ try {
     const ranges=[...text.matchAll(/\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g)].at(-1);
     assert.ok(ranges,'actual app must generate a PDF signature');
     const [a,b,c,d]=ranges.slice(1).map(Number);
-    const signature=Buffer.from([...text.matchAll(/\/Contents\s*<([a-fA-F0-9]+)>/g)].at(-1)[1],'hex');
+    const contentsMatch = [...text.matchAll(/\/Contents\s*<([a-fA-F0-9]+)>/g)].at(-1);
+    assert.ok(contentsMatch, 'actual app must embed a /Contents hex blob');
+    const signature=Buffer.from(contentsMatch[1],'hex');
     const contentPath=join(directory,'pdf-content'),sigPath=join(directory,'pdf-signature.der');
     await writeFile(contentPath,Buffer.concat([pdf.subarray(a,a+b),pdf.subarray(c,c+d)]));
     await writeFile(sigPath,signature);

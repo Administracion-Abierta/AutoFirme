@@ -126,6 +126,15 @@ pnpm package:extension
 bash test/fixtures/verify-fixtures.sh
 ```
 
+`pnpm check` runs two TypeScript projects: the app (`tsconfig.json` over
+`src`, `test`, root configs) and `tsconfig.extension.json` over `extension/`
+and `scripts/`. The extension project keeps `checkJs: true` and `strict` but
+sets `noImplicitAny: false` and ships no `@types/chrome`: the MV3 code and
+driver scripts are plain JS whose tests hand-write stubs, and typing every
+`chrome.*` stub would add noise without catching API misuse. JSDoc casts went
+only where real type errors hid (optional regex matches, `Array.at(-1)`,
+PDFObject lookups). A new type error in either directory fails `pnpm check`.
+
 The extension browser workflow uses a disposable unpacked Chromium profile, local
 non-binding website fixture and freshly generated OpenSSL test certificate. It
 requires OpenSSL and Chrome/Chromium. Set `CHROME_PATH` to its executable, or install

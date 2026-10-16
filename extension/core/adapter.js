@@ -5,10 +5,10 @@ export function wrapAutoScript(api, transport) {
   Object.defineProperty(api, wrappedMarker, {value: true});
   let sticky = false;
   let customStore = false;
-  for (const [name, update] of [
-    ['setStickySignatory', value => { sticky = Boolean(value); }],
-    ['setKeyStore', value => { customStore = value != null; }],
-  ]) {
+  for (const [name, update] of /** @type {const} */ ([
+    ['setStickySignatory', /** @param {any} value */ (value) => { sticky = Boolean(value); }],
+    ['setKeyStore', /** @param {any} value */ (value) => { customStore = value != null; }],
+  ])) {
     const original = api[name];
     if (typeof original === 'function') api[name] = function (...args) {
       update(args[0]);
