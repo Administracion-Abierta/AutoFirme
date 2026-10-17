@@ -10,7 +10,7 @@ Static build, zero backend. Signing runs in the browser; Pages serves files only
    - Build command: `pnpm install --frozen-lockfile && pnpm build`
    - Output directory: `build`
    - Deploy command: **empty / none**. Pages serves `build/` directly after building.
-   - Node version: `22` (pinned by `.nvmrc`; pnpm 11 comes from `package.json` `packageManager`)
+   - Node version: `22.22.0` (pinned by `.nvmrc`; pnpm 11 needs Node ≥ 22.13, so never pin below that)
 4. No environment variables, no bindings, no Functions. The app needs none.
 
 > NEVER set the deploy command to `npx wrangler deploy`. Wrangler detects SvelteKit and
