@@ -61,3 +61,28 @@ jobs:
             dist/autofirme-extension-*.zip
             dist/SHA256SUMS
           if-no-files-found: error
+
+  deploy:
+    name: deploy worker to production
+    needs: checks
+    # Production worker autofirme.eduard3v.workers.dev tracks main; develop ships
+    # the dev pre-release instead (release-develop.yml). PRs never deploy.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Deploy to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy
