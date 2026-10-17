@@ -9,8 +9,15 @@ Static build, zero backend. Signing runs in the browser; Pages serves files only
 3. Build settings — Framework preset `SvelteKit`, or manual:
    - Build command: `pnpm install --frozen-lockfile && pnpm build`
    - Output directory: `build`
+   - Deploy command: **empty / none**. Pages serves `build/` directly after building.
    - Node version: `22` (pinned by `.nvmrc`; pnpm 11 comes from `package.json` `packageManager`)
 4. No environment variables, no bindings, no Functions. The app needs none.
+
+> NEVER set the deploy command to `npx wrangler deploy`. Wrangler detects SvelteKit and
+> tries to convert the project into a Worker (`sv add`, `wrangler.jsonc` pointing at
+> `.svelte-kit/cloudflare/_worker.js`), which fails in CI on pnpm ignored-build-scripts
+> and is the wrong target anyway: this app is static files, no edge code. If that command
+> already ran, check the Cloudflare dashboard for a stray `autofirme` Worker and delete it.
 
 ## Conventions
 
