@@ -9,7 +9,7 @@
  *    requests are touched, so a produced signature can never end up in a cache;
  *  - a `share_target` POST (Web Share from Android) is stashed in IndexedDB and answered with a
  *    redirect into the sign flow — a static host cannot receive multipart bodies itself.
-
+ */
 import { assets, immutable, prerendered } from '$app/manifest';
 import { version } from '$app/env';
 import { asset, resolve } from '$app/paths';
