@@ -15,7 +15,6 @@ export interface Copy {
 	themeDark: string;
 	themeSystem: string;
 	brand: string;
-	tagline: string;
 	privacyNote: string;
 	/** Title of the privacy section of the settings modal. */
 	privacyTitle: string;
@@ -38,6 +37,7 @@ export interface Copy {
 	dropHint: string;
 	browse: string;
 	dragging: string;
+	dropOverlay: string;
 	remove: string;
 	step2Title: string;
 	/** Trigger of the signature picker modal. */
@@ -87,26 +87,7 @@ export interface Copy {
 	queueDownload: string;
 	queueArchive: string;
 	downloadOne: string;
-	modesLabel: string;
 	modeSign: string;
-	modeVerify: string;
-	verifyStepTitle: string;
-	/** Closes the loaded signature and its report, back to the verify drop zone. */
-	verifyClose: string;
-	verifyDropTitle: string;
-	verifyDropHint: string;
-	verifyRunning: string;
-	verifyReportTitle: string;
-	verifyOk: string;
-	/** Valid signature whose signer certificate is outside its validity window (#40). */
-	verifyExpired: string;
-	verifyFail: string;
-	verifySigner: string;
-	verifySigningTime: string;
-	verifyNoSigner: string;
-	verifyAddDocument: string;
-	verifyAddDocumentHint: string;
-	verifyDocumentLabel: string;
 	checkLabels: Record<CheckId, string>;
 	storeTitle: string;
 	storeHint: string;
@@ -152,7 +133,6 @@ export const copy: Record<Lang, Copy> = {
 		themeDark: 'Oscuro',
 		themeSystem: 'Sistema',
 		brand: 'AutoFirma Web',
-		tagline: 'Firma electrónica en tu navegador, sin instalar nada.',
 		privacyNote: 'Las claves privadas nunca salen de tu equipo: todo se firma en el navegador.',
 		helpMenu: 'Ayuda',
 		privacyTitle: 'Privacidad',
@@ -168,6 +148,7 @@ export const copy: Record<Lang, Copy> = {
 		dropHint: 'o selecciónalos desde tu equipo',
 		browse: 'Seleccionar ficheros',
 		dragging: 'Suelta el fichero para cargarlo',
+		dropOverlay: 'Suelta los ficheros aquí para añadirlos',
 		remove: 'Quitar',
 		step2Title: 'Elige los documentos',
 		selectSign: 'Seleccionar firma',
@@ -231,24 +212,7 @@ export const copy: Record<Lang, Copy> = {
 		queueDownload: 'Descargar ZIP',
 		queueArchive: 'firmas-lote.zip',
 		downloadOne: 'Descargar',
-		modesLabel: 'Modo',
 		modeSign: 'Firmar',
-		modeVerify: 'Verificar',
-		verifyStepTitle: 'Comprueba una firma',
-		verifyClose: 'Cerrar',
-		verifyDropTitle: 'Arrastra aquí el fichero firmado (.csig, .xsig o PDF)',
-		verifyDropHint: 'se analiza en tu equipo, sin subir nada',
-		verifyRunning: 'Comprobando la firma…',
-		verifyReportTitle: 'Informe de validación',
-		verifyOk: 'Firma verificada: todas las comprobaciones han pasado.',
-		verifyExpired: 'Firma válida, pero el certificado del firmante ha caducado.',
-		verifyFail: 'La firma no supera todas las comprobaciones.',
-		verifySigner: 'Firmante',
-		verifySigningTime: 'Fecha de firma',
-		verifyNoSigner: 'No se ha encontrado el certificado del firmante.',
-		verifyAddDocument: 'Añade el documento original',
-		verifyAddDocumentHint: 'la firma es separada (detached): sin el documento no se puede comprobar el contenido',
-		verifyDocumentLabel: 'Documento original',
 		checkLabels: {
 			structure: 'Estructura de la firma',
 			contentDigest: 'Integridad del contenido',
@@ -306,7 +270,6 @@ export const copy: Record<Lang, Copy> = {
 		themeDark: 'Dark',
 		themeSystem: 'System',
 		brand: 'AutoFirma Web',
-		tagline: 'Electronic signature in your browser, nothing to install.',
 		privacyNote: 'Private keys never leave your machine: signing happens in the browser.',
 		helpMenu: 'Help',
 		privacyTitle: 'Privacy',
@@ -323,6 +286,7 @@ export const copy: Record<Lang, Copy> = {
 		dropHint: 'or pick them from your machine',
 		browse: 'Choose files',
 		dragging: 'Drop the file to load it',
+		dropOverlay: 'Drop the files here to add them',
 		step2Title: 'Choose the documents',
 		selectSign: 'Select signature',
 		addSign: 'Add signature',
@@ -385,24 +349,7 @@ export const copy: Record<Lang, Copy> = {
 		queueDownload: 'Download ZIP',
 		queueArchive: 'signed-batch.zip',
 		downloadOne: 'Download',
-		modesLabel: 'Mode',
 		modeSign: 'Sign',
-		modeVerify: 'Verify',
-		verifyStepTitle: 'Check a signature',
-		verifyClose: 'Close',
-		verifyDropTitle: 'Drop the signed file here (.csig, .xsig or PDF)',
-		verifyDropHint: 'it is analysed on your machine, nothing is uploaded',
-		verifyRunning: 'Checking the signature…',
-		verifyReportTitle: 'Validity report',
-		verifyOk: 'Signature verified: every check passed.',
-		verifyExpired: 'Signature valid, but the signer certificate has expired.',
-		verifyFail: 'The signature does not pass every check.',
-		verifySigner: 'Signer',
-		verifySigningTime: 'Signing time',
-		verifyNoSigner: 'No signer certificate was found.',
-		verifyAddDocument: 'Add the original document',
-		verifyAddDocumentHint: 'this is a detached signature: without the document the content cannot be checked',
-		verifyDocumentLabel: 'Original document',
 		checkLabels: {
 			structure: 'Signature structure',
 			contentDigest: 'Content integrity',

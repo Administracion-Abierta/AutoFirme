@@ -26,13 +26,11 @@
 		type SignerCert
 	} from '#lib/sign';
 	import { signXades } from '#lib/xades';
-	import { verifyArtifact, type Bytes, type VerificationReport } from '#lib/verify';
 	import BatchQueue from '#lib/components/BatchQueue.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
 	import FileCard from '#lib/components/FileCard.svelte';
 	import FileDrop from '#lib/components/FileDrop.svelte';
 	import PwaControls from '#lib/components/PwaControls.svelte';
-	import VerifyReport from '#lib/components/VerifyReport.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.js';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -83,24 +81,6 @@
 	// http away from localhost: the browser withholds WebCrypto from insecure contexts, so no
 	// signature can be produced or verified here until the page is served over https.
 	const secure = $derived(globalThis.crypto?.subtle !== undefined);
-	/** `?tab=` deep link (ES and EN spellings both accepted); also mirrored back into the URL. */
-	function tabFromSearch(search: string): 'sign' | 'verify' {
-		const tab = new URLSearchParams(search).get('tab');
-		return tab === 'verificar' || tab === 'verify' ? 'verify' : 'sign';
-	}
-
-	// `location` exists only where a DOM exists — prerender runs without one.
-	const onClient = typeof location === 'object';
-	let mode = $state<'sign' | 'verify'>(onClient ? tabFromSearch(location.search) : 'sign');
-
-	/** Switch tab and keep the address bar honest, so the current view is linkable. */
-	function setMode(next: 'sign' | 'verify') {
-		mode = next;
-		if (!onClient) return;
-		const url = new URL(location.href);
-		url.searchParams.set('tab', next === 'verify' ? 'verificar' : 'firmar');
-		history.replaceState(history.state, '', url);
-	}
 	let settingsOpen = $state(false);
 	let mcpOpen = $state(false);
 	// Empty until mount, so the prerendered HTML and the hydrated one agree.
@@ -140,6 +120,23 @@
 	]);
 
 	let files = $state<File[]>([]);
+	let fileListEl = $state<HTMLDivElement | null>(null);
+	/** Horizontal scroll room left/right of the visible area, for the edge fades. */
+	let scrollLeft = $state(0);
+	let scrollRight = $state(0);
+	function measureFileList() {
+		if (!fileListEl) return;
+		scrollLeft = fileListEl.scrollLeft;
+		scrollRight = fileListEl.scrollWidth - fileListEl.clientWidth - fileListEl.scrollLeft;
+	}
+	$effect(() => {
+		if (files.length >= 0) queueMicrotask(measureFileList);
+	});
+	/** Depth counter: dragenter/dragleave fire per child element, so a bool would flicker. */
+	let dragDepth = $state(0);
+	function hasFiles(event: DragEvent): boolean {
+		return event.dataTransfer?.types.includes('Files') ?? false;
+	}
 	let format = $state<SignFormat>('cades');
 	let formatOpen = $state(false);
 	// Visible signature block (#45), PAdES only and off by default: an uploaded image plus the
@@ -171,6 +168,7 @@
 
 	/** The 3-step flow: 1 configure, 2 files, 3 progress + download. Not persisted. */
 	let step = $state<1 | 2 | 3>(1);
+	const dragging = $derived(dragDepth > 0 && step === 2);
 	const signedCount = $derived(batch.documents.filter((entry) => entry.status === 'signed').length);
 
 	/** Step 2 fires the run: the queue throws only when it is already running, which cannot happen
@@ -277,59 +275,6 @@
 	// Step 1 gates on the certificate alone now: the format lives on step 2, next to the files.
 	const signHint = $derived(cert === null ? t.signNeedsCert : '');
 
-	let verifyFile = $state<SelectedFile | null>(null);
-	let verifyBytes = $state<Bytes | null>(null);
-	let detachedFile = $state<SelectedFile | null>(null);
-	let detachedBytes = $state<Bytes | null>(null);
-	let report = $state<VerificationReport | null>(null);
-	let running = $state(false);
-	const needsDocument = $derived(
-		(report?.checks.some((entry) => entry.id === 'contentDigest' && entry.status === 'info') ?? false) &&
-			detachedFile === null
-	);
-
-	async function runVerify() {
-		if (verifyBytes === null) return;
-		running = true;
-		try {
-			report = await verifyArtifact(verifyBytes, { detached: detachedBytes });
-		} finally {
-			running = false;
-		}
-	}
-
-	async function pickSignature(picked: File[]) {
-		const file = picked[0];
-		if (!file) return;
-		verifyBytes = new Uint8Array(await file.arrayBuffer());
-		verifyFile = toSelectedFile(file);
-		detachedFile = null;
-		detachedBytes = null;
-		report = null;
-		await runVerify();
-	}
-
-	async function pickDocument(picked: File[]) {
-		const file = picked[0];
-		if (!file) return;
-		detachedBytes = new Uint8Array(await file.arrayBuffer());
-		detachedFile = toSelectedFile(file);
-		await runVerify();
-	}
-
-	function clearVerification() {
-		verifyFile = null;
-		verifyBytes = null;
-		detachedFile = null;
-		detachedBytes = null;
-		report = null;
-	}
-
-	function clearDocument() {
-		detachedFile = null;
-		detachedBytes = null;
-		void runVerify();
-	}
 </script>
 
 <!--
@@ -363,57 +308,45 @@
 	</svg>
 {/snippet}
 
+	<svelte:window
+		ondragenter={(event) => {
+			if (step === 2 && hasFiles(event)) dragDepth++;
+		}}
+		ondragleave={(event) => {
+			if (step === 2 && hasFiles(event)) dragDepth = Math.max(0, dragDepth - 1);
+		}}
+		ondragover={(event) => {
+			if (step === 2 && hasFiles(event)) event.preventDefault();
+		}}
+		ondrop={(event) => {
+			dragDepth = 0;
+			if (step !== 2) return;
+			event.preventDefault();
+			const dropped = Array.from(event.dataTransfer?.files ?? []);
+			if (dropped.length > 0) files = [...files, ...dropped];
+		}}
+	/>
+
 <TooltipProvider>
 	<div
 		class="mx-auto flex h-dvh max-w-7xl flex-col gap-6 px-3 py-4 sm:px-5 sm:py-6 [--panel-offset:7.5rem] max-lg:h-auto max-lg:min-h-dvh"
 	>
-		<header class="flex flex-wrap items-start justify-between gap-4">
+		<header class="flex items-center justify-between gap-4">
 			<div class="flex min-w-0 items-center gap-3 sm:gap-4">
-				{@render seal(44)}
-				<div>
-					<h1 class="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-						{t.brand}
-					</h1>
-					<p class="text-muted-foreground mt-1">{t.tagline}</p>
-				</div>
+				{@render seal(28)}
+				<h1 class="font-display text-lg font-semibold tracking-tight">{t.brand}</h1>
 			</div>
-			<div class="flex min-w-0 max-w-full flex-col items-end gap-2 text-sm">
-				<div class="flex flex-wrap items-center justify-end gap-2">
-					<PwaControls copy={t} />
-					<Button
-						variant="ghost"
-						size="icon"
-						aria-label={t.settingsLabel}
-						aria-haspopup="dialog"
-						onclick={() => (settingsOpen = true)}
-					>
-						<SettingsIcon class="size-5" aria-hidden="true" />
-					</Button>
-				</div>
-				<div
-					class="bg-muted inline-flex items-center gap-1 rounded-lg p-1"
-					role="tablist"
-					aria-label={t.modesLabel}
+			<div class="flex shrink-0 items-center gap-2">
+				<PwaControls copy={t} />
+				<Button
+					variant="ghost"
+					size="icon"
+					aria-label={t.settingsLabel}
+					aria-haspopup="dialog"
+					onclick={() => (settingsOpen = true)}
 				>
-					<Button
-						role="tab"
-						aria-selected={mode === 'sign'}
-						aria-controls="panel-sign"
-						variant={mode === 'sign' ? 'default' : 'ghost'}
-						size="sm"
-						class="h-8 px-4"
-						onclick={() => setMode('sign')}>{t.modeSign}</Button
-					>
-					<Button
-						role="tab"
-						aria-selected={mode === 'verify'}
-						aria-controls="panel-verify"
-						variant={mode === 'verify' ? 'default' : 'ghost'}
-						size="sm"
-						class="h-8 px-4"
-						onclick={() => setMode('verify')}>{t.modeVerify}</Button
-					>
-				</div>
+					<SettingsIcon class="size-5" aria-hidden="true" />
+				</Button>
 			</div>
 		</header>
 
@@ -425,416 +358,357 @@
 					<AlertDescription>{t.insecureContext}</AlertDescription>
 				</Alert>
 			{/if}
-			{#if mode === 'sign'}
-				<div
-					id="panel-sign"
-					role="tabpanel"
-					aria-label={t.modeSign}
-					class="mx-auto flex w-full max-w-3xl flex-col gap-6"
-				>
-					<!-- Step indicator: where the flow stands; back-navigation allowed when idle. -->
-					<ol class="flex items-center gap-2" aria-label={t.modeSign}>
-						{#each [1, 2, 3] as entry, index (entry)}
-							{@const labels = [t.stepConfigure, t.stepFiles, t.stepDownload]}
-							{@const reached = step >= entry}
-							{@const canJump = entry < step && batch.phase !== 'running'}
-							<li class="flex min-w-0 items-center gap-2" aria-current={step === entry ? 'step' : undefined}>
-								{#if canJump}
-									<button
-										type="button"
-										class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-medium"
-										onclick={() => (step = entry as 1 | 2 | 3)}
-									>
+			<div
+				id="panel-sign"
+				role="tabpanel"
+				aria-label={t.modeSign}
+				class="mx-auto flex w-full max-w-3xl flex-col gap-6"
+			>
+				<!-- Step indicator: where the flow stands; back-navigation allowed when idle. -->
+				<ol class="flex items-center gap-2" aria-label={t.modeSign}>
+					{#each [1, 2, 3] as entry, index (entry)}
+						{@const labels = [t.stepConfigure, t.stepFiles, t.stepDownload]}
+						{@const reached = step >= entry}
+						{@const canJump = entry < step && batch.phase !== 'running'}
+						<li class="flex min-w-0 items-center gap-2" aria-current={step === entry ? 'step' : undefined}>
+							{#if canJump}
+								<button
+									type="button"
+									class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-medium"
+									onclick={() => (step = entry as 1 | 2 | 3)}
+								>
+									<CheckIcon class="size-4" aria-hidden="true" />
+									{labels[index]}
+								</button>
+							{:else}
+								<span
+									class="flex items-center gap-1.5 text-sm font-medium {reached
+										? 'text-foreground'
+										: 'text-muted-foreground'}"
+								>
+									{#if step > entry}
 										<CheckIcon class="size-4" aria-hidden="true" />
-										{labels[index]}
-									</button>
-								{:else}
-									<span
-										class="flex items-center gap-1.5 text-sm font-medium {reached
-											? 'text-foreground'
-											: 'text-muted-foreground'}"
-									>
-										{#if step > entry}
-											<CheckIcon class="size-4" aria-hidden="true" />
-										{:else}
-											<span
-												class="bg-muted text-foreground inline-flex size-5 items-center justify-center rounded-full text-xs"
-												aria-hidden="true">{entry}</span
-											>
-										{/if}
-										{labels[index]}
-									</span>
-								{/if}
-								{#if index < 2}
-									<span class="bg-border h-px w-6 shrink-0" aria-hidden="true"></span>
-								{/if}
-							</li>
-						{/each}
-					</ol>
-
-					{#if step === 1}
-						<!-- Step 1: configure the signature — certificate and format. -->
-						<Card>
-							<CardHeader>
-							<h2 class="font-display text-xl font-semibold">{t.step1Title}</h2>
-							</CardHeader>
-							<CardContent class="flex flex-col gap-4">
-								<CertPicker
-									copy={t}
-									{cert}
-									{vault}
-									onpick={(picked, certificates) => {
-										if (picked === null) {
-											console.error('[autofirme:app] picker cleared the signer');
-										}
-										cert = picked;
-										chain = certificates;
-									}}
-								/>
-
-								<div class="flex items-center justify-between gap-3 border-t pt-4">
-									{#if signHint}
-										<p id="sign-hint" class="text-muted-foreground text-sm">{signHint}</p>
 									{:else}
-										<span class="text-sm" aria-hidden="true"></span>
-									{/if}
-									<Button
-										disabled={signer === null}
-										aria-describedby={signHint ? 'sign-hint' : undefined}
-										onclick={() => (step = 2)}
-									>
-										{t.next}
-										<ArrowRightIcon class="size-4" aria-hidden="true" />
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
-					{:else if step === 2}
-						<!-- Step 2: documents and format — global for the batch, overridable per file;
-						     Firmar starts the run and lands on step 3. -->
-						<Card>
-							<CardHeader>
-							<h2 class="font-display text-xl font-semibold">{t.step2Title}</h2>
-							</CardHeader>
-							<CardContent class="flex flex-col gap-4">
-								<fieldset class="flex flex-col gap-2">
-									<legend class="text-sm font-medium">{t.formatTitle}</legend>
-									<Button
-										variant="outline"
-										class="justify-between px-4 py-3 text-left h-auto"
-										aria-haspopup="dialog"
-										onclick={() => (formatOpen = true)}
-									>
-										<span class="flex min-w-0 items-center gap-3">
-											<span class="font-medium">{currentFormat.label}</span>
-											<span class="text-muted-foreground tnum text-sm"
-												>{currentFormat.extension}</span
-											>
-											<span class="text-muted-foreground text-sm">{t.formatAll}</span>
-										</span>
-										<ChevronDownIcon class="text-muted-foreground size-4" aria-hidden="true" />
-									</Button>
-								</fieldset>
-
-								<FileDrop copy={t} onselect={(picked) => (files = [...files, ...picked])} />
-								{#if files.length > 0}
-									<Table>
-										<TableHeader>
-											<TableRow>
-												<TableHead>{t.colFile}</TableHead>
-												<TableHead>{t.formatTitle}</TableHead>
-												<TableHead class="text-right">{t.colActions}</TableHead>
-											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{#each files as file, index (index)}
-												{@const entry = batch.documents[index] ?? null}
-												{@const docFormat = entry?.format ?? format}
-												<FileCard
-													copy={t}
-													file={toSelectedFile(file)}
-													document={entry}
-													removable={true}
-													onremove={() => {
-														files = files.filter((_, position) => position !== index);
-													}}
-												>
-													{#snippet extra()}
-														<TableCell>
-															<select
-																class="border-input bg-background h-8 rounded-md border px-2 text-sm"
-																aria-label="{t.formatTitle}: {file.name}"
-																value={docFormat}
-																onchange={(event) => {
-																	if (entry) queue.setFormat(entry.id, event.currentTarget.value as SignFormat);
-																}}
-															>
-																{#each SIGN_FORMATS as option (option.id)}
-																	<option value={option.id} disabled={!option.implemented}>
-																		{option.label}{option.implemented ? '' : ` (${t.pendingIssue})`}
-																	</option>
-																{/each}
-															</select>
-														</TableCell>
-													{/snippet}
-												</FileCard>
-											{/each}
-										</TableBody>
-									</Table>
-								{/if}
-
-								{#if format === 'pades'}
-									<!-- Visible signature block (#45), off by default. -->
-									<fieldset class="flex flex-col gap-3 border-t pt-4">
-										<legend class="sr-only">{t.visibleTitle}</legend>
-										<div class="flex items-start justify-between gap-3">
-											<label for="visible-signature" class="flex flex-col gap-0.5">
-												<span class="text-sm font-medium">{t.visibleTitle}</span>
-												<span class="text-muted-foreground text-xs">{t.visibleHint}</span>
-											</label>
-											<Switch id="visible-signature" bind:checked={visibleOn} />
-										</div>
-
-										{#if visibleOn}
-											<div class="flex flex-wrap items-center gap-2">
-												<input
-													bind:this={visibleImageInput}
-													class="sr-only"
-													type="file"
-													accept="image/png,image/jpeg"
-													aria-label={t.visibleImage}
-													onchange={(event) => pickSignatureImage(event.currentTarget.files?.[0])}
-												/>
-												<Button
-													variant="outline"
-													size="sm"
-													onclick={() => visibleImageInput?.click()}
-												>
-													<UploadIcon class="size-4" aria-hidden="true" />
-													{t.visibleImageChoose}
-												</Button>
-												{#if visibleImage}
-													<span class="text-muted-foreground text-xs">
-														{visibleImage.name} · {formatBytes(visibleImage.bytes.length)}
-													</span>
-													<Button variant="ghost" size="sm" onclick={() => (visibleImage = null)}>
-														{t.remove}
-													</Button>
-												{/if}
-											</div>
-											{#if visibleImageError}
-												<p class="text-destructive text-xs" role="alert">{visibleImageError}</p>
-											{/if}
-
-											<div class="flex flex-wrap items-end gap-4">
-												<div class="flex flex-col gap-1">
-													<label for="visible-page" class="text-xs font-medium">{t.visiblePage}</label>
-													<Input
-														id="visible-page"
-														type="number"
-														min="1"
-														class="w-20"
-														bind:value={visiblePage}
-													/>
-												</div>
-												<div class="flex flex-col gap-1">
-													<span id="visible-corner" class="text-xs font-medium">{t.visibleCorner}</span>
-													<div
-														class="grid grid-cols-2 gap-1"
-														role="group"
-														aria-labelledby="visible-corner"
-													>
-														{#each SIGNATURE_CORNERS as corner (corner)}
-															<Button
-																variant={visibleCorner === corner ? 'default' : 'outline'}
-																size="sm"
-																aria-pressed={visibleCorner === corner}
-																onclick={() => (visibleCorner = corner)}
-															>
-																{t.visibleCorners[corner]}
-															</Button>
-														{/each}
-													</div>
-												</div>
-											</div>
-										{/if}
-									</fieldset>
-								{/if}
-
-								{#if format === 'cades'}
-									<!-- Trusted timestamp (#43): collapsed until asked for — one click opens it. -->
-									<details class="group flex flex-col gap-2 rounded-lg border p-3">
-										<summary class="flex cursor-pointer list-none items-center justify-between text-sm font-medium select-none [&::-webkit-details-marker]:hidden">
-											{t.timeStampTitle}
-											<ChevronDownIcon
-												class="text-muted-foreground size-4 transition-transform group-open:rotate-180"
-												aria-hidden="true"
-											/>
-										</summary>
-										<div class="flex flex-col gap-2">
-											<Input
-												id="tsa-url"
-												type="url"
-												placeholder={t.timeStampPlaceholder}
-												bind:value={tsaUrl}
-												autocomplete="off"
-												spellcheck={false}
-											/>
-											<p class="text-muted-foreground text-xs">{t.timeStampHint}</p>
-										</div>
-									</details>
-								{/if}
-
-								<div class="flex items-center justify-between gap-3 border-t pt-4">
-									<Button variant="outline" onclick={() => (step = 1)}>
-										<ArrowLeftIcon class="size-4" aria-hidden="true" />
-										{t.back}
-									</Button>
-									<Button disabled={files.length === 0} onclick={startBatch}>
-										<PenLineIcon class="size-4" aria-hidden="true" />
-										{t.signButton}
-									</Button>
-								</div>
-							</CardContent>
-						</Card>
-					{:else}
-						<!-- Step 3: progress and downloads. The run started on the Firmar click. -->
-						<Card>
-							<CardHeader>
-								<h2 class="font-display text-xl font-semibold">{t.stepDownload}</h2>
-							</CardHeader>
-							<CardContent class="flex flex-col gap-4">
-								<BatchQueue copy={t} {queue} />
-								{#if files.length > 0}
-									<Table>
-										<TableHeader>
-											<TableRow>
-												<TableHead>{t.colFile}</TableHead>
-												<TableHead class="text-right">{t.colActions}</TableHead>
-											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{#each files as file, index (index)}
-												<FileCard
-													copy={t}
-													file={toSelectedFile(file)}
-													document={batch.documents[index] ?? null}
-													removable={false}
-													onremove={() => {}}
-												/>
-											{/each}
-										</TableBody>
-									</Table>
-								{/if}
-
-								<div class="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-									<Button
-										variant="outline"
-										disabled={batch.phase === 'running'}
-										onclick={() => (step = 2)}
-									>
-										<ArrowLeftIcon class="size-4" aria-hidden="true" />
-										{t.back}
-									</Button>
-									<div class="flex flex-wrap items-center gap-2">
-										<Button variant="outline" disabled={signedCount === 0} onclick={downloadZip}>
-											<DownloadIcon class="size-4" aria-hidden="true" />
-											{t.queueDownload}
-										</Button>
-										<Button
-											disabled={batch.phase === 'running'}
-											onclick={() => {
-												files = [];
-												step = 2;
-											}}
+										<span
+											class="bg-muted text-foreground inline-flex size-5 items-center justify-center rounded-full text-xs"
+											aria-hidden="true">{entry}</span
 										>
-											<PlusIcon class="size-4" aria-hidden="true" />
-											{t.newBatch}
-										</Button>
-									</div>
+									{/if}
+									{labels[index]}
+								</span>
+							{/if}
+							{#if index < 2}
+								<span class="bg-border h-px w-6 shrink-0" aria-hidden="true"></span>
+							{/if}
+						</li>
+					{/each}
+				</ol>
+
+				{#if step === 1}
+					<!-- Step 1: configure the signature — certificate and format. -->
+					<Card>
+						<CardHeader>
+						<h2 class="font-display text-xl font-semibold">{t.step1Title}</h2>
+						</CardHeader>
+						<CardContent class="flex flex-col gap-4">
+							<CertPicker
+								copy={t}
+								{cert}
+								{vault}
+								onpick={(picked, certificates) => {
+									if (picked === null) {
+										console.error('[autofirme:app] picker cleared the signer');
+									}
+									cert = picked;
+									chain = certificates;
+								}}
+							/>
+
+							<div class="flex items-center justify-between gap-3 border-t pt-4">
+								{#if signHint}
+									<p id="sign-hint" class="text-muted-foreground text-sm">{signHint}</p>
+								{:else}
+									<span class="text-sm" aria-hidden="true"></span>
+								{/if}
+								<Button
+									disabled={signer === null}
+									aria-describedby={signHint ? 'sign-hint' : undefined}
+									onclick={() => (step = 2)}
+								>
+									{t.next}
+									<ArrowRightIcon class="size-4" aria-hidden="true" />
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				{:else if step === 2}
+					<!-- Step 2: documents and format — global for the batch, overridable per file;
+					     Firmar starts the run and lands on step 3. -->
+					<Card>
+						<CardHeader>
+						<h2 class="font-display text-xl font-semibold">{t.step2Title}</h2>
+						</CardHeader>
+						<CardContent class="flex flex-col gap-4">
+							<fieldset class="flex w-full min-w-0 flex-col gap-2">
+								<legend class="text-sm font-medium">{t.formatTitle}</legend>
+								<Button
+									variant="outline"
+									class="w-full min-w-0 justify-between px-4 py-3 text-left h-auto whitespace-normal"
+									aria-haspopup="dialog"
+									onclick={() => (formatOpen = true)}
+								>
+									<span class="flex min-w-0 flex-1 items-center gap-3">
+										<span class="font-medium truncate">{currentFormat.label}</span>
+										<span class="text-muted-foreground tnum text-sm"
+											>{currentFormat.extension}</span
+										>
+										<span class="text-muted-foreground min-w-0 truncate text-sm">{t.formatAll}</span>
+									</span>
+									<ChevronDownIcon class="text-muted-foreground size-4" aria-hidden="true" />
+								</Button>
+							</fieldset>
+
+							{#if files.length === 0}
+								<FileDrop copy={t} onselect={(picked) => (files = [...files, ...picked])} />
+							{/if}
+							{#if files.length > 0}
+								<div class="relative min-w-0">
+								{#if scrollLeft > 0}<div aria-hidden="true" class="from-background pointer-events-none absolute inset-y-0 start-0 z-10 w-6 bg-gradient-to-r to-transparent"></div>{/if}
+								{#if scrollRight > 0}<div aria-hidden="true" class="from-background pointer-events-none absolute inset-y-0 end-0 z-10 w-6 bg-gradient-to-l to-transparent"></div>{/if}
+								<div class="max-h-80 overflow-x-hidden overflow-y-auto" onscroll={measureFileList} bind:this={fileListEl}>
+								<div class="overflow-visible">
+								<Table>
+									<TableBody>
+										<TableRow class="border-border/50 hover:bg-transparent">
+											<TableCell class="p-0">
+												<FileDrop copy={t} compact onselect={(picked) => (files = [...files, ...picked])} />
+											</TableCell>
+										</TableRow>
+										{#each files as file, index (index)}
+											{@const entry = batch.documents[index] ?? null}
+											{@const docFormat = entry?.format ?? format}
+											<FileCard
+												copy={t}
+												file={toSelectedFile(file)}
+												document={entry}
+												removable={true}
+												downloadable={false}
+												onremove={() => {
+													files = files.filter((_, position) => position !== index);
+												}}
+											>
+																											{#snippet actions()}
+																												<select
+																													class="border-input bg-background h-8 shrink-0 rounded-md border px-2 text-sm"
+																													aria-label="{t.formatTitle}: {file.name}"
+																													value={docFormat}
+																													onchange={(event) => {
+																													if (entry) queue.setFormat(entry.id, event.currentTarget.value as SignFormat);
+																													}}
+																													>
+																													{#each SIGN_FORMATS as option (option.id)}
+																														<option value={option.id} disabled={!option.implemented}>
+																															{option.label}
+																														</option>
+																													{/each}
+																												</select>
+																											{/snippet}
+	</FileCard>
+										{/each}
+									</TableBody>
+								</Table>
 								</div>
-							</CardContent>
-						</Card>
-					{/if}
-				</div>
-			{:else}
-				<div
-					id="panel-verify"
-					role="tabpanel"
-					aria-label={t.modeVerify}
-					class="mx-auto flex w-full max-w-3xl flex-col gap-8"
-				>
-					{#if verifyFile === null}
-						<!-- One signature at a time: this card steps aside while one is loaded. -->
-						<Card>
-							<CardHeader>
-								<h2 class="text-lg font-medium">{t.verifyStepTitle}</h2>
-							</CardHeader>
-							<CardContent class="flex flex-col gap-4">
-								<FileDrop
-									copy={t}
-									onselect={pickSignature}
-									title={t.verifyDropTitle}
-									hint={t.verifyDropHint}
-									multiple={false}
-								/>
-							</CardContent>
-						</Card>
-					{/if}
+								</div>
+								</div>
+							{/if}
 
-					{#if verifyFile !== null}
-						<Card>
-							<CardContent>
-								<VerifyReport copy={t} {report} {running} />
-							</CardContent>
-						</Card>
+							{#if format === 'pades'}
+								<!-- Visible signature block (#45), off by default. -->
+								<fieldset class="flex flex-col gap-3 border-t pt-4">
+									<legend class="sr-only">{t.visibleTitle}</legend>
+									<div class="flex items-start justify-between gap-3">
+										<label for="visible-signature" class="flex flex-col gap-0.5">
+											<span class="text-sm font-medium">{t.visibleTitle}</span>
+											<span class="text-muted-foreground text-xs">{t.visibleHint}</span>
+										</label>
+										<Switch id="visible-signature" bind:checked={visibleOn} />
+									</div>
 
-						{#if needsDocument}
-							<Card>
-								<CardHeader>
-									<h2 class="text-lg font-medium">{t.verifyAddDocument}</h2>
-								</CardHeader>
-								<CardContent>
-									<FileDrop
-										copy={t}
-										onselect={pickDocument}
-										title={t.verifyAddDocument}
-										hint={t.verifyAddDocumentHint}
-										multiple={false}
-									/>
-								</CardContent>
-							</Card>
-						{:else if detachedFile !== null}
-							<Card>
-								<CardHeader>
-									<h2 class="text-lg font-medium">{t.verifyDocumentLabel}</h2>
-								</CardHeader>
-								<CardContent>
-									<Table>
-										<TableBody>
-											<FileCard copy={t} file={detachedFile} onremove={clearDocument} />
-										</TableBody>
-									</Table>
-								</CardContent>
-							</Card>
-						{/if}
+									{#if visibleOn}
+										<div class="flex flex-wrap items-center gap-2">
+											<input
+												bind:this={visibleImageInput}
+												class="sr-only"
+												type="file"
+												accept="image/png,image/jpeg"
+												aria-label={t.visibleImage}
+												onchange={(event) => pickSignatureImage(event.currentTarget.files?.[0])}
+											/>
+											<Button
+												variant="outline"
+												size="sm"
+												onclick={() => visibleImageInput?.click()}
+											>
+												<UploadIcon class="size-4" aria-hidden="true" />
+												{t.visibleImageChoose}
+											</Button>
+											{#if visibleImage}
+												<span class="text-muted-foreground text-xs">
+													{visibleImage.name} · {formatBytes(visibleImage.bytes.length)}
+												</span>
+												<Button variant="ghost" size="sm" onclick={() => (visibleImage = null)}>
+													{t.remove}
+												</Button>
+											{/if}
+										</div>
+										{#if visibleImageError}
+											<p class="text-destructive text-xs" role="alert">{visibleImageError}</p>
+										{/if}
 
-						<!-- Cerrar: the way back to the drop zone — it drops the signature and report. -->
-						<div class="flex justify-center">
-							<Button variant="outline" onclick={clearVerification}>{t.verifyClose}</Button>
-						</div>
-					{/if}
-				</div>
-			{/if}
+										<div class="flex flex-wrap items-end gap-4">
+											<div class="flex flex-col gap-1">
+												<label for="visible-page" class="text-xs font-medium">{t.visiblePage}</label>
+												<Input
+													id="visible-page"
+													type="number"
+													min="1"
+													class="w-20"
+													bind:value={visiblePage}
+												/>
+											</div>
+											<div class="flex flex-col gap-1">
+												<span id="visible-corner" class="text-xs font-medium">{t.visibleCorner}</span>
+												<div
+													class="grid grid-cols-2 gap-1"
+													role="group"
+													aria-labelledby="visible-corner"
+												>
+													{#each SIGNATURE_CORNERS as corner (corner)}
+														<Button
+															variant={visibleCorner === corner ? 'default' : 'outline'}
+															size="sm"
+															aria-pressed={visibleCorner === corner}
+															onclick={() => (visibleCorner = corner)}
+														>
+															{t.visibleCorners[corner]}
+														</Button>
+													{/each}
+												</div>
+											</div>
+										</div>
+									{/if}
+								</fieldset>
+							{/if}
+
+							{#if format === 'cades'}
+								<!-- Trusted timestamp (#43): collapsed until asked for — one click opens it. -->
+								<details class="group flex flex-col gap-2 rounded-lg border p-3">
+									<summary class="flex cursor-pointer list-none items-center justify-between text-sm font-medium select-none [&::-webkit-details-marker]:hidden">
+										{t.timeStampTitle}
+										<ChevronDownIcon
+											class="text-muted-foreground size-4 transition-transform group-open:rotate-180"
+											aria-hidden="true"
+										/>
+									</summary>
+									<div class="flex flex-col gap-2">
+										<Input
+											id="tsa-url"
+											type="url"
+											placeholder={t.timeStampPlaceholder}
+											bind:value={tsaUrl}
+											autocomplete="off"
+											spellcheck={false}
+										/>
+										<p class="text-muted-foreground text-xs">{t.timeStampHint}</p>
+									</div>
+								</details>
+							{/if}
+
+							<div class="flex items-center justify-between gap-3 border-t pt-4">
+								<Button variant="outline" onclick={() => (step = 1)}>
+									<ArrowLeftIcon class="size-4" aria-hidden="true" />
+									{t.back}
+								</Button>
+								<Button disabled={files.length === 0} onclick={startBatch}>
+									<PenLineIcon class="size-4" aria-hidden="true" />
+									{t.signButton}
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				{:else}
+					<!-- Step 3: progress and downloads. The run started on the Firmar click. -->
+					<Card>
+						<CardHeader>
+							<h2 class="font-display text-xl font-semibold">{t.stepDownload}</h2>
+						</CardHeader>
+						<CardContent class="flex flex-col gap-4">
+							<BatchQueue copy={t} {queue} />
+							{#if files.length > 0}
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>{t.colFile}</TableHead>
+											<TableHead class="text-right">{t.colActions}</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{#each files as file, index (index)}
+											<FileCard
+												copy={t}
+												file={toSelectedFile(file)}
+												document={batch.documents[index] ?? null}
+												removable={false}
+												onremove={() => {}}
+											/>
+										{/each}
+									</TableBody>
+								</Table>
+							{/if}
+
+							<div class="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+								<Button
+									variant="outline"
+									disabled={batch.phase === 'running'}
+									onclick={() => (step = 2)}
+								>
+									<ArrowLeftIcon class="size-4" aria-hidden="true" />
+									{t.back}
+								</Button>
+								<div class="flex flex-wrap items-center gap-2">
+									<Button variant="outline" disabled={signedCount === 0} onclick={downloadZip}>
+										<DownloadIcon class="size-4" aria-hidden="true" />
+										{t.queueDownload}
+									</Button>
+									<Button
+										disabled={batch.phase === 'running'}
+										onclick={() => {
+											files = [];
+											step = 2;
+										}}
+									>
+										<PlusIcon class="size-4" aria-hidden="true" />
+										{t.newBatch}
+									</Button>
+								</div>
+							</div>
+						</CardContent>
+					</Card>
+				{/if}
+			</div>
 		</main>
-
-		<footer
-			class="text-muted-foreground flex items-center justify-between gap-4 border-t pt-3 text-sm"
-		>
-			<p class="truncate">{t.privacyNote}</p>
-			<div class="max-sm:hidden opacity-60">{@render seal(28)}</div>
-		</footer>
 	</div>
+
+	{#if dragging}
+		<!-- Whole-screen target: the page takes any file dropped anywhere while step 2 is open. -->
+		<div
+			role="status"
+			aria-live="polite"
+			class="bg-background/60 border-primary fixed inset-0 z-50 flex items-center justify-center border-4 border-dashed backdrop-blur-sm"
+		>
+			<p class="text-primary font-display text-2xl font-semibold">{t.dropOverlay}</p>
+		</div>
+	{/if}
 
 	<Dialog bind:open={settingsOpen}>
 		<DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-lg">

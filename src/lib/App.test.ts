@@ -166,28 +166,67 @@ describe('App (sign workflow shell)', () => {
 		expect(localStorage.getItem('autofirme-theme')).toBe('system');
 	});
 
-	it('opens on the tab ?tab= names and mirrors the choice back into the URL', async () => {
-		history.replaceState(null, '', '/?tab=verificar');
-		try {
-			const { container } = render(App);
-			expect(screen.getByRole('tab', { name: 'Verificar' }).getAttribute('aria-selected')).toBe('true');
-			expect(container.querySelector('#panel-verify')).not.toBeNull();
+	it('step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button', async () => {
+		const { container } = render(App);
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 
-			// Switching tabs mirrors the param, so the address bar stays linkable.
-			await fireEvent.click(screen.getByRole('tab', { name: 'Firmar' }));
-			expect(new URLSearchParams(location.search).get('tab')).toBe('firmar');
-		} finally {
-			history.replaceState(null, '', '/');
-		}
+		expect(container.textContent).toContain('Arrastra aquí los ficheros');
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
+		// With a file in place the big zone is gone; the row-sized add tile stays first in the list.
+		expect(container.querySelector('[data-slot="card"][class*="min-h-44"]')).toBeNull();
+		expect(container.querySelector('tbody tr')?.textContent).toContain('Seleccionar ficheros');
+		expect(container.querySelector('thead')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Descargar' })).toBeNull();
+		expect(screen.getByRole('button', { name: 'Quitar' }).querySelector('svg')).not.toBeNull();
+	});
 
-		// The English spelling is accepted too.
-		history.replaceState(null, '', '/?tab=verify');
-		try {
-			const { container } = render(App);
-			expect(container.querySelector('#panel-verify')).not.toBeNull();
-		} finally {
-			history.replaceState(null, '', '/');
-		}
+	it('step 2: a file dragged over the page raises the full-screen drop overlay until it leaves', async () => {
+		const { container } = render(App);
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+		const dragEvent = (type: string) => {
+			const event = new Event(type, { bubbles: true, cancelable: true });
+			Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files: [] } });
+			return event;
+		};
+		window.dispatchEvent(dragEvent('dragenter'));
+		await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Suelta los ficheros aquí'), ASYNC);
+		window.dispatchEvent(dragEvent('dragleave'));
+		await waitFor(() => expect(screen.queryByRole('status')).toBeNull(), ASYNC);
+	});
+
+	it('step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content', async () => {
+		const { container } = render(App);
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
+
+		const list = container.querySelector('.overflow-x-hidden.overflow-y-auto') as HTMLElement;
+		expect(list.className).toContain('overflow-x-hidden');
+		// jsdom has no layout: give the list a 300px viewport over 600px of content, scrolled to the start.
+		Object.defineProperties(list, {
+			scrollWidth: { value: 600, configurable: true },
+			clientWidth: { value: 300, configurable: true },
+			scrollLeft: { value: 0, writable: true, configurable: true }
+		});
+		await fireEvent.scroll(list);
+		await waitFor(() => expect(container.querySelector('.from-background.bg-gradient-to-l')).not.toBeNull(), ASYNC);
+		expect(container.querySelector('.from-background.bg-gradient-to-r')).toBeNull();
+
+		// Scrolled to the far end: only the left fade remains.
+		Object.defineProperty(list, 'scrollLeft', { value: 300, configurable: true });
+		await fireEvent.scroll(list);
+		await waitFor(() => expect(container.querySelector('.from-background.bg-gradient-to-r')).not.toBeNull(), ASYNC);
+		expect(container.querySelector('.from-background.bg-gradient-to-l')).toBeNull();
 	});
 
 	it('loads a PKCS#12 file and enables the next step with the certificate it holds', async () => {
@@ -489,84 +528,6 @@ describe('App (sign workflow shell)', () => {
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
 	});
 
-});
-
-describe('verify mode', () => {
-	it('renders a per-check validity report for a dropped artifact', async () => {
-		const { container } = render(App);
-		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
-
-		expect(container.textContent).toContain('Arrastra aquí el fichero firmado');
-
-		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/cades-tampered.csig'));
-		await fireEvent.change(fileInput(container), {
-			target: { files: [new File([bytes], 'firma.csig')] }
-		});
-
-		await screen.findByText(/no supera todas las comprobaciones/, {}, ASYNC);
-		expect(container.querySelector('[data-check="contentDigest"]')?.getAttribute('data-status')).toBe('fail');
-		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
-		expect(container.textContent).toContain('Firmante');
-	});
-
-	it('verifies a signed PDF as PAdES, check by check', async () => {
-		const { container } = render(App);
-		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
-
-		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/pades-b-b-signed.pdf'));
-		await fireEvent.change(fileInput(container), {
-			target: { files: [new File([bytes], 'contrato.pdf')] }
-		});
-
-		await screen.findByText(/comprobaciones/, {}, ASYNC);
-		expect(container.textContent).toContain('PAdES');
-		expect(container.querySelector('[data-check="contentDigest"]')?.getAttribute('data-status')).toBe('pass');
-		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
-		// The test signer is self-signed and outside the bundled roots: red banner, right reason.
-		expect(container.querySelector('[data-check="certChain"]')?.getAttribute('data-status')).toBe('fail');
-		expect(container.textContent).toContain('Test Signer RSA');
-	});
-
-	it('shows one signature at a time, closed by a button at the bottom', async () => {
-		const { container } = render(App);
-		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
-
-		// One file per pick: in this mode the chooser is single-select.
-		const drop = container.querySelector<HTMLInputElement>('input[type=file]');
-		expect(drop?.multiple).toBe(false);
-		expect(container.textContent).toContain('Comprueba una firma');
-
-		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/cades-tampered.csig'));
-		await fireEvent.change(fileInput(container), {
-			target: { files: [new File([bytes], 'firma.csig')] }
-		});
-		await screen.findByText(/no supera todas las comprobaciones/, {}, ASYNC);
-
-		// The step-1 card steps aside while a signature is loaded; Cerrar is the way out.
-		expect(container.textContent).not.toContain('Comprueba una firma');
-		expect(screen.getByRole('button', { name: 'Cerrar' })).toBeTruthy();
-
-		await fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
-		expect(container.textContent).toContain('Comprueba una firma');
-		expect(screen.queryByText(/no supera todas las comprobaciones/)).toBeNull();
-		expect(screen.queryByRole('button', { name: 'Cerrar' })).toBeNull();
-	});
-
-	it('labels the trust-chain check as failed when the root is not bundled, keeping the rest green', async () => {
-		const { container } = render(App);
-		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
-
-		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/xades-valid.xsig'));
-		await fireEvent.change(fileInput(container), {
-			target: { files: [new File([bytes], 'firma.xsig')] }
-		});
-
-		await screen.findByText(/no supera todas las comprobaciones/, {}, ASYNC);
-		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
-		expect(container.querySelector('[data-check="reference"]')?.getAttribute('data-status')).toBe('pass');
-		expect(container.querySelector('[data-check="certChain"]')?.getAttribute('data-status')).toBe('fail');
-		expect(container.textContent).toContain('XAdES');
-	});
 });
 
 describe('MCP endpoint settings', () => {

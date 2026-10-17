@@ -320,7 +320,7 @@
 {#snippet identityContent()}
 	{#if !persistent}
 		<!-- No usable database: say it, and let the user throw the broken one away. -->
-		<div class="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+		<div class="flex flex-col gap-2 rounded-lg bg-amber-500/5 p-3">
 			<p class="text-sm text-amber-700 dark:text-amber-400" role="alert">{copy.storeEphemeral}</p>
 			<Button variant="outline" size="sm" class="self-start" onclick={() => vault.reset()}
 				>{copy.storeReset}</Button
@@ -336,7 +336,7 @@
 	{#if openId}
 		{@const target = identities.find((entry) => entry.id === openId)}
 		<!-- One signature clicked: ask for its PIN alone, then select it and get out of the way. -->
-		<div class="flex flex-col gap-3 rounded-lg border p-3">
+		<div class="bg-muted/40 flex flex-col gap-3 rounded-lg p-3">
 			<div class="flex items-center gap-2">
 				<FileIcon class="text-muted-foreground size-5 shrink-0" />
 				<span class="min-w-0">
@@ -376,7 +376,7 @@
 	<div class={cn("grid max-h-80 gap-3 overflow-y-auto pr-1", compact ? "max-h-52 grid-cols-1 gap-2" : "grid-cols-2 sm:grid-cols-4")}>
 		{#if pending}
 			<!-- The sign sitting in memory: first cell, and no button — there is nothing to re-pick. -->
-			<div class="relative rounded-lg border">
+			<div class="bg-muted/40 relative rounded-lg">
 				<div class="flex h-full w-full flex-col gap-1 p-3 text-left text-xs">
 					<FileIcon class="text-muted-foreground size-5" />
 					<span class="w-full truncate font-medium">{file?.name}</span>
@@ -385,7 +385,7 @@
 		{/if}
 
 		{#each visibleIdentities as identity (identity.id)}
-			<div class="relative rounded-lg border">
+			<div class="bg-muted/40 relative rounded-lg">
 				<Button
 					variant="ghost"
 					size="icon"
@@ -399,7 +399,7 @@
 					type="button"
 					class={cn(
 						'hover:bg-accent/50 flex h-full w-full flex-col gap-1 rounded-lg p-3 text-left text-xs transition-colors',
-						identity.id === usedId && 'border-primary/60 border'
+						identity.id === usedId && 'bg-brand-soft'
 					)}
 					aria-expanded={openId === identity.id}
 					onclick={() => select(identity)}
@@ -429,7 +429,7 @@
 		{#if !compact}
 		<button
 			type="button"
-			class="hover:border-primary/50 hover:text-foreground text-muted-foreground flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-xs transition-colors"
+			class="bg-muted/40 hover:bg-muted hover:text-foreground text-muted-foreground flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg p-3 text-xs transition-colors"
 			onclick={() => fileInput?.click()}
 		>
 			<PlusIcon class="size-5" />
@@ -440,7 +440,7 @@
 
 	{#if pending}
 		<!-- File added from the modal and not sealed yet: its PIN opens it and stores it at once. -->
-		<div class="flex flex-wrap items-end gap-2 rounded-lg border p-3">
+		<div class="bg-muted/40 flex flex-wrap items-end gap-2 rounded-lg p-3">
 			<label class="flex min-w-40 flex-1 flex-col gap-1 text-xs" for="add-pin">
 				{copy.storePin}
 				<Input
