@@ -98,15 +98,23 @@ pnpm build:extension      # extensión en dist/extension
 pnpm check:extension      # comprobaciones del artefacto
 pnpm package:extension    # ZIP + SHA256SUMS
 pnpm test:extension:browser   # flujo real en Chromium con openssl cms -verify
+pnpm demo:registradores        # prueba en la web real de los registradores (Playwright)
 ```
 
 ## Pruebas y evidencia
 
 304 pruebas automatizadas (235 vitest, 43 de puente web, 18 de artefactos, 8 de flujo de publicación).
 Toda la cripto se contrasta con herramientas independientes: `openssl cms -verify`, `openssl ts`,
-`pdfsig`, `qpdf`, `unzip -t` y recomputación de resumenes en Python. Comprobaciones que aún requieren
-manual: diálogos nativos de instalación de Chrome, Windows/macOS físicos, TSA pública real y una
-transacción administrativa con certificado personal (`CHROME-EXTENSION-VERIFICATION.md` §5).
+`pdfsig`, `qpdf`, `unzip -t` y recomputación de resumenes en Python. Además, la extensión se probó
+contra la página de pruebas del Colegio de Registradores
+(<https://www.registradores.org/test-autofirma>): firma CAdES verificada con OpenSSL en los tres
+tipos de contenido que la página genera, y paso directo al AutoFirma de escritorio en PAdES/XAdES/AUTO
+(`CHROME-EXTENSION-VERIFICATION.md` §4.1). Esa prueba se puede repetir con
+`pnpm demo:registradores` ([`../demo/README.md`](../demo/README.md)): carga la extensión compilada en
+Chrome, firma documentos reales en la web y verifica cada firma con OpenSSL. Comprobaciones que aún
+requieren manual: diálogos nativos de instalación de Chrome, Windows/macOS físicos, TSA pública real
+y una transacción administrativa con certificado personal
+(`CHROME-EXTENSION-VERIFICATION.md` §5).
 
 ## Dónde mirar
 
@@ -120,3 +128,4 @@ transacción administrativa con certificado personal (`CHROME-EXTENSION-VERIFICA
 | [`architecture.md`](architecture.md) | mapa del núcleo Java que este proyecto reemplaza |
 | [`MCP-DESIGN.md`](MCP-DESIGN.md) | servidor MCP: motor bajo Node, transporte, modelo de amenaza |
 | [`REVERSING-NOTES.md`](REVERSING-NOTES.md) | procedencia del estudio de los instaladores 1.9 |
+| [`../demo/README.md`](../demo/README.md) | pruebas en webs reales con la extensión y OpenSSL |

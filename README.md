@@ -86,6 +86,22 @@ pnpm verify:zip   # cross-check a batch ZIP with unzip -t and sha256sum
 bash scripts/smoke-real.sh   # real expired-cert smoke test (skips without work/certs/*.p12)
 ```
 
+## Live website demo (extension)
+
+`demo/` drives the built extension against a real administration page in Chrome, signs real
+documents there and verifies every signature with OpenSSL:
+
+```bash
+pnpm build:extension
+pnpm demo:chromium           # one-time browser download
+pnpm demo:registradores     # --headed to watch the chooser windows
+```
+
+It signs each CAdES target the Colegio de Registradores' test page offers, checks that the digest
+the chooser shows matches an independent SHA-256 of the payload, and checks cancelling, fallback,
+concurrent requests, pass-through of the formats the extension does not claim, and Site access.
+See [`demo/README.md`](demo/README.md).
+
 ## Verify flow (issue #8)
 
 `Verificar` mode drops a `/.csig` (CAdES), `/.xsig` (XAdES) or PDF and reports one card per check,

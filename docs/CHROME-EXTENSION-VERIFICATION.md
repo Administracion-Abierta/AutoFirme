@@ -108,6 +108,53 @@ check cancelled the chooser without signing or launching desktop AutoFirma.
 The user also confirmed capture after enabling and reloading the site in 0.1.0;
 the install-time wildcard grant covers that site without any further authorization.
 
+## 4.1 Colegio de Registradores test page
+
+Recorded for extension 0.1.2 on 2026-10-17 against
+<https://www.registradores.org/test-autofirma>, the Colegio de Registradores'
+own AutoFirma test page, and reproducible with `pnpm demo:registradores`
+(see [`demo/README.md`](../demo/README.md)), which runs the same checks through
+Playwright against Chrome for Testing 156 and the unpacked `dist/extension`
+build, then verifies every signature with OpenSSL. A disposable profile and a
+freshly generated OpenSSL PKCS#12 identity are used per run. The page calls
+`AutoScript.sign(dataB64, "SHA256withRSA", format, "mode=explicit", ok, error)`
+and offers four formats (AUTO, CAdES, PAdES, XAdES) over four targets
+(Archivo, Datos generados, Documento PDF, Formulario).
+
+### Signed results
+
+| Target | Format | Intercepted | Outcome |
+|---|---|---|---|
+| Datos generados | CAdES | yes | Signed. `openssl cms -verify -cades` recovered the 81,918-byte generated payload byte-identically |
+| Documento PDF | CAdES | yes | Signed. OpenSSL verified the detached CAdES over the site's exact 9,979-byte PDF |
+| Formulario | CAdES | yes | Signed. OpenSSL verified over `fNif=…&fNombre=…` as the page serialized it |
+| Direct `mode=implicit` call | CAdES | yes | Signed. OpenSSL extracted the embedded content `Hello AutoFirme Web test signature` |
+| `AutoScript.selectCertificate(null, ok, error)` | — | yes | Chooser titled "Solicitud de certificado"; the page callback received the public certificate in DER |
+| Datos generados / PDF | XAdES | no | Passed through to the original AutoFirma, which reported "No se ha podido conectar con AutoFirma." (no desktop app installed) |
+| Datos generados / PDF | PAdES | no | Same pass-through and same site error |
+| Datos generados / PDF | AUTO | no | Same pass-through and same site error |
+| Any | Archivo | no call | The page never calls `AutoScript.sign`: its handler leaves `dataB64` null for this target, so nothing is requested (a page-side no-op, not an extension limit) |
+
+CAdES is the only format the website bridge intercepts, matching the documented
+contract; PAdES and XAdES requests fall through to the site's original desktop
+integration unchanged, which is the intended behaviour.
+
+### Other checks on the same page
+
+| Check | Result |
+|---|---|
+| Request details disclosure | Shows `CAdES · SHA-256 · explicit`, the SHA-256 digest, and the consent notice. The displayed digest matches an independent SHA-256 of the payload byte-for-byte |
+| Cancelar | Site error callback received `AOCancelledOperationException` / "Operation cancelled"; no signature field value |
+| Continuar con AutoFirma | The original call resumed exactly once ("No se ha podido conectar con AutoFirma."), never the extension |
+| Two concurrent CAdES requests | Two independent choosers; signing each produced a signature that verified against its own payload, so no cross-talk |
+| Site disabled through Site access | After disabling `https://www.registradores.org` and reloading, the CAdES request no longer opened a chooser and ran the original integration |
+| Site re-enabled | Interception resumed on the next page load without reinstalling the extension |
+
+The test certificate is self-issued and not an FNMT trust anchor, and the
+identity lives only in the disposable browser profile, so no legal signature was
+produced. The XAdES/PAdES rows show the extension declining work it does not
+support, not that those formats work.
+
 ## 5. Remaining manual checks
 
 | Check | Limit of the current evidence |
@@ -118,6 +165,8 @@ the install-time wildcard grant covers that site without any further authorizati
 | MV3 worker process termination/restart | Chrome API fakes cover worker loss; the browser test does not kill the worker |
 | Live public TSA | Permission tests and timestamp oracles pass; no live TSA was used in the extension browser test |
 | Administration signing transaction | DGSFP capture was checked; no personal certificate or legally binding signature was submitted |
+| Registradores page with desktop AutoFirma installed | Pass-through for PAdES/XAdES/AUTO was observed reaching the original integration and failing only because desktop AutoFirma is absent on this Linux host |
+| The page's "Archivo" target | Not exercised end-to-end: the page issues no signing call for it, so no signature was produced or verified |
 
 After an update, reload the extension and already-open websites. Site access starts
 enabled everywhere; disable the origins you do not want intercepted. No external

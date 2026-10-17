@@ -22,7 +22,9 @@
     "test:extension:browser": "node scripts/test-extension-browser.mjs",
     "test:extension:artifacts": "node --test scripts/check-extension.test.mjs",
     "package:extension": "python3 scripts/package-extension.py",
-    "check:versions": "node scripts/check-versions.mjs"
+    "check:versions": "node scripts/check-versions.mjs",
+    "demo:chromium": "playwright install chromium",
+    "demo:registradores": "node demo/registradores.mjs"
   },
   "devDependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",
@@ -39,6 +41,7 @@
     "clsx": "^2.1.1",
     "jsdom": "^30.1.2",
     "mode-watcher": "^1.1.0",
+    "playwright": "^1.64.1",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.6",
     "svelte-sonner": "^1.2.1",

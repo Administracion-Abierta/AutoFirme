@@ -130,6 +130,7 @@ pnpm test:extension:artifacts
 pnpm test:extension:browser
 pnpm package:extension
 bash test/fixtures/verify-fixtures.sh
+pnpm demo:registradores          # live website run, see demo/README.md
 ```
 
 `pnpm check` runs two TypeScript projects: the app (`tsconfig.json` over
@@ -160,5 +161,8 @@ re-enabled. Chrome's actual installation prompts and desktop AutoFirma launch ne
 separate manual checks.
 
 See the [verification record](CHROME-EXTENSION-VERIFICATION.md) for executed checks
-and remaining manual/environment-specific checks. `pnpm package:extension` packages
-the existing verified build; rebuild first after making source changes.
+and remaining manual/environment-specific checks, including the full target and
+format matrix run against the Colegio de Registradores' own test page
+(<https://www.registradores.org/test-autofirma>) in §4.1.
+`pnpm package:extension` packages the existing verified build; rebuild first after
+making source changes.
