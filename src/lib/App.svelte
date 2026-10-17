@@ -74,6 +74,14 @@
 	import UploadIcon from '@lucide/svelte/icons/upload';
 	import { onMount, type Snippet } from 'svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import {
+		buildDeepLinkReturn,
+		encodeBase64,
+		parseDeepLink,
+		takeShare,
+		type DeepLinkRequest,
+		type DeepLinkResult
+	} from '#lib/pwa-entry';
 
 	let { extensionSettings }: { extensionSettings?: Snippet<[Lang]> } = $props();
 	let lang = $state<Lang>('es');
@@ -111,7 +119,68 @@
 	onMount(() => {
 		theme = readTheme();
 		mcp = readMcp();
+		void consumeEntry();
 	});
+
+	/** PWA sign entry (#47): share_target, file_handlers, shortcut, portal deep-link. */
+	let deepLink = $state<DeepLinkRequest | null>(null);
+	let deepLinkError = $state('');
+	let entryNotice = $state('');
+	let returned = $state<DeepLinkResult | null>(null);
+
+	/** One-shot intake: preload files/data, never sign without explicit user confirm. */
+	async function consumeEntry(): Promise<void> {
+		if (typeof location === 'undefined') return;
+		const params = new URLSearchParams(location.search);
+		const nonce = params.get('share');
+		const parsed = parseDeepLink(location.search);
+		if (parsed && 'error' in parsed) deepLinkError = parsed.error;
+		if (parsed && 'request' in parsed) {
+			deepLink = parsed.request;
+			format = parsed.request.format;
+			files = [new File([parsed.request.bytes.slice()], parsed.request.name)];
+		}
+		if (nonce) {
+			try {
+				const shared = await takeShare(nonce);
+				const textFile =
+					shared.text.length > 0 ? [new File([shared.text], 'compartido.txt', { type: 'text/plain' })] : [];
+				const picked = [...shared.files, ...textFile];
+				if (picked.length > 0) {
+					files = [...files, ...picked];
+					const pdf = picked.find((file) => file.type === 'application/pdf' || file.name.endsWith('.pdf'));
+					if (pdf) format = 'pades';
+					entryNotice = 'shared';
+				}
+			} catch {
+				// Stash unreadable (private mode, cleared storage): fall through to manual pick.
+			}
+		}
+	// `launchQueue` (file_handlers): the OS opens a file with the installed app.
+	const launcher = (
+		window as Window & { launchQueue?: { setConsumer: (fn: (p: { files: File[] }) => void) => void } }
+	).launchQueue;
+	launcher?.setConsumer((launch) => {
+		if (launch.files.length > 0) {
+			files = [...files, ...launch.files];
+			step = 2;
+		}
+	});
+		// Entry links land on step 2 with files preloaded; plain visits stay on step 1.
+		if (files.length > 0) step = 2;
+		if (params.has('entry') || params.has('shared') || (parsed && 'request' in parsed)) {
+			history.replaceState(null, '', location.pathname);
+		}
+	}
+
+	/**
+	 * Hand the signed result back to the portal. Fires only on explicit click, shows the
+	 * destination first, and navigates in the same tab so the user sees where they go.
+	 */
+	function returnToPortal(): void {
+		if (!deepLink?.returnUrl || !returned) return;
+		location.href = buildDeepLinkReturn(deepLink.returnUrl, returned);
+	}
 	$effect(() => applyTheme(theme));
 	const THEMES = $derived([
 		{ id: 'light' as const, label: t.themeLight, icon: SunIcon },
@@ -449,6 +518,21 @@
 						<h2 class="font-display text-xl font-semibold">{t.step2Title}</h2>
 						</CardHeader>
 						<CardContent class="flex flex-col gap-4">
+							{#if deepLinkError || entryNotice === 'shared' || deepLink}
+								<!-- PWA entry: what preloaded this batch and where it returns. -->
+								<div class="rounded-lg border p-3 text-sm" role="status">
+									{#if deepLinkError}
+										<p class="text-destructive">{t.entryError}: {deepLinkError}</p>
+									{:else if deepLink}
+										<p>{t.entryPortal}: <span class="font-medium">{deepLink.name}</span> · {deepLink.format}</p>
+										{#if deepLink.returnUrl}
+											<p class="text-muted-foreground mt-1 text-xs">{t.entryReturn}: {deepLink.returnUrl}</p>
+										{/if}
+									{:else}
+										<p>{t.entryShared}</p>
+									{/if}
+								</div>
+							{/if}
 							<fieldset class="flex w-full min-w-0 flex-col gap-2">
 								<legend class="text-sm font-medium">{t.formatTitle}</legend>
 								<Button
@@ -643,6 +727,35 @@
 							<h2 class="font-display text-xl font-semibold">{t.stepDownload}</h2>
 						</CardHeader>
 						<CardContent class="flex flex-col gap-4">
+							{#if deepLink?.returnUrl}
+								{@const doc = batch.documents.find((entry) => entry.status === 'signed' && entry.bytes)}
+								<!-- Portal hand-back: explicit click only, destination shown first. -->
+								<div class="rounded-lg border p-3 text-sm" role="status">
+									{#if doc?.bytes}
+										{@const result = {
+											format: doc.format,
+											signatureB64: encodeBase64(doc.bytes),
+											algorithm: doc.algorithm,
+											sha256: doc.sha256
+										}}
+										{@const href = buildDeepLinkReturn(deepLink.returnUrl, result)}
+										<p>{t.entryReturnReady}</p>
+										<p class="text-muted-foreground mt-1 break-all text-xs">{href}</p>
+										<div class="mt-2">
+											<Button
+												onclick={() => {
+													returned = result;
+													returnToPortal();
+												}}
+											>
+												{t.entryReturnButton}
+											</Button>
+										</div>
+									{:else}
+										<p class="text-muted-foreground">{t.entryReturnWait}</p>
+									{/if}
+								</div>
+							{/if}
 							<BatchQueue copy={t} {queue} />
 							{#if files.length > 0}
 								<Table>

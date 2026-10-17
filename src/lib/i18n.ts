@@ -88,6 +88,13 @@ export interface Copy {
 	queueArchive: string;
 	downloadOne: string;
 	modeSign: string;
+	entryShared: string;
+	entryPortal: string;
+	entryError: string;
+	entryReturn: string;
+	entryReturnWait: string;
+	entryReturnReady: string;
+	entryReturnButton: string;
 	checkLabels: Record<CheckId, string>;
 	storeTitle: string;
 	storeHint: string;
@@ -212,6 +219,13 @@ export const copy: Record<Lang, Copy> = {
 		queueDownload: 'Descargar ZIP',
 		queueArchive: 'firmas-lote.zip',
 		downloadOne: 'Descargar',
+		entryShared: 'Ficheros recibidos para firmar: revisa, elige certificado y confirma.',
+		entryPortal: 'Solicitud de firma recibida',
+		entryError: 'Solicitud de firma no válida',
+		entryReturn: 'Devolver a',
+		entryReturnWait: 'Tras firmar, podrás devolver el resultado al portal.',
+		entryReturnReady: 'Firma lista. Revísala y devuélvela al portal con el botón.',
+		entryReturnButton: 'Devolver al portal',
 		modeSign: 'Firmar',
 		checkLabels: {
 			structure: 'Estructura de la firma',
@@ -349,6 +363,13 @@ export const copy: Record<Lang, Copy> = {
 		queueDownload: 'Download ZIP',
 		queueArchive: 'signed-batch.zip',
 		downloadOne: 'Download',
+		entryShared: 'Files received for signing: review, pick a certificate and confirm.',
+		entryPortal: 'Signature request received',
+		entryError: 'Invalid signature request',
+		entryReturn: 'Return to',
+		entryReturnWait: 'After signing, you can hand the result back to the portal.',
+		entryReturnReady: 'Signature ready. Review it and hand it back to the portal.',
+		entryReturnButton: 'Return to portal',
 		modeSign: 'Sign',
 		checkLabels: {
 			structure: 'Signature structure',
