@@ -171,7 +171,7 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 | Operation | 1.9 evidence | Meaning | Our status |
 |---|---|---|---|
 | `afirma://sign`, `cosign`, `countersign` | `standalone/protocol/ProtocolInvocationLauncher.java:372`; `core/misc/protocol/UrlParametersToSignAndSave.java:25,31` (`cop`, `format`, `algorithm`, …) | a web form hands a document (or a URL/fileId) to AutoFirma, gets the signature back | `N/A-BROWSER` — the SPA **is** the signer; drop the document, sign locally |
-| `…/signandsave` + storage servlet | `standalone/protocol/ProtocolInvocationLauncher.java:306`; `UrlParametersToSave`, `UrlParameters.STORAGE_SERVLET_PARAM` | AutoFirma POSTs the result back to the calling server | `MISSING` by design (static, no backend) — a caller-side download is the equivalent (`src/lib/components/DownloadsDialog.svelte`) |
+| `…/signandsave` + storage servlet | `standalone/protocol/ProtocolInvocationLauncher.java:306`; `UrlParametersToSave`, `UrlParameters.STORAGE_SERVLET_PARAM` | AutoFirma POSTs the result back to the calling server | `MISSING` by design (static, no backend) — a caller-side download is the equivalent (per-row `Descargar`, batch ZIP) |
 | `…/load`, `…/save` | `standalone/protocol/ProtocolInvocationLauncher.java:437,251` | pass a file in/out of the local disk | `N/A-BROWSER` (File System Access API / downloads instead) |
 | `…/selectcert` | `standalone/protocol/ProtocolInvocationLauncher.java:203` | a page asks the user to choose a certificate | `N/A-BROWSER` (`src/lib/components/CertPicker.svelte`) |
 | `…/batch` | `standalone/protocol/ProtocolInvocationLauncher.java:151` | JSON batch queue handed to AutoFirma | `N/A-BROWSER` (our local queue, #9) |
@@ -190,7 +190,7 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 | Help window, About dialog, version | `SimpleAfirma.showHelp`, `standalone/ui/AboutDialog.java` | `MISSING` | P2 |
 | Update check / updater | `standalone/updater/Updater.java:20`; pref `PREFERENCE_GENERAL_UPDATECHECK` | `N/A-BROWSER` (static hosting) | — |
 | Proxy configuration | `standalone/ProxyUtil.java`, `standalone/ProxyConfig.java`, `standalone/ui/preferences/ProxyPanel.java:22` | `N/A-BROWSER` (the browser proxies) | — |
-| Diagnostic data window, debug logging (`afirma_debug`, `-Dafirma_debug_level`) | `standalone/ui/DataDebugDialog.java`; `SimpleAfirma.configureLog` | `PARTIAL` (`DownloadsDialog`, technical reasons in the verify report) | P2 |
+| Diagnostic data window, debug logging (`afirma_debug`, `-Dafirma_debug_level`) | `standalone/ui/DataDebugDialog.java`; `SimpleAfirma.configureLog` | `PARTIAL` (technical reasons in the verify report) | P2 |
 | VDI/low-resource optimisation, HiDPI | pref `PREFERENCE_GENERAL_VDI_OPTIMIZATION`; `standalone/ui/ScalablePane.java`, `LookAndFeelManager` | `N/A-BROWSER` | — |
 | macOS/Windows/Linux OS integration (dock icon, `OSXHandler`, ask-on-close) | `standalone/ui/OSXHandler.java`; pref `PREFERENCE_GENERAL_OMIT_ASKONCLOSE` | `OUT-OF-SCOPE` | — |
 | Sign-file data types shown in the UI (icons per type, `FileType`) | `standalone/ui/FileIconProvider.java`, `standalone/ui/FileType.java` | `DONE` (`src/lib/components/FileCard.svelte`) | — |

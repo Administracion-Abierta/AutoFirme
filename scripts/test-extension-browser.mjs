@@ -65,7 +65,7 @@ try {
   main = await open(appURL); mainSession=main.session;
   await cdp.wait(main.session, `document.querySelector('h1')?.textContent.includes('AutoFirma')`);
   assert.equal(await cdp.evaluate(main.session, 'location.protocol'), 'chrome-extension:');
-  assert.ok(await cdp.evaluate(main.session, "document.body.textContent.includes('CAdES')"));
+  assert.ok(await cdp.evaluate(main.session, "document.body.textContent.includes('Configura la firma')"));
   const click = (session, selector) => cdp.evaluate(session, `document.querySelector(${JSON.stringify(selector)}).click()`);
   const set = (session, selector, value) => cdp.evaluate(session, `(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.value=${JSON.stringify(value)};el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const enter = (session, selector) => cdp.evaluate(session, `document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
@@ -92,6 +92,11 @@ try {
     assert.ok(node.nodeId, `missing file input ${selector}`);
     await cdp.send('DOM.setFileInputFiles',{nodeId:node.nodeId,files},session);
   }
+  // Two steps now: certificate on step 1, then the documents card that holds the format chooser.
+  // The Next button carries no aria-describedby once a certificate is picked; match its text.
+  await cdp.wait(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Siguiente')?.disabled===false`);
+  await cdp.evaluate(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Siguiente').click()`);
+  await cdp.wait(main.session, "Boolean(document.querySelector('#panel-sign fieldset button[aria-haspopup=dialog]'))");
   await cdp.evaluate(main.session, `[...document.querySelectorAll('button[aria-haspopup=dialog]')].find(b=>b.textContent.includes('CAdES-BES')).click()`);
   await cdp.wait(main.session, 'Boolean(document.querySelector("input[name=format][value=pades]"))');
   await click(main.session,'input[name=format][value=pades]');
@@ -101,14 +106,23 @@ try {
   const source=resolve('test/fixtures/pades-source.pdf'), second=join(directory,'second.pdf');
   await cp(source,second);
   await upload(main.session,'#panel-sign input[type=file][multiple]',[source,second]);
-  await cdp.wait(main.session, 'document.querySelector("button[aria-describedby=sign-hint]")?.disabled===false');
-  await click(main.session,'button[aria-describedby=sign-hint]');
-  const outputQuery=`new Promise((resolve,reject)=>{const open=indexedDB.open('autofirme-web',2);open.onerror=()=>reject(Error('test output DB unavailable'));open.onsuccess=()=>{const db=open.result;const tx=db.transaction('outputs');const q=tx.objectStore('outputs').getAll();q.onsuccess=()=>{const rows=q.result;db.close();resolve(rows.map(r=>({name:r.value.name,bytes:Array.from(r.value.bytes)})));};q.onerror=()=>reject(Error('test outputs unavailable'));};})`;
-  await cdp.wait(main.session, `(${outputQuery}).then(rows=>rows.length===2)`);
-  const outputs=await cdp.evaluate(main.session,outputQuery);
+  await cdp.wait(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Firmar')?.disabled===false`);
+  await cdp.evaluate(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Firmar').click()`);
+  await cdp.wait(main.session, `document.querySelector('[aria-live=polite]')?.textContent.includes('2/2')`);
+  // The signed bytes live only in the queue now: pull them from the ZIP the app downloads.
+  await cdp.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:directory});
+  await cdp.evaluate(main.session, `[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Descargar ZIP')).click()`);
+  let archive;
+  for(let i=0;i<100;i++){archive=(await readdir(directory)).find(name=>name.endsWith('.zip'));if(archive)break;await new Promise(r=>setTimeout(r,100));}
+  assert.ok(archive,'batch ZIP download');
+  const zipCheck=spawnSync('unzip',['-t',join(directory,archive)]);assert.equal(zipCheck.status,0,zipCheck.stdout.toString()+zipCheck.stderr.toString());
+  const names=spawnSync('unzip',['-Z1',join(directory,archive)]).stdout.toString().split('\n').filter(Boolean);
+  assert.equal(names.length,3,'ZIP carries both signed documents plus the manifest');
   let producedPDF;
-  for(const record of outputs) {
-    const pdf=Buffer.from(record.bytes), text=pdf.toString('latin1');
+  for(const name of names) {
+    if(name==='manifest.json') continue;
+    const pdf=Buffer.from(spawnSync('unzip',['-p',join(directory,archive),name]).stdout);
+    const text=pdf.toString('latin1');
     const ranges=[...text.matchAll(/\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g)].at(-1);
     assert.ok(ranges,'actual app must generate a PDF signature');
     const [a,b,c,d]=ranges.slice(1).map(Number);
@@ -121,18 +135,12 @@ try {
     openssl(['cms','-verify','-cades','-binary','-inform','DER','-in',sigPath,'-content',contentPath,'-CAfile',fixtureCert,'-purpose','any','-out',join(directory,'pdf-verified')]);
     producedPDF=join(directory,'signed.pdf');await writeFile(producedPDF,pdf);
   }
-  await cdp.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:directory});
-  await cdp.evaluate(main.session, `[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Descargar ZIP')).click()`);
-  let archive;
-  for(let i=0;i<100;i++){archive=(await readdir(directory)).find(name=>name.endsWith('.zip'));if(archive)break;await new Promise(r=>setTimeout(r,100));}
-  assert.ok(archive,'batch ZIP download');
-  const zipCheck=spawnSync('unzip',['-t',join(directory,archive)]);assert.equal(zipCheck.status,0,zipCheck.stdout.toString()+zipCheck.stderr.toString());
   await click(main.session,'[role=tab][aria-controls=panel-verify]');
   await cdp.wait(main.session,'Boolean(document.querySelector("#panel-verify input[type=file]"))');
   await upload(main.session,'#panel-verify input[type=file]',[producedPDF]);
   await cdp.wait(main.session, 'document.querySelector("[data-check=signature]")?.dataset.status==="pass"');
   assert.equal(await cdp.evaluate(main.session,'document.querySelector("[data-check=structure]").dataset.status'),'pass');
-  process.stdout.write('PASS: full app PDF stamps, two-document batch signing, saved outputs, valid ZIP and PDF verification; OpenSSL checks both signatures.\n');
+  process.stdout.write('PASS: full app PDF stamps, two-document batch signing, valid ZIP and PDF verification; OpenSSL checks both signatures.\n');
   // Clean install intercepts every HTTP(S) site: the fixture page gets the bridge
   // immediately and the first sign call opens the chooser.
   const cold = await open(origin);
@@ -148,8 +156,8 @@ try {
   assert.ok(coldChooser,'a clean install must capture the first website call');
   await cdp.send('Target.closeTarget',{targetId:coldChooser.targetId});
   await cdp.wait(cold.session, 'window.fixture.fallbackCalls===0');
-  // The SiteAccess panel is wired: the disable button enables for a typed origin.
-  await click(main.session, '#site-access-open');
+  // The SiteAccess panel lives inside the app's settings dialog now: open it by its label.
+  await click(main.session, "[aria-label='Ajustes y ayuda']");
   await cdp.wait(main.session, 'Boolean(document.querySelector("#site-access-panel"))');
   await set(main.session, '#site-origin', origin);
   await cdp.wait(main.session, "document.querySelector('#disable-site')?.disabled===false");

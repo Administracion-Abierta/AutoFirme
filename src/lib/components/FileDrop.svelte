@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Card, CardContent } from '#lib/components/ui/card/index.js';
+	import FilePlusIcon from '@lucide/svelte/icons/file-plus';
 	import { cn } from '#lib/utils.js';
 	import type { Copy } from '#lib/i18n';
 
@@ -54,35 +55,14 @@
 	}}
 >
 	<CardContent class="flex flex-col items-center gap-3 overflow-hidden px-6 py-12 text-center">
-		<!-- Document-with-plus icon from the operator's reference, drawn in one stroke weight. -->
-		<svg
+		<FilePlusIcon
 			aria-hidden="true"
 			class={cn(
 				'size-12 transition-colors',
 				dragging ? 'text-primary' : 'text-muted-foreground'
 			)}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="1.5"
-		>
-			<path
-				d="M14 3v4a1 1 0 0 0 1 1h4"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			/>
-			<path
-				d="M5 8V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2h-3"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			/>
-			<path d="M9 21H5a2 2 0 0 1-2-2v-4m6 0h.01M12 15h.01M9 18h.01M12 18h.01" stroke-linecap="round" />
-			{#if dragging}
-				<path d="M12 3v6m0 0 2.5-2.5M12 9 9.5 6.5" stroke-linecap="round" stroke-linejoin="round" />
-			{:else}
-				<path d="M12 15v-3m0 0-1.5 1.5M12 12l1.5 1.5" stroke-linecap="round" stroke-linejoin="round" />
-			{/if}
-		</svg>
+			strokeWidth={1.5}
+		/>
 		<p class="text-lg font-medium">
 			{dragging ? copy.dragging : (title ?? copy.dropTitle)}
 			{#if !dragging}

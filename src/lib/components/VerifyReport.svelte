@@ -1,5 +1,10 @@
 <script lang="ts">
 	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.js';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import CircleXIcon from '@lucide/svelte/icons/circle-x';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import InfoIcon from '@lucide/svelte/icons/info';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import type { Copy } from '#lib/i18n';
 	import type { Check, VerificationReport } from '#lib/verify';
 
@@ -17,12 +22,11 @@
 		pdf: 'PAdES',
 		unknown: '?'
 	};
-
-	const styles: Record<Check['status'], { card: string; dot: string }> = {
-		pass: { card: 'border-emerald-600/60 bg-emerald-600/5', dot: 'bg-emerald-600' },
-		warn: { card: 'border-amber-600/60 bg-amber-600/5', dot: 'bg-amber-600' },
-		fail: { card: 'border-destructive/60 bg-destructive/5', dot: 'bg-destructive' },
-		info: { card: 'border-dashed opacity-80', dot: 'bg-muted-foreground' }
+	const styles: Record<Check['status'], string> = {
+		pass: 'border-emerald-600/60 bg-emerald-600/5',
+		warn: 'border-amber-600/60 bg-amber-600/5',
+		fail: 'border-destructive/60 bg-destructive/5',
+		info: 'border-dashed opacity-80'
 	};
 </script>
 
@@ -34,18 +38,7 @@
 	{:else if report}
 		{#if report.status === 'invalid'}
 			<Alert variant="destructive">
-				<svg
-					aria-hidden="true"
-					class="size-4"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2.5"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path d="M18 6 6 18M6 6l12 12" />
-				</svg>
+				<CircleXIcon class="size-4" aria-hidden="true" />
 				<AlertTitle>
 					{copy.verifyFail}
 					<span class="ml-1 font-normal opacity-70">{formatLabels[report.format]}</span>
@@ -54,18 +47,7 @@
 		{:else if report.status === 'valid-but-expired'}
 			<!-- Valid signature, certificate out of its window: warning, never a rejection (#40). -->
 			<Alert class="border-amber-600/50 bg-amber-600/5 text-amber-800 dark:text-amber-300">
-				<svg
-					aria-hidden="true"
-					class="size-4"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2.5"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path d="M12 3 2.5 20h19L12 3Zm0 6v5m0 3v.01" />
-				</svg>
+				<TriangleAlertIcon class="size-4" aria-hidden="true" />
 				<AlertTitle>
 					{copy.verifyExpired}
 					<span class="ml-1 font-normal opacity-70">{formatLabels[report.format]}</span>
@@ -73,18 +55,7 @@
 			</Alert>
 		{:else}
 			<Alert class="border-emerald-600/50 bg-emerald-600/5 text-emerald-800 dark:text-emerald-300">
-				<svg
-					aria-hidden="true"
-					class="size-4"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2.5"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-				>
-					<path d="M20 6 9 17l-5-5" />
-				</svg>
+				<CircleCheckIcon class="size-4" aria-hidden="true" />
 				<AlertTitle>
 					{copy.verifyOk}
 					<span class="ml-1 font-normal opacity-70">{formatLabels[report.format]}</span>
@@ -95,14 +66,19 @@
 		<ul class="flex flex-col gap-2">
 			{#each report.checks as entry, index (index)}
 				<li
-					class="flex items-start gap-3 rounded-xl border px-4 py-3 {styles[entry.status].card}"
+				class="flex items-start gap-3 rounded-xl border px-4 py-3 {styles[entry.status]}"
 					data-check={entry.id}
 					data-status={entry.status}
 				>
-					<span
-						class="mt-1.5 size-2.5 shrink-0 rounded-full {styles[entry.status].dot}"
-						aria-hidden="true"
-					></span>
+					{#if entry.status === 'info'}
+						<InfoIcon class="mt-1 size-4 shrink-0" aria-hidden="true" />
+					{:else if entry.status === 'warn'}
+						<TriangleAlertIcon class="mt-1 size-4 shrink-0" aria-hidden="true" />
+					{:else if entry.status === 'fail'}
+						<CircleXIcon class="mt-1 size-4 shrink-0" aria-hidden="true" />
+					{:else}
+						<CircleCheckIcon class="mt-1 size-4 shrink-0" aria-hidden="true" />
+					{/if}
 					<div class="min-w-0">
 						<p class="font-medium">{copy.checkLabels[entry.id] ?? entry.id}</p>
 						<p class="break-words text-sm opacity-80">{entry.detail}</p>
@@ -124,7 +100,7 @@
 				<dd class="text-muted-foreground font-mono text-xs break-all">{report.signer.serial}</dd>
 				<dt class="sr-only">validity</dt>
 				<dd class="text-muted-foreground font-mono text-xs">
-					{report.signer.notBefore} → {report.signer.notAfter}
+				{report.signer.notBefore} <ArrowRightIcon class="inline size-3 align-[-0.125em]" aria-hidden="true" /> {report.signer.notAfter}
 				</dd>
 			</dl>
 		{:else}

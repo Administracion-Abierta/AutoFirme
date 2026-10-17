@@ -31,6 +31,8 @@ export interface BatchDocument {
 	/** Manifest `id`; stable while the document stays in the queue. */
 	id: string;
 	file: File;
+	/** Format this document signs with — the global choice unless overridden per file. */
+	format: SignFormat;
 	status: DocumentStatus;
 	/** Manifest `result`. */
 	result: BatchResult;
@@ -52,6 +54,7 @@ export interface BatchState {
 	documents: BatchDocument[];
 	/** `cancelled` is a run the user stopped; the documents not reached stay `pending`. */
 	phase: 'idle' | 'running' | 'done' | 'cancelled';
+	/** Format for every document that has no per-document override. */
 	format: SignFormat;
 	/** Id of the document being signed right now, null otherwise. */
 	current: string | null;
@@ -77,6 +80,8 @@ export type BatchSigner = (
 export interface BatchQueue extends Readable<BatchState> {
 	/** Replace the document list (clears every previous result). */
 	set(files: File[], format: SignFormat): void;
+	/** One document's format override; resets that document's result. No-op while running. */
+	setFormat(id: string, format: SignFormat): void;
 	/**
 	 * Sign every document that is not signed yet, one at a time, in queue order. Resolves with the
 	 * final state; a failing document is recorded as `error` and never stops the run.
@@ -132,6 +137,7 @@ export function createBatchQueue(): BatchQueue {
 				documents: files.map((file, index) => ({
 					id: String(index + 1),
 					file,
+					format,
 					status: 'pending' as const,
 					result: 'NOT_STARTED' as const,
 					description: '',
@@ -145,6 +151,19 @@ export function createBatchQueue(): BatchQueue {
 				format,
 				current: null
 			});
+		},
+		/** Re-sign one document with a different format: clears its result, keeps the rest. */
+		setFormat(id: string, format: SignFormat) {
+			if (get(store).phase === 'running') return;
+			generation += 1;
+			store.update((state) => ({
+				...state,
+				documents: state.documents.map((document) =>
+					document.id === id
+						? { ...document, format, status: 'pending' as const, result: 'NOT_STARTED' as const }
+						: document
+				)
+			}));
 		},
 		clear() {
 			generation += 1;
@@ -160,8 +179,8 @@ export function createBatchQueue(): BatchQueue {
 			if (start.phase === 'running') throw new Error('the batch is already running');
 			if (start.documents.length === 0) return start;
 			cancelled = false;
-			const format = start.format;
-			const extension = SIGN_FORMATS.find((option) => option.id === format)?.extension ?? '';
+			const extensionOf = (id: SignFormat): string =>
+				SIGN_FORMATS.find((option) => option.id === id)?.extension ?? '';
 			const taken = new Set(
 				start.documents
 					.filter((document) => document.status === 'signed')
@@ -187,14 +206,18 @@ export function createBatchQueue(): BatchQueue {
 				try {
 					const bytes = new Uint8Array(await document.file.arrayBuffer());
 					digest = await sha256Hex(bytes);
-					const signed = await sign(document.file, bytes, format);
+					const signed = await sign(document.file, bytes, document.format);
 					if (generation !== run) return get(store);
 					patch(document.id, {
 						status: 'signed',
 						result: 'DONE_AND_SAVED',
 						sha256: digest,
 						bytes: signed.bytes,
-						output: signedOutputName(document.file.name, extension, taken),
+						output: signedOutputName(
+							document.file.name,
+							extensionOf(document.format),
+							taken
+						),
 						timestamp: new Date().toISOString(),
 						algorithm: signed.algorithm ?? ''
 					});
@@ -237,11 +260,14 @@ export interface BatchManifest {
 }
 
 export function buildManifest(state: BatchState): BatchManifest {
-	const label = SIGN_FORMATS.find((option) => option.id === state.format)?.label ?? state.format;
+	const labelOf = (id: SignFormat): string =>
+		SIGN_FORMATS.find((option) => option.id === id)?.label ?? id;
 	const algorithm = state.documents.find((document) => document.algorithm)?.algorithm;
+	const formats = [...new Set(state.documents.map((document) => document.format))];
 	return {
 		signbatch: {
-			format: label,
+			// A mixed batch lists every format used; a single-format batch keeps its one label.
+			format: formats.map(labelOf).join(', '),
 			suboperation: 'sign',
 			...(algorithm ? { algorithm } : {})
 		},
@@ -249,7 +275,7 @@ export function buildManifest(state: BatchState): BatchManifest {
 			id: document.id,
 			datareference: document.file.name,
 			sha256: document.sha256,
-			format: label,
+			format: labelOf(document.format),
 			suboperation: 'sign',
 			result: document.result,
 			...(document.description ? { description: document.description } : {}),

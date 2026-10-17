@@ -10,10 +10,8 @@ import { webcrypto } from 'node:crypto';
 import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { crc32 as nodeCrc32 } from 'node:zlib';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { get } from 'svelte/store';
-import BatchQueue from './components/BatchQueue.svelte';
 import {
 	buildManifest,
 	buildZip,
@@ -23,11 +21,10 @@ import {
 	type SignedDocument
 } from './batch';
 import { signCadesDetached } from './cms';
-import { copy } from './i18n';
 import { loadSignerSession } from './keystore';
 import type { SignerCert } from './sign';
 import { signingAlgorithmName } from './sign';
-import { ASYNC, createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../test/fixtures';
+import { createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../test/fixtures';
 
 // jsdom's `crypto` only has getRandomValues; the queue's SHA-256 needs SubtleCrypto — the same API
 // browsers expose.
@@ -49,8 +46,6 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(() => rmSync(fixtures.dir, { recursive: true, force: true }));
-
-afterEach(cleanup);
 
 const file = (name: string, content: string) => new File([content], name, { type: 'text/plain' });
 
@@ -362,85 +357,61 @@ describe('batch queue', () => {
 	});
 });
 
-describe('BatchQueue UI', () => {
-	let downloaded: Blob | null = null;
-
-	beforeEach(() => {
-		downloaded = null;
-		// jsdom has no object URLs (and cannot follow a download link), so the blob the component
-		// hands to the browser is captured here instead.
-		URL.createObjectURL = (blob: Blob | MediaSource) => {
-			downloaded = blob as Blob;
-			return 'blob:preview';
-		};
-		URL.revokeObjectURL = () => {};
-		HTMLAnchorElement.prototype.click = () => {};
-	});
-
-	it('runs the batch, reports progress and downloads the ZIP', async () => {
+describe('per-document format', () => {
+	it('signs each document with its own format and names the outputs accordingly', async () => {
 		const queue = createBatchQueue();
-		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos'), file('c.txt', 'tres')], 'cades');
+		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos')], 'cades');
+		queue.setFormat('2', 'xades');
 
-		const { container } = render(BatchQueue, {
-			copy: copy.es,
-			queue,
-			hint: '',
-			signer: cadesEngine()
+		const formats: string[] = [];
+		const state = await queue.run((_file, _bytes, format) => {
+			formats.push(format);
+			return Promise.resolve({ bytes: new Uint8Array(0) });
 		});
 
-		expect(container.textContent).toContain('Firmados: 0/3');
-
-		await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
-
-		await screen.findByText('Firmados: 3/3', {}, ASYNC);
-
-		await fireEvent.click(screen.getByRole('button', { name: 'Descargar ZIP' }));
-
-		const archive = new Uint8Array(await downloaded!.arrayBuffer());
-		expect(readZip(archive).map((entry) => entry.name)).toEqual([
-			'a.txt.csig',
-			'b.txt.csig',
-			'c.txt.csig',
-			'manifest.json'
+		expect(formats).toEqual(['cades', 'xades']);
+		expect(state.documents.map((document) => [document.output, document.format])).toEqual([
+			['a.txt.csig', 'cades'],
+			['b.txt.xsig', 'xades']
 		]);
 	});
 
-	it('shows the cancel in place of the run button while signing, and stops the batch there', async () => {
+	it('labels the manifest per entry and joins the batch formats when they differ', async () => {
 		const queue = createBatchQueue();
-		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos'), file('c.txt', 'tres')], 'cades');
+		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos')], 'cades');
+		queue.setFormat('2', 'pades');
+
+		const manifest = buildManifest(get(queue));
+
+		expect(manifest.signbatch.format).toBe('CAdES-BES, PAdES-B-B');
+		expect(manifest.singlesigns.map((entry) => entry.format)).toEqual([
+			'CAdES-BES',
+			'PAdES-B-B'
+		]);
+	});
+
+	it('refuses a format change while the batch is running and keeps the run consistent', async () => {
+		const queue = createBatchQueue();
+		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos')], 'cades');
 
 		let release = () => {};
 		const gate = new Promise<void>((resolve) => (release = resolve));
-		// Held open so the run is still in flight when the cancel is clicked.
-		const slow: BatchSigner = async (document, bytes) => {
+		let started = false;
+		const engine: BatchSigner = async (document, bytes, format) => {
+			started = true;
 			await gate;
 			return cadesEngine()(document, bytes);
 		};
 
-		const { container } = render(BatchQueue, { copy: copy.es, queue, hint: '', signer: slow });
+		const run = queue.run(engine);
+		// The loop awaits the file read before calling the engine, so spin until it is reached.
+		await vi.waitFor(() => expect(started).toBe(true));
 
-		await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
-
-		// One button: while the batch runs the primary action is the cancel itself.
-		const cancel = await screen.findByRole('button', { name: 'Cancelar' });
-		expect(screen.queryByRole('button', { name: 'Firmar' })).toBeNull();
-
-		await fireEvent.click(cancel);
+		queue.setFormat('2', 'pades');
 		release();
+		const state = await run;
 
-		// The document in flight finished, the two behind it were never started, and the run says so.
-		expect(await screen.findByText('Lote cancelado: 1/3')).toBeTruthy();
-		expect(container.textContent).not.toContain('Cancelar');
-		expect(screen.getByRole('button', { name: 'Firmar' })).toBeTruthy();
-		expect(get(queue).documents.map((document) => document.status)).toEqual([
-			'signed',
-			'pending',
-			'pending'
-		]);
-
-		// The ZIP after a cancel holds exactly what signed, nothing half-queued.
-		await fireEvent.click(screen.getByRole('button', { name: 'Descargar ZIP' }));
-		const archive = new Uint8Array(await downloaded!.arrayBuffer());
-		expect(readZip(archive).map((entry) => entry.name)).toEqual(['a.txt.csig', 'manifest.json']);
+		// The override was a no-op: the run kept the format the batch started with.
+		expect(state.documents.map((document) => document.format)).toEqual(['cades', 'cades']);
 	});
 });

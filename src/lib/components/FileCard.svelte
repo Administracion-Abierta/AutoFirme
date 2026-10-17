@@ -3,10 +3,11 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Spinner } from '#lib/components/ui/spinner/index.js';
 	import { TableCell, TableRow } from '#lib/components/ui/table/index.js';
+	import { formatBytes } from '#lib/sign';
+	import type { Snippet } from 'svelte';
 	import type { BatchDocument, DocumentStatus } from '#lib/batch';
 	import type { Copy } from '#lib/i18n';
 	import type { SelectedFile } from '#lib/sign';
-	import { formatBytes } from '#lib/sign';
 
 	interface Props {
 		copy: Copy;
@@ -14,9 +15,20 @@
 		onremove: () => void;
 		/** Queue entry for this document; null/absent while it is not in a batch (verify flow). */
 		document?: BatchDocument | null;
+		/** Cells rendered between the file and the actions column (step 2: per-file format). */
+		extra?: Snippet;
+		/** False hides the remove button (step 3, where removing a signed row makes no sense). */
+		removable?: boolean;
 	}
 
-	let { copy, file, onremove, document: entry = null }: Props = $props();
+	let {
+		copy,
+		file,
+		onremove,
+		document: entry = null,
+		extra,
+		removable = true
+	}: Props = $props();
 
 	const status = $derived<DocumentStatus | null>(entry?.status ?? null);
 
@@ -50,8 +62,11 @@
 			{formatBytes(file.size)}
 		</span>
 	</TableCell>
+	{#if extra}{@render extra()}{/if}
 	<TableCell class="py-3 text-right">
-		<Button variant="ghost" size="sm" class="h-7" onclick={onremove}>{copy.remove}</Button>
+		{#if removable}
+			<Button variant="ghost" size="sm" class="h-7" onclick={onremove}>{copy.remove}</Button>
+		{/if}
 		<Button
 			variant="ghost"
 			size="sm"

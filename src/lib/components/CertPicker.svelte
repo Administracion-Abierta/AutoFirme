@@ -18,6 +18,7 @@
 	import type { SignerCert, SignerSession } from '#lib/sign';
 	import { cn } from '#lib/utils.js';
 	import FileIcon from '@lucide/svelte/icons/file';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -245,7 +246,7 @@
 					<div class="text-muted-foreground grid gap-1 pt-1">
 						<p class="break-words">{cert.subject}</p>
 						<p class="break-words">{copy.signIssuer}: {cert.issuer}</p>
-						<p class="tnum">{copy.signValidity}: {dateFormat.format(cert.notBefore)} → {dateFormat.format(cert.notAfter)}</p>
+					<p class="tnum">{copy.signValidity}: {dateFormat.format(cert.notBefore)} <ArrowRightIcon class="inline size-3 align-[-0.125em]" aria-hidden="true" /> {dateFormat.format(cert.notAfter)}</p>
 					</div>
 				</details>
 			</div>
@@ -489,7 +490,7 @@
 					cert.expired && 'text-amber-700 dark:text-amber-400'
 				)}
 				>
-				{copy.signValidity}: {dateFormat.format(cert.notBefore)} → {dateFormat.format(cert.notAfter)}
+			{copy.signValidity}: {dateFormat.format(cert.notBefore)} <ArrowRightIcon class="inline size-3 align-[-0.125em]" aria-hidden="true" /> {dateFormat.format(cert.notAfter)}
 			</span>
 		</span>
 	{/if}

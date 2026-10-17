@@ -17,12 +17,15 @@ export interface Copy {
 	brand: string;
 	tagline: string;
 	privacyNote: string;
+	/** Title of the privacy section of the settings modal. */
+	privacyTitle: string;
+	/** Link to the project's source repository, in the Ayuda section. */
+	sourceCode: string;
 	/** Label of the header help menu. */
 	helpMenu: string;
-	/** Title of the privacy dialog opened from that menu. */
-	privacyTitle: string;
-	/** Menu entry linking to the project's source repository. */
-	sourceCode: string;
+	/** Header settings button and modal title. */
+	settingsLabel: string;
+	settingsTitle: string;
 	/** Header button that opens the browser's install prompt (#47). */
 	installApp: string;
 	/** Header button that activates a downloaded update of the installed app (#47). */
@@ -52,6 +55,8 @@ export interface Copy {
 	certErrors: Record<Pkcs12ErrorCode | 'unknown', string>;
 	formatTitle: string;
 	formatHint: string;
+	/** Label shown next to the chosen format: it applies to the whole batch. */
+	formatAll: string;
 	/** Optional RFC 3161 timestamp: the TSA address field of the sign panel. */
 	timeStampTitle: string;
 	timeStampPlaceholder: string;
@@ -120,12 +125,13 @@ export interface Copy {
 	storeOpen: string;
 	storeExpiry: string;
 	storeErrors: Record<StoreErrorCode, string>;
-	downloadsLabel: string;
-	downloadsTitle: string;
-	downloadsEmpty: string;
-	downloadsDownload: string;
-	downloadsClose: string;
-	/** MCP endpoint settings dialog, opened from the help menu. */
+	stepConfigure: string;
+	stepFiles: string;
+	stepDownload: string;
+	next: string;
+	back: string;
+	newBatch: string;
+	/** MCP server section, inline in the settings modal. */
 	mcpMenu: string;
 	mcpTitle: string;
 	mcpHint: string;
@@ -153,15 +159,17 @@ export const copy: Record<Lang, Copy> = {
 		sourceCode: 'Código fuente',
 		installApp: 'Instalar app',
 		updateApp: 'Actualizar versión',
+		settingsLabel: 'Ajustes y ayuda',
+		settingsTitle: 'Ajustes y ayuda',
 		colFile: 'Fichero',
 		colActions: 'Acciones',
-		step1Title: '1. Elige los documentos',
+		step1Title: 'Configura la firma',
 		dropTitle: 'Arrastra aquí los ficheros que quieres firmar',
 		dropHint: 'o selecciónalos desde tu equipo',
 		browse: 'Seleccionar ficheros',
 		dragging: 'Suelta el fichero para cargarlo',
 		remove: 'Quitar',
-		step2Title: '2. Configura la firma',
+		step2Title: 'Elige los documentos',
 		selectSign: 'Seleccionar firma',
 		addSign: 'Agregar firma',
 		certLoading: 'Descifrando el fichero…',
@@ -184,6 +192,7 @@ export const copy: Record<Lang, Copy> = {
 		},
 		formatTitle: 'Formato de firma',
 		formatHint: 'Elige el tipo de firma digital que quieres generar',
+		formatAll: 'para todo el lote — se puede cambiar por archivo',
 		timeStampTitle: 'Sello de tiempo (TSA)',
 		timeStampPlaceholder: 'https://tu-servidor-tsa/ruta',
 		timeStampHint:
@@ -271,11 +280,12 @@ export const copy: Record<Lang, Copy> = {
 			unavailable: 'El almacén del navegador no está disponible.',
 			missing: 'Esa firma ya no está guardada.'
 		},
-		downloadsLabel: 'Descargas',
-		downloadsTitle: 'Firmas generadas',
-		downloadsEmpty: 'Todavía no has firmado ningún documento.',
-		downloadsDownload: 'Descargar',
-		downloadsClose: 'Cerrar',
+		stepConfigure: 'Configurar',
+		stepFiles: 'Documentos',
+		stepDownload: 'Descargar firmados',
+		next: 'Siguiente',
+		back: 'Atrás',
+		newBatch: 'Nuevo lote',
 		mcpMenu: 'Servidor MCP',
 		mcpTitle: 'Servidor MCP remoto',
 		mcpHint:
@@ -303,15 +313,17 @@ export const copy: Record<Lang, Copy> = {
 		sourceCode: 'Source code',
 		installApp: 'Install app',
 		updateApp: 'Update version',
+		settingsLabel: 'Settings and help',
+		settingsTitle: 'Settings and help',
 		colFile: 'File',
+		remove: 'Remove',
 		colActions: 'Actions',
-		step1Title: '1. Choose the documents',
+		step1Title: 'Configure the signature',
 		dropTitle: 'Drag the files you want to sign here',
 		dropHint: 'or pick them from your machine',
 		browse: 'Choose files',
 		dragging: 'Drop the file to load it',
-		remove: 'Remove',
-		step2Title: '2. Configure the signature',
+		step2Title: 'Choose the documents',
 		selectSign: 'Select signature',
 		addSign: 'Add signature',
 		certLoading: 'Decrypting the file…',
@@ -334,6 +346,7 @@ export const copy: Record<Lang, Copy> = {
 		},
 		formatTitle: 'Signature format',
 		formatHint: 'Pick the type of digital signature to generate',
+		formatAll: 'for the whole batch — changeable per file',
 		timeStampTitle: 'Trusted timestamp (TSA)',
 		timeStampPlaceholder: 'https://your-tsa-server/path',
 		timeStampHint:
@@ -421,11 +434,12 @@ export const copy: Record<Lang, Copy> = {
 			unavailable: 'The browser store is not available.',
 			missing: 'That signature is no longer saved.'
 		},
-		downloadsLabel: 'Downloads',
-		downloadsTitle: 'Produced signatures',
-		downloadsEmpty: 'You have not signed anything yet.',
-		downloadsDownload: 'Download',
-		downloadsClose: 'Close',
+		stepConfigure: 'Configure',
+		stepFiles: 'Documents',
+		stepDownload: 'Download signed',
+		next: 'Next',
+		back: 'Back',
+		newBatch: 'New batch',
 		mcpMenu: 'MCP server',
 		mcpTitle: 'Remote MCP server',
 		mcpHint:
