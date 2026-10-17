@@ -225,7 +225,7 @@ node --input-type=module -e "const { createPkcs12Fixtures } = await import('./sr
 1. `pnpm dev` and open `/`; the app starts in **Firmar** [Sign]. Open it from `localhost` or over
    https: away from a secure context the browser withholds WebCrypto entirely, and the app says
    so (banner + error) instead of pretending the file is broken.
-2. In *2. Configura la firma* [2. Set up the signature], press **Agregar firma** [Add signature]
+2. In *1. Configura la firma* [1. Set up the signature], press **Agregar firma** [Add signature]
    and choose the `.p12`; type its PIN in **PIN de la firma** [PIN of the signature] and press
    **Guardar** [Save]: the container is sealed into this browser (IndexedDB), selected, and the
    modal closes on it. The file-shaped card fills in with the file name and the signer's `CN`:
@@ -238,10 +238,11 @@ node --input-type=module -e "const { createPkcs12Fixtures } = await import('./sr
    a new one joins the grid instead of replacing the previous. Clicking a saved sign selects it
    and closes the modal; the first click of the visit asks that sign's PIN (the key cannot be
    used before it is unsealed), later clicks do not.
-4. Drop the document in *1. Elige los documentos* [1. Choose the documents] and press **Firmar**
-   [Sign]; the row turns to **Firmada** [Signed] and its **Descargar** [Download] saves the `.csig`
-   (the same file is listed in the **Descargas** [Downloads] dialog, *Firmas generadas* [Produced
-   signatures], with the signer and the file's SHA-256).
+4. Press **Siguiente** [Next] to reach *2. Elige los documentos* [2. Choose the documents], drop
+   the documents there and press **Firmar** [Sign]; each row turns to **Firmada** [Signed] and its
+   **Descargar** [Download] saves that signature (the batch ZIP under *3. Descargar firmados*
+   [3. Download signed] carries every output plus a `manifest.json`, with the signer and the
+   file's SHA-256).
 5. Switch to **Verificar** [Verify] and drop the `.csig`; a detached CAdES then asks for the
    original file under *Documento original* [Original document]. The report shows one card per check
    — *Estructura de la firma*, *Integridad del contenido*, *Firma criptográfica*, *Certificado del
