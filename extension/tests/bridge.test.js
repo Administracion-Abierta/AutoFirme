@@ -19,8 +19,11 @@ test('contract accepts supported RSA formats and resolves AUTO from the content'
   assert.deepEqual(call('YQ==','SHA256withRSA','AUTO'),sign);
   const xml='PHgvPg==';
   assert.deepEqual(call(xml,'SHA256withRSA','XAdES'),{...sign,data:xml,format:'XAdES'});
+  const legacy=call(xml,'SHA1withRSA','XAdES');
+  assert.deepEqual(legacy,{...sign,data:xml,algorithm:'SHA1withRSA',format:'XAdES'});
+  assert.deepEqual(validateRequest(legacy),legacy);
   assert.deepEqual(call(xml,'SHA256withRSA','AUTO'),{...sign,data:xml,format:'XAdES'});
-  for(const [data,algorithm,format,params] of [['YR==','SHA256withRSA','CAdES',''],['YQ==','SHA256withRSA','PAdES',''],['YQ==','SHA1withRSA','CAdES',''],['YQ==','SHA256withRSA','CAdES','mode=implicit\nother=x'],['PHgvPg==','SHA256withRSA','XAdES','mode=explicit'],['PHgvPg==','SHA256withRSA','AUTO','mode=explicit'],['YQ==','SHA256withRSA','ASiC',''],['YQ==','SHA256withRSA','constructor','']]) assert.equal(call(data,algorithm,format,params),null);
+  for(const [data,algorithm,format,params] of [['YR==','SHA256withRSA','CAdES',''],['YQ==','SHA256withRSA','PAdES',''],['YQ==','SHA1withRSA','CAdES',''],['YQ==','SHA1withRSA','PAdES',''],['PHgvPg==','SHA1withRSA','XAdES','mode=explicit'],['YQ==','SHA256withRSA','CAdES','mode=implicit\nother=x'],['PHgvPg==','SHA256withRSA','XAdES','mode=explicit'],['PHgvPg==','SHA256withRSA','AUTO','mode=explicit'],['YQ==','SHA256withRSA','ASiC',''],['YQ==','SHA256withRSA','constructor','']]) assert.equal(call(data,algorithm,format,params),null);
   assert.throws(()=>validateRequest({...sign,origin:'https://spoof.test'}));
   assert.deepEqual(publicResult({certificate:'YQ==',signature:'Yg==',privateKey:'secret'},'sign'),{kind:'result',certificate:'YQ==',signature:'Yg=='});
 });

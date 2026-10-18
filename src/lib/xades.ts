@@ -19,13 +19,15 @@ const XADES = 'http://uri.etsi.org/01903/v1.3.2#';
 const SIGNED_PROPERTIES_TYPE = 'http://uri.etsi.org/01903#SignedProperties';
 
 const DIGEST_ALGORITHM: Record<SigningAlgorithm['hash'], string> = {
+	'SHA-1': 'http://www.w3.org/2000/09/xmldsig#sha1',
 	'SHA-256': 'http://www.w3.org/2001/04/xmlenc#sha256',
 	'SHA-384': 'http://www.w3.org/2001/04/xmldsig-more#sha384',
 	'SHA-512': 'http://www.w3.org/2001/04/xmlenc#sha512'
 };
 
-const SIGNATURE_ALGORITHM: Record<SigningAlgorithm['name'], Record<SigningAlgorithm['hash'], string>> = {
+const SIGNATURE_ALGORITHM: Record<SigningAlgorithm['name'], Partial<Record<SigningAlgorithm['hash'], string>>> = {
 	'RSASSA-PKCS1-v1_5': {
+		'SHA-1': 'http://www.w3.org/2000/09/xmldsig#rsa-sha1',
 		'SHA-256': 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
 		'SHA-384': 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha384',
 		'SHA-512': 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha512'
@@ -48,6 +50,8 @@ export interface XadesSignatureOptions {
 	policy?: { identifier: string; description?: string; digest?: Bytes };
 	/** XAdES `DataObjectFormat` of the signed document. */
 	dataObject?: { description?: string; mimeType?: string };
+	/** Overrides the certificate's default hash (legacy portals ask for SHA1withRSA). */
+	hash?: SigningAlgorithm['hash'];
 	/** Signing time; defaults to now. */
 	now?: Date;
 	/** Deterministic ids — for golden vectors and reproducible output. */
@@ -168,6 +172,9 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 	const signer = options.signer ?? options.certificates.find((certificate) => certificate.key !== null);
 	if (!signer?.key || !signer.algorithm) throw new Error('XAdES: the signing certificate has no private key');
 	const algorithm = signer.algorithm;
+	const hash = options.hash ?? algorithm.hash;
+	const signatureMethod = SIGNATURE_ALGORITHM[algorithm.name][hash];
+	if (!signatureMethod) throw new Error(`XAdES: ${algorithm.name} cannot sign with ${hash}`);
 	const ids = idsFor(options.ids);
 	const chain = options.certificates.length === 0 ? [signer] : options.certificates;
 
@@ -176,7 +183,7 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 
 	// Reference #1 — the document itself: PIs/comments above the root included, the ds:Signature
 	// not yet inserted (the enveloped-signature transform would remove it anyway).
-	const documentDigest = await digest(algorithm.hash, canonicalize(doc, { exclusive: true }));
+	const documentDigest = await digest(hash, canonicalize(doc, { exclusive: true }));
 	const certificateDigests = await Promise.all(chain.map((certificate) => digest('SHA-256', certificate.der)));
 	const signingTime = (options.now ?? new Date()).toISOString().replace(/\.\d{3}Z$/, 'Z');
 	const mimeType = options.dataObject?.mimeType ?? 'application/xml';
@@ -184,20 +191,20 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 	const template = `<ds:Signature xmlns:ds="${DS}" Id="${ids.signature}">
 	<ds:SignedInfo Id="${ids.signedInfo}">
 		<ds:CanonicalizationMethod Algorithm="${EXC_C14N}"/>
-		<ds:SignatureMethod Algorithm="${SIGNATURE_ALGORITHM[algorithm.name][algorithm.hash]}"/>
+		<ds:SignatureMethod Algorithm="${signatureMethod}"/>
 		<ds:Reference Id="${ids.documentReference}" URI="">
 			<ds:Transforms>
 				<ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
 				<ds:Transform Algorithm="${EXC_C14N}"/>
 			</ds:Transforms>
-			<ds:DigestMethod Algorithm="${DIGEST_ALGORITHM[algorithm.hash]}"/>
+			<ds:DigestMethod Algorithm="${DIGEST_ALGORITHM[hash]}"/>
 			<ds:DigestValue/>
 		</ds:Reference>
 		<ds:Reference Id="${ids.propertiesReference}" Type="${SIGNED_PROPERTIES_TYPE}" URI="#${ids.signedProperties}">
 			<ds:Transforms>
 				<ds:Transform Algorithm="${EXC_C14N}"/>
 			</ds:Transforms>
-			<ds:DigestMethod Algorithm="${DIGEST_ALGORITHM[algorithm.hash]}"/>
+			<ds:DigestMethod Algorithm="${DIGEST_ALGORITHM[hash]}"/>
 			<ds:DigestValue/>
 		</ds:Reference>
 	</ds:SignedInfo>
@@ -232,11 +239,11 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 	setDigest(ids.documentReference, documentDigest);
 	setDigest(
 		ids.propertiesReference,
-		await digest(algorithm.hash, canonicalize(byId(doc, ids.signedProperties), { exclusive: true }))
+		await digest(hash, canonicalize(byId(doc, ids.signedProperties), { exclusive: true }))
 	);
 
 	const signedInfo = byId(doc, ids.signedInfo);
-	const signatureValue = await signBytes(signer, canonicalize(signedInfo, { exclusive: true }));
+	const signatureValue = await signBytes(signer, canonicalize(signedInfo, { exclusive: true }), hash);
 	byId(doc, ids.signatureValue).textContent = toBase64(signatureValue);
 
 	// Serialize every document child — top-level PIs/comments must survive signing.

@@ -90,9 +90,12 @@ proxy.
 
 The bridge accepts certificate selection and RSA/SHA-256 signing as CAdES
 (implicit or explicit), PAdES and enveloped XAdES, plus `AUTO` content sniffing, up
-to 4 MiB of canonical Base64. It also accepts `CAdEStri` from Aragon's portafirmas:
-the page supplies `serverUrl`, so the extension performs the pre-sign and post-sign
-calls while the private key stays local; RSA/SHA-256 and RSA/SHA-512 are supported.
+to 4 MiB of canonical Base64. Legacy `SHA1withRSA` calls are accepted only for
+enveloped XAdES (CORES' compatibility test, for one); the SHA-1 key view is still
+non-extractable and every other format remains SHA-256-only. It also accepts
+`CAdEStri` from Aragon's portafirmas: the page supplies `serverUrl`, so the
+extension performs the pre-sign and post-sign calls while the private key stays
+local; RSA/SHA-256 and RSA/SHA-512 are supported.
 Explicit XAdES stays outside the contract because the engine only emits enveloped
 signatures. Unsupported methods, filters, sticky identities, other `*Tri` formats
 and custom stores use the original AutoFirma implementation. The full app retains

@@ -71,6 +71,7 @@ export async function signRequest(request: ExtensionRequest, cert: SignerCert, c
    certificates: chain.length ? chain : [cert],
    signer: cert,
    dataObject: { mimeType: 'application/xml' },
+   hash: request.algorithm === 'SHA1withRSA' ? 'SHA-1' : undefined,
   });
   signature = new TextEncoder().encode(xml);
  } else {

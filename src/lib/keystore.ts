@@ -149,7 +149,7 @@ function curveOid(namedCurve: NonNullable<SigningAlgorithm['namedCurve']>): stri
 	return entry[0];
 }
 
-function toSignerCert(certificate: Certificate, algorithm: SigningAlgorithm | null, key: CryptoKey | null, sha512Key: CryptoKey | null, now: Date, position: number): SignerCert {
+function toSignerCert(certificate: Certificate, algorithm: SigningAlgorithm | null, key: CryptoKey | null, sha512Key: CryptoKey | null, sha1Key: CryptoKey | null, now: Date, position: number): SignerCert {
 	return {
 		// Position-prefixed: serial numbers are only unique per issuer (RFC 5280), so one
 		// container may hold two certificates with the same serial; the picker keys its
@@ -166,6 +166,7 @@ function toSignerCert(certificate: Certificate, algorithm: SigningAlgorithm | nu
 		der: certificate.der,
 		key,
 		sha512Key,
+		sha1Key,
 		algorithm
 	};
 }
@@ -204,6 +205,13 @@ export async function loadSignerSession(
 			.importKey('pkcs8', info.der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' }, false, ['sign'])
 			.catch(() => null)
 		: null;
+	// Older portals (CORES' compatibility test, for one) still ask for SHA1withRSA XAdES.
+	// Same non-extractable key material, separate hash binding; absent in browsers that refuse.
+	const sha1Key = info.algorithm.name === 'RSASSA-PKCS1-v1_5'
+		? await crypto.subtle
+			.importKey('pkcs8', info.der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-1' }, false, ['sign'])
+			.catch(() => null)
+		: null;
 
 	const parsed = certificates.map((der, position) => {
 		try {
@@ -233,8 +241,8 @@ export async function loadSignerSession(
 	const now = options.now ?? new Date();
 	const signerCerts = parsed.map((certificate, position) =>
 		samePublicKey(certificate.publicKey, info.publicKey)
-			? toSignerCert(certificate, info.algorithm, key, sha512Key, now, position)
-			: toSignerCert(certificate, null, null, null, now, position)
+			? toSignerCert(certificate, info.algorithm, key, sha512Key, sha1Key, now, position)
+			: toSignerCert(certificate, null, null, null, null, now, position)
 	);
 	const signer = signerCerts.find((certificate) => certificate.key !== null);
 	if (!signer) throw new Pkcs12Error('key-mismatch', 'no signable certificate in this container');

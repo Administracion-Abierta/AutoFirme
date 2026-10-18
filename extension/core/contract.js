@@ -113,7 +113,8 @@ export function parseCall(method, args) {
   }
 
   const format = Object.hasOwn(FORMAT_ALIASES, rawFormat) ? FORMAT_ALIASES[rawFormat] : rawFormat;
-  if (algorithm !== 'SHA256withRSA' || !Object.hasOwn(SIGN_FORMATS, format)) return null;
+  // Legacy portals ask for XAdES SHA-1; every other local engine stays SHA-256-only.
+  if ((algorithm !== 'SHA256withRSA' && !(algorithm === 'SHA1withRSA' && rawFormat === 'XAdES')) || !Object.hasOwn(SIGN_FORMATS, format)) return null;
   const options = localOptions(entries);
   if (!options) return null;
   // AUTO resolves from the bytes, as AutoFirma does. The XML engine ships enveloped

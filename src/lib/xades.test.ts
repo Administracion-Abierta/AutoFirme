@@ -112,6 +112,40 @@ describe('signXades', () => {
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('FAIL');
 	});
 
+	it('signs SHA1withRSA XAdES for legacy portals', async () => {
+		const sha1Signed = await signXades({
+			xml: SAMPLE,
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW,
+			hash: 'SHA-1'
+		});
+		const sha1Root = parse(sha1Signed).documentElement;
+		expect(elements(sha1Root, DS, 'SignatureMethod')[0].getAttribute('Algorithm')).toBe(
+			'http://www.w3.org/2000/09/xmldsig#rsa-sha1'
+		);
+		expect(elements(sha1Root, DS, 'DigestMethod').map((method) => method.getAttribute('Algorithm'))).toEqual([
+			'http://www.w3.org/2000/09/xmldsig#sha1',
+			'http://www.w3.org/2000/09/xmldsig#sha1',
+			'http://www.w3.org/2001/04/xmlenc#sha256',
+			'http://www.w3.org/2001/04/xmlenc#sha256'
+		]);
+		const path = writeFixtureFile(fixtures.dir, 'facturae-sha1.xsig', encoder.encode(sha1Signed));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+
+		const signedInfo = canonicalize(elements(sha1Root, DS, 'SignedInfo')[0], { exclusive: true });
+		const signature = Buffer.from(elements(sha1Root, DS, 'SignatureValue')[0].textContent!, 'base64');
+		const signedInfoPath = writeFixtureFile(fixtures.dir, 'signedinfo-sha1.bin', new Uint8Array(signedInfo));
+		const signaturePath = writeFixtureFile(fixtures.dir, 'signature-sha1.bin', new Uint8Array(signature));
+		const output = execFileSync(
+			'openssl',
+			['dgst', '-sha1', '-verify', join(fixtures.dir, 'leaf.pub.pem'), '-signature', signaturePath, signedInfoPath],
+			{ encoding: 'utf8' }
+		);
+		expect(output).toMatch(/Verified OK/);
+	});
+
 	it('keeps document-level PIs and comments and xmlsec1 still verifies', async () => {
 		const withMisc = SAMPLE.replace(
 			'<fe:Facturae',
