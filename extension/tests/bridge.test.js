@@ -10,9 +10,17 @@ const root = 'chrome-extension://extension/';
 const ui = id => ({id:'extension',url:`${root}index.html?request=${id}`,tab:{id:15,url:`${root}index.html?request=${id}`},frameId:0});
 const flush = () => new Promise(resolve=>setImmediate(resolve));
 
-test('contract limits interception to supported RSA CAdES calls and canonical base64', () => {
-  assert.deepEqual(parseCall('sign',['YQ==','SHA256withRSA','CAdES',null,()=>{},()=>{}]),sign);
-  for(const [data,algorithm,format,params] of [['YR==','SHA256withRSA','CAdES',''],['YQ==','SHA256withRSA','PAdES',''],['YQ==','SHA1withRSA','CAdES',''],['YQ==','SHA256withRSA','CAdES','mode=implicit\nother=x']]) assert.equal(parseCall('sign',[data,algorithm,format,params,()=>{},()=>{}]),null);
+test('contract accepts supported RSA formats and resolves AUTO from the content', () => {
+  const call=(data,algorithm,format,params)=>parseCall('sign',[data,algorithm,format,params,()=>{},()=>{}]);
+  assert.deepEqual(call('YQ==','SHA256withRSA','CAdES'),sign);
+  const pdf='JVBERi0xLjM=';
+  assert.deepEqual(call(pdf,'SHA256withRSA','PAdES','mode=explicit'),{...sign,data:pdf,format:'PAdES',mode:'explicit'});
+  assert.deepEqual(call(pdf,'SHA256withRSA','AUTO','mode=explicit'),{...sign,data:pdf,format:'PAdES',mode:'explicit'});
+  assert.deepEqual(call('YQ==','SHA256withRSA','AUTO'),sign);
+  const xml='PHgvPg==';
+  assert.deepEqual(call(xml,'SHA256withRSA','XAdES'),{...sign,data:xml,format:'XAdES'});
+  assert.deepEqual(call(xml,'SHA256withRSA','AUTO'),{...sign,data:xml,format:'XAdES'});
+  for(const [data,algorithm,format,params] of [['YR==','SHA256withRSA','CAdES',''],['YQ==','SHA256withRSA','PAdES',''],['YQ==','SHA1withRSA','CAdES',''],['YQ==','SHA256withRSA','CAdES','mode=implicit\nother=x'],['PHgvPg==','SHA256withRSA','XAdES','mode=explicit'],['PHgvPg==','SHA256withRSA','AUTO','mode=explicit'],['YQ==','SHA256withRSA','ASiC',''],['YQ==','SHA256withRSA','constructor','']]) assert.equal(call(data,algorithm,format,params),null);
   assert.throws(()=>validateRequest({...sign,origin:'https://spoof.test'}));
   assert.deepEqual(publicResult({certificate:'YQ==',signature:'Yg==',privateKey:'secret'},'sign'),{kind:'result',certificate:'YQ==',signature:'Yg=='});
 });

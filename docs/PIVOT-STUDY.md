@@ -73,8 +73,9 @@ needed a desktop install: the `afirma://` handler and the localhost:63117 socket
   application license (`extension/README.md:27-28`); today it loads unpacked in developer mode
   only. Self-hosting the zip is fine; the Web Store is not.
 - **Deliberately narrow website contract:** `selectCertificate` + RSA/SHA-256 CAdES
-  implicit/explicit, ≤ 4 MiB base64, no cert filters, no sticky identities, no custom stores —
-  anything else falls through to whatever the site already had (`docs/CHROME-EXTENSION.md:83-94`).
+  implicit/explicit, PAdES, enveloped XAdES and `AUTO` content sniffing, ≤ 4 MiB base64, no cert
+  filters, no sticky identities, no custom stores — anything else, including detached XAdES,
+  falls through to whatever the site already had (`docs/CHROME-EXTENSION.md:83-101`).
 - **Cannot touch OS keystores or smartcards.** No Windows-MY, no Keychain, no NSS, no PKCS#11/PC/SC
   (`docs/PARITY.md:107-112`, all browser-moot). This is the gap the desktop app would fill.
 - **Identity silo.** Extension-origin IndexedDB ≠ webapp-origin IndexedDB; imported containers do

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { rmSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../../test/fixtures';
 import { loadSignerSession } from '../keystore';
 import type { SignerSession } from '../sign';
@@ -52,6 +53,18 @@ describe('website request consent', () => {
  it('returns only public certificate for certificate-selection requests', async () => {
   const result = await signRequest({ id: 'select', origin: request.origin, operation: 'selectCertificate' }, session.signer, session.certificates);
   expect(result).toEqual({ certificate: expect.any(String) });
+ });
+});
+
+describe('format dispatch', () => {
+ it('signs PDFs as PAdES and XML as enveloped XAdES', async () => {
+  const pdf = readFileSync(join(process.cwd(), 'test/fixtures/pades-source.pdf'));
+  const signed = await signRequest({ ...request, format: 'PAdES', data: pdf.toString('base64') }, session.signer, session.certificates);
+  expect(Buffer.from(signed.signature!, 'base64').subarray(0, 5).toString()).toBe('%PDF-');
+
+  const xml = '<?xml version="1.0"?><root><value>1</value></root>';
+  const enveloped = await signRequest({ ...request, format: 'XAdES', mode: 'implicit', data: Buffer.from(xml).toString('base64') }, session.signer, session.certificates);
+  expect(Buffer.from(enveloped.signature!, 'base64').toString()).toContain('<ds:Signature');
  });
 });
 

@@ -18,7 +18,7 @@ import {launchWithExtension, waitForChooser} from './lib/extension.mjs';
 import {
   assertConfirmationGated, cancelChooser, fallbackChooser, shareCertificateWithChooser, signWithChooser,
 } from './lib/chooser.mjs';
-import {opensslVersion, verifyCades} from './lib/openssl.mjs';
+import {opensslVersion, verifyCades, verifyPades} from './lib/openssl.mjs';
 import {
   REGISTRADORES_URL, fillForm, formPayload, generatedPayload, openTestPage, pressSign,
   readForm, readLatestMessage, readResult, selectSigningOptions, sha256Hex, waitForOutcome,
@@ -229,21 +229,62 @@ async function main() {
       return 'each chooser handled its own payload';
     });
 
-    heading('Formats the extension does not claim to handle');
-    for (const format of ['XAdES', 'PAdES', 'AUTO']) {
-      await check(`${format} passes through to the site's own AutoFirma`, async () => {
+    heading('PAdES and AUTO');
+    for (const format of ['PAdES', 'AUTO']) {
+      await check(`${format} signs the page's PDF locally`, async () => {
         await openTestPage(await freshTab(), url);
+        const payload = await samplePdf();
         await selectSigningOptions(site, {target: 'targetPdfDocument', format});
         await pressSign(site);
-        await site.waitForTimeout(4_000);
-        assert.equal(chooserOpen(), false, `${format} must not open the extension chooser`);
-        const outcome = await waitForOutcome(site, {expectSignature: false, timeout: 45_000});
-        assert.ok(outcome.message, `${format} produced no outcome on the site`);
-        // With no desktop AutoFirma installed the site reports its own connection error,
-        // which is exactly the proof that the original integration ran instead.
-        return outcome.message.slice(0, 90);
+        const chooser = await waitForChooser(context);
+        await assertConfirmationGated(chooser);
+        await signWithChooser(chooser, {subject: identity.subject, pin: identity.pin});
+        const outcome = await waitForOutcome(site, {expectSignature: true});
+        assert.ok(outcome.signatureBase64, `${format} produced no signature`);
+        const signed = Buffer.from(outcome.signatureBase64, 'base64');
+        assert.equal(signed.subarray(0, 5).toString(), '%PDF-', `${format} did not return a PDF`);
+        const verification = verifyPades({directory: artifacts, pdf: signed, certificate: identity.certificate});
+        assert.ok(verification.verified, `OpenSSL rejected the ${format} signature: ${verification.error}`);
+        // The CMS digest covers the signed revision (original bytes plus the incremental update),
+        // so only its PDF shape is comparable to the source here.
+        assert.equal(verification.content?.subarray(0, 5).toString(), '%PDF-', 'OpenSSL recovered no PDF content');
+        assert.ok(signed.length > payload.length, 'the signed PDF carries no incremental update');
+        return `${signed.length} bytes signed as PAdES, verified by OpenSSL`;
       });
     }
+
+    await check('AUTO signs a non-PDF payload as CAdES', async () => {
+      await openTestPage(await freshTab(), url);
+      const payload = generatedPayload();
+      await selectSigningOptions(site, {target: 'targetGeneratedData', format: 'AUTO'});
+      await pressSign(site);
+      const chooser = await waitForChooser(context);
+      await signWithChooser(chooser, {subject: identity.subject, pin: identity.pin});
+      const outcome = await waitForOutcome(site, {expectSignature: true});
+      assert.ok(outcome.signatureBase64, 'AUTO produced no signature');
+      const verification = verifyCades({
+        directory: artifacts,
+        signature: Buffer.from(outcome.signatureBase64, 'base64'),
+        certificate: identity.certificate,
+        detachedContent: payload,
+      });
+      assert.ok(verification.verified, `OpenSSL rejected the AUTO signature: ${verification.error}`);
+      return 'content sniffing selected CAdES';
+    });
+
+    heading('Formats the extension does not claim to handle');
+    await check("XAdES explicit passes through to the site's own AutoFirma", async () => {
+      await openTestPage(await freshTab(), url);
+      await selectSigningOptions(site, {target: 'targetPdfDocument', format: 'XAdES'});
+      await pressSign(site);
+      await site.waitForTimeout(4_000);
+      assert.equal(chooserOpen(), false, 'detached XAdES must not open the extension chooser');
+      const outcome = await waitForOutcome(site, {expectSignature: false, timeout: 45_000});
+      assert.ok(outcome.message, 'XAdES produced no outcome on the site');
+      // With no desktop AutoFirma installed the site reports its own connection error,
+      // which is exactly the proof that the original integration ran instead.
+      return outcome.message.slice(0, 90);
+    });
 
     heading('Site access');
     await check('a disabled site stops being intercepted', async () => {

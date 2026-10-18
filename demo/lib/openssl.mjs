@@ -53,3 +53,40 @@ export function verifyCades({directory, signature, certificate, detachedContent}
   }
   return {verified: status === 0, content, error: stderr.trim()};
 }
+
+/**
+ * Verify the signature embedded in a signed PDF, using only its `/ByteRange` and `/Contents`.
+ *
+ * @param {object} options
+ * @param {string} options.directory Scratch directory for the files OpenSSL reads.
+ * @param {Buffer} options.pdf The whole signed PDF exactly as the website received it.
+ * @param {string} options.certificate PEM of the signer certificate.
+ * @returns {{verified: boolean, content: Buffer|null, error: string}}
+ */
+export function verifyPades({directory, pdf, certificate}) {
+  const text = pdf.toString('latin1');
+  const ranges = [...text.matchAll(/\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g)].at(-1);
+  const contents = [...text.matchAll(/\/Contents\s*<([a-fA-F0-9]+)>/g)].at(-1);
+  if (!ranges || !contents) return {verified: false, content: null, error: 'no PDF signature found'};
+  const [start, length, restStart, restLength] = ranges.slice(1).map(Number);
+  const signaturePath = join(directory, 'pdf-signature.der');
+  const contentPath = join(directory, 'pdf-content.bin');
+  const contentOutPath = join(directory, 'pdf-recovered.bin');
+  const certificatePath = join(directory, 'signer.pem');
+  // The excluded `/Contents` hex string is exactly what the signature covers.
+  writeFileSync(signaturePath, Buffer.from(contents[1], 'hex'));
+  writeFileSync(contentPath, Buffer.concat([pdf.subarray(start, start + length), pdf.subarray(restStart, restStart + restLength)]));
+  writeFileSync(certificatePath, certificate);
+  const {status, stderr} = openssl([
+    'cms', '-verify', '-cades', '-binary', '-inform', 'DER',
+    '-in', signaturePath, '-content', contentPath, '-CAfile', certificatePath,
+    '-purpose', 'any', '-out', contentOutPath,
+  ]);
+  let content = null;
+  try {
+    content = readFileSync(contentOutPath);
+  } catch {
+    content = null;
+  }
+  return {verified: status === 0, content, error: stderr.trim()};
+}

@@ -7,6 +7,15 @@ export function validBase64(value, max = MAX_BASE64) {
   if(padding){const last='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'.indexOf(value[value.length-padding-1]);if(last & (padding===2?15:3))return false;}
   return true;
 }
+const SIGN_FORMATS = {CAdES: true, PAdES: true, XAdES: true, AUTO: true};
+/** Content sniffing for AutoFirma's AUTO format: PDF → PAdES, XML → XAdES, otherwise CAdES. */
+function contentFormat(data) {
+  const head = Uint8Array.from(atob(data.slice(0, 16)), (character) => character.charCodeAt(0));
+  if (head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46 && head[4] === 0x2d) return 'PAdES';
+  let index = head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf ? 3 : 0;
+  while (index < head.length && [0x09, 0x0a, 0x0d, 0x20].includes(head[index])) index++;
+  return head[index] === 0x3c ? 'XAdES' : 'CAdES';
+}
 export function parseCall(method, args) {
   if (method === 'selectCertificate') {
     if (args.length !== 3 || (args[0] != null && args[0] !== '') || typeof args[1] !== 'function' || typeof args[2] !== 'function') return null;
@@ -14,7 +23,7 @@ export function parseCall(method, args) {
   }
   if (method !== 'sign' || args.length !== 6) return null;
   const [data, algorithm, format, params, success, error] = args;
-  if (typeof success !== 'function' || typeof error !== 'function' || !validBase64(data) || algorithm !== 'SHA256withRSA' || format !== 'CAdES') return null;
+  if (typeof success !== 'function' || typeof error !== 'function' || !validBase64(data) || algorithm !== 'SHA256withRSA' || !Object.hasOwn(SIGN_FORMATS, format)) return null;
   const padding=data.endsWith('==')?2:data.endsWith('=')?1:0;
   if(data.length/4*3-padding>MAX_DATA_BYTES)return null;
   let mode = 'implicit';
@@ -24,7 +33,13 @@ export function parseCall(method, args) {
     if (!match) return null;
     mode = match[1];
   }
-  return {operation: 'sign', data, algorithm, format, mode};
+  // AUTO resolves from the bytes, as AutoFirma does. The XML engine ships enveloped
+  // signatures only, so detached (explicit) XAdES requests keep using native AutoFirma.
+  const sniffed = contentFormat(data);
+  const type = format === 'AUTO' ? sniffed : format;
+  if (type === 'XAdES' && (mode !== 'implicit' || sniffed !== 'XAdES')) return null;
+  if (type === 'PAdES' && sniffed !== 'PAdES') return null;
+  return {operation: 'sign', data, algorithm, format: type, mode};
 }
 export function validateRequest(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Invalid signing request');

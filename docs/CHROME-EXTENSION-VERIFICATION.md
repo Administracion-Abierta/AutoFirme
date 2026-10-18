@@ -78,7 +78,11 @@ Observed results:
   signature checks. OpenSSL verifies both signatures against the test certificate.
 - Opening the chooser, selecting a certificate and unlocking it do not sign.
   Confirmation returns attached and detached CAdES signatures that OpenSSL verifies
-  with `-cades`.
+  with `-cades`, plus PAdES signatures and `AUTO` PDF requests whose embedded CMS
+  OpenSSL verifies against the extracted `/ByteRange` content. `AUTO` non-PDF
+  requests resolve to CAdES.
+- Explicit XAdES passes through to the site's original AutoFirma integration; the
+  local engine only emits enveloped (implicit) XAdES.
 - Certificate selection, explicit fallback, dismissal fallback exactly once,
   cancellation and unsupported PDF pass-through work.
 - Two distinct concurrent payloads remain separate. Cancelling one leaves the

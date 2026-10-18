@@ -85,14 +85,19 @@ AutoScript.selectCertificate(null, success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', null, success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', 'mode=implicit', success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', 'mode=explicit', success, error);
+AutoScript.sign(base64, 'SHA256withRSA', 'PAdES', null, success, error);
+AutoScript.sign(base64, 'SHA256withRSA', 'AUTO', null, success, error);
 ```
 
 Input must be canonical Base64, at most 4 MiB. Certificate selection does not
 honor unsupported filters. Supported signing uses currently valid RSA certificates
-with at least 2048-bit keys and appropriate document-signing usage. Unsupported
-methods, formats, algorithms, parameters, sticky identities and custom stores
-continue through the original implementation unchanged. This website contract is
-narrower than the full app's interactive feature set.
+with at least 2048-bit keys and appropriate document-signing usage. `AUTO` sniffs
+the payload the way AutoFirma does: a `%PDF-` header signs as PAdES, XML signs as
+enveloped XAdES when the mode is implicit, and everything else signs as CAdES.
+Explicit XAdES needs a detached signature and continues through the original
+implementation. Unsupported methods, formats, algorithms, parameters, sticky
+identities and custom stores also continue through it unchanged. This website
+contract is narrower than the full app's interactive feature set.
 
 ## 4. Security boundaries and limits
 

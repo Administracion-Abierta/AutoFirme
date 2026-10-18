@@ -1,7 +1,9 @@
 import { oid, parseDer, type Bytes } from '../asn1';
 import { signCadesDetached } from '../cms';
+import { signPdf } from '../pades';
 import type { SignerCert } from '../sign';
 import { certificateIdentity } from '../x509';
+import { signXades } from '../xades';
 import type { ExtensionRequest, Rpc, SignatureResult } from './runtime';
 
 export const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
@@ -33,8 +35,9 @@ export function certificateProblem(cert: SignerCert, now = Date.now()): Certific
  } catch { return 'invalid'; }
  return null;
 }
+const FORMATS: Record<string, true> = { CAdES: true, PAdES: true, XAdES: true };
 function decodeContent(request: ExtensionRequest): Bytes {
- if (request.operation !== 'sign' || request.format?.toLowerCase() !== 'cades' || !['explicit', 'implicit'].includes(request.mode ?? '')) throw new Error('Unsupported request');
+ if (request.operation !== 'sign' || !Object.hasOwn(FORMATS, request.format ?? '') || !['explicit', 'implicit'].includes(request.mode ?? '')) throw new Error('Unsupported request');
  const value = request.data;
  if (typeof value !== 'string' || !value.length || value.length > Math.ceil(MAX_REQUEST_BYTES / 3) * 4 || value.length % 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) throw new Error('Invalid or oversized request data');
  const raw = atob(value);
@@ -48,7 +51,28 @@ export function base64(bytes: Bytes): string {
 }
 export async function signRequest(request: ExtensionRequest, cert: SignerCert, chain: readonly SignerCert[]): Promise<SignatureResult> {
  if (request.operation === 'selectCertificate') return { certificate: base64(cert.der) };
- const signature = await signCadesDetached(cert, decodeContent(request), { attached: request.mode === 'implicit', chain });
+ const content = decodeContent(request);
+ let signature: Bytes;
+ if (request.format === 'PAdES') {
+  if (!cert.key) throw new Error('The signing certificate has no private key');
+  signature = await signPdf(content, {
+   certificate: cert.der,
+   chain: chain.filter((entry) => entry !== cert).map((entry) => entry.der),
+   privateKey: cert.key,
+   signingTime: new Date(),
+   name: cert.commonName,
+  });
+ } else if (request.format === 'XAdES') {
+  const xml = await signXades({
+   xml: content,
+   certificates: chain.length ? chain : [cert],
+   signer: cert,
+   dataObject: { mimeType: 'application/xml' },
+  });
+  signature = new TextEncoder().encode(xml);
+ } else {
+  signature = await signCadesDetached(cert, content, { attached: request.mode === 'implicit', chain });
+ }
  return { certificate: base64(cert.der), signature: base64(signature) };
 }
 /** Called only by explicit confirmation. The begin transition prevents unsafe native replay. */

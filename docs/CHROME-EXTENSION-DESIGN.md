@@ -35,7 +35,7 @@ and webapp service-worker registration.
 | `src/lib/extension/ExtensionShell.svelte` | Full-app window controls |
 | `src/lib/extension/RequestChooser.svelte` | Request review and confirmation |
 | `src/lib/extension/SiteAccess.svelte` | Disabled-site list and TSA permission controls |
-| `src/lib/extension/sign-request.ts` | Certificate eligibility and local CAdES signing |
+| `src/lib/extension/sign-request.ts` | Certificate eligibility and local CAdES/PAdES/XAdES signing |
 
 ## 2. App windows and certificate storage
 
@@ -88,10 +88,12 @@ proxy.
 
 ## 4. Supported requests and app messages
 
-The bridge accepts certificate selection and RSA/SHA-256 CAdES signing with
-implicit or explicit content, up to 4 MiB of canonical Base64. Unsupported methods,
-formats, filters, sticky identities and custom stores use the original AutoFirma
-implementation. The full app retains its broader interactive format support.
+The bridge accepts certificate selection and RSA/SHA-256 signing as CAdES
+(implicit or explicit), PAdES and enveloped XAdES, plus `AUTO` content sniffing, up
+to 4 MiB of canonical Base64. Explicit XAdES stays outside the contract because the
+engine only emits enveloped signatures. Unsupported methods, filters, sticky
+identities and custom stores use the original AutoFirma implementation. The full
+app retains its broader interactive format support.
 
 Page ports use the name `autofirme-page`. A request carries `{id, request}`; a
 reply carries `{id, response}`. The background uses Chrome's sender metadata to
