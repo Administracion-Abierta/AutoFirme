@@ -128,8 +128,8 @@ describe('signXades', () => {
 		expect(elements(sha1Root, DS, 'DigestMethod').map((method) => method.getAttribute('Algorithm'))).toEqual([
 			'http://www.w3.org/2000/09/xmldsig#sha1',
 			'http://www.w3.org/2000/09/xmldsig#sha1',
-			'http://www.w3.org/2001/04/xmlenc#sha256',
-			'http://www.w3.org/2001/04/xmlenc#sha256'
+			'http://www.w3.org/2000/09/xmldsig#sha1',
+			'http://www.w3.org/2000/09/xmldsig#sha1'
 		]);
 		const path = writeFixtureFile(fixtures.dir, 'facturae-sha1.xsig', encoder.encode(sha1Signed));
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');

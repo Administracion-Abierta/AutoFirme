@@ -50,7 +50,8 @@ export interface XadesSignatureOptions {
 	policy?: { identifier: string; description?: string; digest?: Bytes };
 	/** XAdES `DataObjectFormat` of the signed document. */
 	dataObject?: { description?: string; mimeType?: string };
-	/** Overrides the certificate's default hash (legacy portals ask for SHA1withRSA). */
+	/** Overrides the certificate's default hash (legacy portals ask for SHA1withRSA). The XAdES
+	 * certificate digests follow it, as AutoFirma does. */
 	hash?: SigningAlgorithm['hash'];
 	/** Signing time; defaults to now. */
 	now?: Date;
@@ -128,12 +129,16 @@ function hexToDecimal(hex: string): string {
 	return BigInt(`0x${hex}`).toString();
 }
 
-function certificatesXml(certificates: readonly SignerCert[], digests: readonly Bytes[]): string {
+function certificatesXml(
+	certificates: readonly SignerCert[],
+	digests: readonly Bytes[],
+	hash: SigningAlgorithm['hash']
+): string {
 	return certificates
 		.map(
 			(certificate, index) => `<xades:Cert>
 					<xades:CertDigest>
-						<ds:DigestMethod Algorithm="${DIGEST_ALGORITHM['SHA-256']}"/>
+						<ds:DigestMethod Algorithm="${DIGEST_ALGORITHM[hash]}"/>
 						<ds:DigestValue>${toBase64(digests[index])}</ds:DigestValue>
 					</xades:CertDigest>
 					<xades:IssuerSerial>
@@ -184,7 +189,7 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 	// Reference #1 — the document itself: PIs/comments above the root included, the ds:Signature
 	// not yet inserted (the enveloped-signature transform would remove it anyway).
 	const documentDigest = await digest(hash, canonicalize(doc, { exclusive: true }));
-	const certificateDigests = await Promise.all(chain.map((certificate) => digest('SHA-256', certificate.der)));
+	const certificateDigests = await Promise.all(chain.map((certificate) => digest(hash, certificate.der)));
 	const signingTime = (options.now ?? new Date()).toISOString().replace(/\.\d{3}Z$/, 'Z');
 	const mimeType = options.dataObject?.mimeType ?? 'application/xml';
 
@@ -217,7 +222,7 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 			<xades:SignedProperties Id="${ids.signedProperties}">
 				<xades:SignedSignatureProperties>
 					<xades:SigningTime>${signingTime}</xades:SigningTime>
-					<xades:SigningCertificate>${certificatesXml(chain, certificateDigests)}</xades:SigningCertificate>
+					<xades:SigningCertificate>${certificatesXml(chain, certificateDigests, hash)}</xades:SigningCertificate>
 					${policyXml(options.policy)}
 				</xades:SignedSignatureProperties>
 				<xades:SignedDataObjectProperties>
