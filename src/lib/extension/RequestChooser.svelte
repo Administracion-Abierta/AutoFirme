@@ -24,6 +24,7 @@
  let content = $state<HTMLElement | null>(null);
  let eligibilityTime = $state(Date.now());
  const problem = $derived(cert ? certificateProblem(cert, eligibilityTime) : null);
+ const hash = $derived((request?.algorithm ?? 'SHA256withRSA').replace('withRSA', '').replace(/^SHA(\d+)/, 'SHA-$1'));
  const waiting = $derived(phase === 'waiting');
  onMount(() => {
   const cleanup = applyTheme(readTheme());
@@ -121,7 +122,7 @@
   <details id="request-details" class="text-xs">
    <summary class="text-muted-foreground cursor-pointer py-1">{t.requestDetails}</summary>
    <div class="bg-muted/50 mt-1 grid gap-2 rounded-lg border p-2">
-    <p>{request.operation==='sign' ? `${request.format} · SHA-256 · ${request.mode}` : t.select}</p>
+    <p>{request.operation==='sign' ? `${request.format}${request.serverUrl ? ' · ' + t.server : ''} · ${hash} · ${request.mode}` : t.select}</p>
     {#if request.operation==='sign'}
      <p class="text-muted-foreground">{t.digest}</p>
      <code id="request-digest" class="break-all">{request.digest ?? '—'}</code>

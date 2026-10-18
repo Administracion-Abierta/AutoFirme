@@ -5,6 +5,9 @@ export interface ExtensionRequest {
  operation: 'sign' | 'selectCertificate';
  format?: string;
  mode?: 'explicit' | 'implicit';
+ algorithm?: string;
+ serverUrl?: string;
+ params?: Record<string, string>;
  data?: string;
  digest?: string;
 }

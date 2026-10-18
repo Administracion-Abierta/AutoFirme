@@ -25,6 +25,30 @@ test('contract accepts supported RSA formats and resolves AUTO from the content'
   assert.deepEqual(publicResult({certificate:'YQ==',signature:'Yg==',privateKey:'secret'},'sign'),{kind:'result',certificate:'YQ==',signature:'Yg=='});
 });
 
+test('accepts CARM aliases and tri-phase calls without widening local formats', () => {
+  const call=(data,algorithm,format,params)=>parseCall('sign',[data,algorithm,format,params,()=>{},()=>{}]);
+  const pdf='JVBERi0xLjM=';
+  const carm=call(pdf,'SHA256withRSA','CMS/PKCS#7','mode=implicit\nfilters=nonexpired:\nmimeType=text/xml');
+  assert.deepEqual(carm,{operation:'sign',data:pdf,algorithm:'SHA256withRSA',format:'CAdES',mode:'implicit',params:{filters:'nonexpired:',mimeType:'text/xml'}});
+  assert.deepEqual(validateRequest(carm),carm);
+  const tri=call('YQ==','SHA512withRSA','CAdEStri','serverUrl=https://sign.test/api?x=1\nprecalculatedHashAlgorithm=SHA-512');
+  if(!tri) throw new Error('tri-phase call was rejected');
+  assert.deepEqual(tri,{operation:'sign',data:'YQ==',algorithm:'SHA512withRSA',format:'CAdES',mode:'implicit',serverUrl:'https://sign.test/api?x=1',params:{precalculatedHashAlgorithm:'SHA-512'}});
+  assert.deepEqual(validateRequest(tri),tri);
+  for(const [algorithm,format,params] of [
+    ['SHA512withRSA','CAdEStri','precalculatedHashAlgorithm=SHA-512'],
+    ['SHA1withRSA','CAdEStri','serverUrl=https://sign.test'],
+    ['SHA512withRSA','CAdEStri','serverUrl=https://sign.test\nprecalculatedHashAlgorithm=SHA-256'],
+    ['SHA512withRSA','CAdEStri','serverUrl=javascript:alert(1)'],
+    ['SHA512withRSA','CAdEStri','serverUrl=https://user:pass@sign.test'],
+    ['SHA512withRSA','CAdEStri','serverUrl=https://sign.test\nfoo=bar'],
+    ['SHA512withRSA','CAdEStri','serverUrl=https://sign.test\nserverUrl=https://evil.test'],
+    ['SHA256withRSA','CAdES','serverUrl=https://sign.test'],
+  ]) assert.equal(call('YQ==',algorithm,format,params),null,`${format} ${params}`);
+  assert.throws(()=>validateRequest({...tri,format:'PAdES'}),/Unsupported/);
+  assert.throws(()=>validateRequest({...tri,serverUrl:'javascript:alert(1)'}),/Unsupported/);
+});
+
 test('adapter preserves original receiver and callbacks and replays fallback exactly once', async () => {
   let calls=0; const receiver={};const args=['YQ==','SHA256withRSA','CAdES','',()=>{},()=>{}];
   const api={sign(...values){calls++;assert.equal(this,receiver);assert.deepEqual(values,args);return 42;}};

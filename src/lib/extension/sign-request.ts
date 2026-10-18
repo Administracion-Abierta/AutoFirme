@@ -5,6 +5,7 @@ import type { SignerCert } from '../sign';
 import { certificateIdentity } from '../x509';
 import { signXades } from '../xades';
 import type { ExtensionRequest, Rpc, SignatureResult } from './runtime';
+import { signCadesTriPhase } from './triphase';
 
 export const MAX_REQUEST_BYTES = 4 * 1024 * 1024;
 export type CertificateProblem = 'expired' | 'notYetValid' | 'privateKey' | 'rsa' | 'invalid' | 'ca' | 'keyUsage';
@@ -53,7 +54,9 @@ export async function signRequest(request: ExtensionRequest, cert: SignerCert, c
  if (request.operation === 'selectCertificate') return { certificate: base64(cert.der) };
  const content = decodeContent(request);
  let signature: Bytes;
- if (request.format === 'PAdES') {
+ if (request.serverUrl) {
+  signature = await signCadesTriPhase(request, cert, chain, content);
+ } else if (request.format === 'PAdES') {
   if (!cert.key) throw new Error('The signing certificate has no private key');
   signature = await signPdf(content, {
    certificate: cert.der,

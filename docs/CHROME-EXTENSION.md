@@ -53,6 +53,12 @@ The extension intercepts every HTTP and HTTPS website from installation: the man
 declares `http://*/*` and `https://*/*` as install-time host permissions, so a site's
 AutoScript calls open the chooser on the first request with no prior setup.
 
+For a `CAdEStri` call (Aragon's portafirmas), the page's signing server performs the
+pre-sign and post-sign phases: the extension sends the selected certificate and the
+request data, signs the returned attributes locally with the RSA key, and returns
+the PKCS#1 signature to that server. The private key never leaves the browser. The
+chooser marks the request as server-backed.
+
 In Site access, enter an origin and select Disable site to exclude it: reload the site
 and its calls run the original AutoFirma integration again. Chrome's own site-access
 settings can still withhold host access; if Chrome revoked the wildcard grant (or a

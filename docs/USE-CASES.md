@@ -67,7 +67,7 @@ cross-reading: <https://github.com/ctt-gob-es/clienteafirma>.
 | OOXML (`.docx/.xlsx/.pptx`) | `signers/ooxml/AOOOXMLSigner.java` | `core/signers/AOSignConstants.java:32-33` | `src/lib/ooxml.ts` (#10), not wired | `PARTIAL` | P0 |
 | FacturaE | `signers/xades/AOFacturaESigner.java` | `core/signers/AOSignConstants.java:41-43` | — | `MISSING` | P0 |
 | ASiC-S (CAdES / XAdES in a ZIP) | `signers/cades/asic/AOCAdESASiCSSigner.java`, `signers/xades/asic/AOXAdESASiCSSigner.java` | `core/signers/AOSignConstants.java:11,19` | — | `MISSING` | P1 |
-| Tri-phase variants (`*Tri`) | `signers/*/client/**`, `AOPkcs1TriPhaseSigner` | `core/signers/AOSignConstants.java:14,18,26,39` | — | `N/A-BROWSER` (`crypto.subtle` is the phase-2 signer; see architecture.md §2) | — |
+| Tri-phase variants (`*Tri`) | `signers/*/client/**`, `AOPkcs1TriPhaseSigner` | `core/signers/AOSignConstants.java:14,18,26,39` | `src/lib/extension/triphase.ts` — CAdES only, in the extension; the page's signing server builds the structure and the extension supplies the PKCS#1 signature | `PARTIAL` (CAdES; XAdES/PAdES tri servers still use native AutoFirma) | P1 |
 
 Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class table), `:36`
 (`getSigner(byte[])`), `:116` (`getSupportedFormats()`). Auto-detection of an already-signed artifact:

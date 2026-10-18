@@ -52,6 +52,8 @@ export interface SignerCert {
 	der: Bytes;
 	/** Non-extractable signing key; null for the certificates of the chain that are not the signer. */
 	key: CryptoKey | null;
+	/** RSA view imported with SHA-512, for the PK1 step of a three-phase signature. */
+	sha512Key?: CryptoKey | null;
 	algorithm: SigningAlgorithm | null;
 }
 

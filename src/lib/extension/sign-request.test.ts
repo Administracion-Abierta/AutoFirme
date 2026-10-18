@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { readFileSync, rmSync } from 'node:fs';
+import { createPublicKey, verify } from 'node:crypto';
 import { join } from 'node:path';
 import { createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../../test/fixtures';
 import { loadSignerSession } from '../keystore';
@@ -68,6 +69,49 @@ describe('format dispatch', () => {
  });
 });
 
+
+it('completes a three-phase CAdES signature with the server-provided pre-sign', async () => {
+ const content = new TextEncoder().encode('123e4567-e89b-12d3-a456-426614174000');
+ const pre = Uint8Array.from({ length: 64 }, (_, index) => (index * 37) & 0xff);
+ const final = Uint8Array.from([0xde, 0xad, 0xbe, 0xef]);
+ const urlSafe = (bytes: Uint8Array) => Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
+ const fromUrlSafe = (value: string) => Buffer.from(value.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+ const reply = (body: string) => ({ ok: true, status: 200, arrayBuffer: async () => new TextEncoder().encode(body).buffer });
+ let preCalled = false;
+ const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+  const url = new URL(String(input));
+  expect(init?.method).toBe('POST');
+  expect(url.searchParams.get('cop')).toBe('sign');
+  expect(url.searchParams.get('format')).toBe('CAdES');
+  expect(url.searchParams.get('algo')).toBe('SHA512withRSA');
+  expect(url.searchParams.get('cert')?.split(',')[0]).toBe(urlSafe(session.signer.der));
+  expect(fromUrlSafe(url.searchParams.get('params')!).toString()).toBe('precalculatedHashAlgorithm=SHA-512\n');
+  if (url.searchParams.get('op') === 'pre') {
+   expect(url.searchParams.get('doc')).toBe(urlSafe(content));
+   preCalled = true;
+   const xml = `<xml><firmas format="CAdES"><firma Id="1"><param n="PRE">${Buffer.from(pre).toString('base64')}</param><param n="NEED_PRE">false</param></firma></firmas></xml>`;
+   return reply(Buffer.from(xml).toString('base64'));
+  }
+  const xml = fromUrlSafe(url.searchParams.get('session')!).toString();
+  const pk1 = /<param n="PK1">([^<]+)<\/param>/.exec(xml)?.[1];
+  expect(pk1).toBeTruthy();
+  expect(verify('sha512', pre, createPublicKey(readFileSync(fixtures.leafPath)), fromUrlSafe(pk1!))).toBe(true);
+  expect(xml).not.toContain('n="PRE"');
+  expect(xml).toContain('<firmas format="CAdES">');
+  return reply('OK NEWID=' + Buffer.from(final).toString('base64url'));
+ });
+ vi.stubGlobal('fetch', fetchMock);
+ try {
+  const result = await signRequest({
+   id: 'tri', origin: request.origin, operation: 'sign', format: 'CAdES', mode: 'implicit',
+   algorithm: 'SHA512withRSA', serverUrl: 'https://sign.test/api',
+   params: { precalculatedHashAlgorithm: 'SHA-512' }, data: Buffer.from(content).toString('base64')
+  }, session.signer, session.certificates);
+  expect(preCalled).toBe(true);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(Buffer.from(result.signature!, 'base64')).toEqual(Buffer.from(final));
+ } finally { vi.unstubAllGlobals(); }
+});
 
 it('rejects CA certificates and keys restricted to other uses', () => {
  const withExtension = (id: string, value: Bytes) => {
