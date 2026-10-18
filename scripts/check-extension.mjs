@@ -27,6 +27,10 @@ async function files(directory) {
     return entry.isDirectory() ? files(name) : [name];
   }))).flat();
 }
+for (const name of await files(root)) {
+  const parts = path.relative(root, name).split(path.sep);
+  assert.ok(!parts.some((part) => part.startsWith('_')), `Chrome reserves names starting with "_": ${path.relative(root, name)}`);
+}
 const javascript = await Promise.all((await files(root)).filter((name) => name.endsWith('.js')).map((name) => readFile(name, 'utf8')));
 const code = javascript.join('\n');
 assert.ok(!/\beval\s*\(|\bnew\s+Function\s*\(/.test(code), 'dynamic code execution');
