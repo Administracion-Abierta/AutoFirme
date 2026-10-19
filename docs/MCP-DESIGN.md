@@ -52,6 +52,12 @@ Cost of the rejected alternatives:
   DOM-free in the first place.
 - **(c) Port the engine to Java/reuse decompiled AutoFirma.** Wastes the clean-room rewrite and
   reintroduces the GPL-derived code the project deliberately keeps out of the app.
+- **(d) Run the MCP server inside the browser extension.** Not possible: Manifest V3 has no
+  server-socket API. `chrome.sockets.tcpServer` exists only for deprecated Chrome Apps, and a
+  service worker or extension page cannot bind a TCP port; it can only make outbound requests.
+  `/mcp` therefore needs a process outside Chrome. A native-messaging host can relay requests to
+  the extension if the agent must use a key that is unlocked there, but the host, not the CRX,
+  owns the listening socket.
 
 **Sequencing note:** the slice deliberately stops at CAdES. XAdES and PAdES are reachable —
 PAdES signing is already DOM-free (it needs only `pdf-lib` as a dependency) and XAdES needs a DOM
