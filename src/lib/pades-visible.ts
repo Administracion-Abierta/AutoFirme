@@ -29,10 +29,16 @@ export const BLOCK_SIZE = { width: 200, height: 70 } as const;
 export const BLOCK_MARGIN = 24;
 
 export interface VisibleSignatureOptions {
-	/** Zero-based page index. Defaults to the first page. */
+	/** Zero-based page index. Negative counts from the end (`-1` is the last page). Defaults to the first page. */
 	page?: number;
 	/** Placement in PDF points; wins over `corner`. */
 	rect?: [number, number, number, number];
+	/**
+	 * AutoFirma's `signaturePositionOnPage*` box. Unlike `rect`, this is in the page's
+	 * unrotated user space; `pades.ts` maps it to the widget rectangle with the page's
+	 * `/MediaBox` and `/Rotate`, as AutoFirma's iText layer does.
+	 */
+	autoFirmaRect?: [number, number, number, number];
 	corner?: SignatureCorner;
 	/** Block size used by `corner`. */
 	size?: { width: number; height: number };
@@ -40,6 +46,42 @@ export interface VisibleSignatureOptions {
 	image?: ArrayBuffer | ArrayBufferView;
 	/** Text lines drawn in the block. Defaults to the signature's `/Name`. */
 	lines?: readonly string[];
+	/** Text layer 2 font. Defaults match AutoFirma: Helvetica, 8 pt, black. */
+	fontFamily?: 0 | 1 | 2;
+	fontSize?: number;
+	fontStyle?: 0 | 1 | 2 | 3;
+	fontColor?: [number, number, number];
+}
+
+const STANDARD_FONTS = [
+	['Courier', 'Courier-Bold', 'Courier-Oblique', 'Courier-BoldOblique'],
+	['Helvetica', 'Helvetica-Bold', 'Helvetica-Oblique', 'Helvetica-BoldOblique'],
+	['Times-Roman', 'Times-Bold', 'Times-Italic', 'Times-BoldItalic']
+] as const;
+// Average glyph width as a fraction of the font size, used only to wrap text.
+const FONT_WIDTH = [0.6, 0.55, 0.5];
+
+/** Map AutoFirma's unrotated placement box to the page's rotated user space. */
+export function mapAutoFirmaRect(
+	geometry: { x: number; y: number; width: number; height: number },
+	rotation: number,
+	rect: [number, number, number, number]
+): [number, number, number, number] {
+	const [x1, y1, x2, y2] = rect;
+	const right = geometry.x + geometry.width;
+	const top = geometry.y + geometry.height;
+	const angle = ((rotation % 360) + 360) % 360;
+	const map = (x: number, y: number): [number, number] =>
+		angle === 90
+			? [right - y, x]
+			: angle === 180
+				? [right - x, top - y]
+				: angle === 270
+					? [y, top - x]
+					: [x, y];
+	const [ax, ay] = map(x1, y1);
+	const [bx, by] = map(x2, y2);
+	return [Math.min(ax, bx), Math.min(ay, by), Math.max(ax, bx), Math.max(ay, by)];
 }
 
 /** Rectangle of a corner block: `[x1, y1, x2, y2]` in PDF coordinates (origin bottom-left). */
@@ -94,6 +136,8 @@ export function serializeObject(node: PDFObject): Bytes {
 export interface Appearance {
 	/** Form XObject content stream. */
 	content: string;
+	/** `/BaseFont` for the content stream's `/F1` resource. */
+	fontBase: string;
 	/** `/XObject` entry for the image, absent when the block has none. */
 	imageRef: PDFRef | null;
 	/** Image streams (the image, plus its `/SMask` when it has alpha) to append to the update. */
@@ -120,10 +164,21 @@ export function imageFormat(bytes: Bytes): keyof typeof raster | null {
 export async function buildAppearance(
 	document: PDFDocument,
 	rect: [number, number, number, number],
-	options: { lines: readonly string[]; image?: ArrayBuffer | ArrayBufferView }
+	options: {
+		lines: readonly string[];
+		image?: ArrayBuffer | ArrayBufferView;
+		fontFamily?: 0 | 1 | 2;
+		fontSize?: number;
+		fontStyle?: 0 | 1 | 2 | 3;
+		fontColor?: [number, number, number];
+	}
 ): Promise<Appearance> {
 	const width = Math.abs(rect[2] - rect[0]);
 	const height = Math.abs(rect[3] - rect[1]);
+	const fontFamily = options.fontFamily ?? 1;
+	const fontSize = options.fontSize ?? 8;
+	const fontBase = STANDARD_FONTS[fontFamily][options.fontStyle ?? 0];
+	const [red, green, blue] = options.fontColor ?? [0, 0, 0];
 
 	let imageRef: PDFRef | null = null;
 	const objects: Appearance['objects'] = [];
@@ -158,9 +213,9 @@ export async function buildAppearance(
 	}
 
 	const available = Math.max(width - imageColumn - 8, 8);
-	// Helvetica at 8 pt averages ~4.4 pt per character.
-	const perLine = Math.max(1, Math.floor(available / 4.4));
-	const leading = 10;
+	// Rough average glyph width for the chosen standard font.
+	const perLine = Math.max(1, Math.floor(available / (FONT_WIDTH[fontFamily] * fontSize)));
+	const leading = Math.max(1, Math.ceil(fontSize * 1.25));
 	const fits = Math.max(1, Math.floor((height - 12) / leading));
 	// Wrap instead of truncating: a date cut in half is worse than a shorter line.
 	const wrapped: string[] = [];
@@ -170,7 +225,7 @@ export async function buildAppearance(
 			const candidate = current.length > 0 ? `${current} ${word}` : word;
 			if (candidate.length > perLine) {
 				if (current.length > 0) wrapped.push(current);
-				// A single word wider than the block is cut; nothing else can be done at 8 pt.
+				// A single word wider than the block is cut; nothing else can be done without shaping.
 				current = word.slice(0, perLine);
 			} else {
 				current = candidate;
@@ -186,7 +241,7 @@ export async function buildAppearance(
 		'0.55 0.55 0.55 RG 0.5 w',
 		`0.25 0.25 ${Math.max(width - 0.5, 0)} ${Math.max(height - 0.5, 0)} re S`,
 		...(imageCommand ? [imageCommand] : []),
-		`BT /Helv 8 Tf 0 0 0 rg ${imageColumn + 4} ${Math.max(height - 12, 1)} Td`,
+		`BT /F1 ${fontSize} Tf ${red} ${green} ${blue} rg ${imageColumn + 4} ${Math.max(height - 12, 1)} Td`,
 		// First line sits at Td; the rest step down with the same offset.
 		lines.join(` 0 -${leading} Td `),
 		'ET',
@@ -194,5 +249,5 @@ export async function buildAppearance(
 		''
 	].join('\n');
 
-	return { content, imageRef, objects };
+	return { content, fontBase, imageRef, objects };
 }

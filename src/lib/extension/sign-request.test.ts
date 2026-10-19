@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { readFileSync, rmSync } from 'node:fs';
 import { createPublicKey, verify } from 'node:crypto';
 import { join } from 'node:path';
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRef, PDFStream, PDFString } from 'pdf-lib';
 import { createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../../test/fixtures';
 import { loadSignerSession } from '../keystore';
 import type { SignerSession } from '../sign';
@@ -66,6 +67,51 @@ describe('format dispatch', () => {
   const xml = '<?xml version="1.0"?><root><value>1</value></root>';
   const enveloped = await signRequest({ ...request, format: 'XAdES', mode: 'implicit', data: Buffer.from(xml).toString('base64') }, session.signer, session.certificates);
   expect(Buffer.from(enveloped.signature!, 'base64').toString()).toContain('<ds:Signature');
+ });
+
+ it('applies AutoFirma’s visible-signature parameters', async () => {
+  const pdf = readFileSync(join(process.cwd(), 'test/fixtures/pades-source.pdf'));
+  const stamped = await signRequest({
+   ...request,
+   format: 'PAdES',
+   data: pdf.toString('base64'),
+   params: {
+    visibleSignature: 'want',
+    signaturePositionOnPageLowerLeftX: '45',
+    signaturePositionOnPageLowerLeftY: '80',
+    signaturePositionOnPageUpperRightX: '560',
+    signaturePositionOnPageUpperRightY: '140',
+    signaturePage: '-1',
+    layer2Text: 'Firmado por $$SUBJECTCN$$ el $$SIGNDATE=dd/MM/yyyy (HH:mm:ss)$$',
+    layer2FontFamily: '1',
+    layer2FontSize: '8',
+    layer2FontStyle: '2',
+    layer2FontColor: 'gray',
+    signReason: 'Conforme',
+    signatureProductionCity: 'Madrid',
+    signerContact: 'signer@example.test'
+   }
+  }, session.signer, session.certificates);
+
+  const source = Uint8Array.from(Buffer.from(stamped.signature!, 'base64'));
+  const document = await PDFDocument.load(source);
+  const acroEntry = document.catalog.get(PDFName.of('AcroForm'));
+  const acroForm = acroEntry instanceof PDFRef ? document.context.lookup(acroEntry, PDFDict) : (acroEntry as PDFDict);
+  const field = document.context.lookup(acroForm.lookup(PDFName.of('Fields'), PDFArray).get(0) as PDFRef, PDFDict);
+  expect(field.lookup(PDFName.of('Rect'), PDFArray).asArray().map((entry) => (entry as PDFNumber).asNumber())).toEqual([45, 80, 560, 140]);
+  const signature = document.context.lookup(field.get(PDFName.of('V')) as PDFRef, PDFDict);
+  expect(signature.lookup(PDFName.of('Reason'), PDFString).decodeText()).toBe('Conforme');
+  expect(signature.lookup(PDFName.of('Location'), PDFString).decodeText()).toBe('Madrid');
+  expect(signature.lookup(PDFName.of('ContactInfo'), PDFString).decodeText()).toBe('signer@example.test');
+  const appearance = field.lookup(PDFName.of('AP'), PDFDict);
+  const form = document.context.lookup(appearance.lookup(PDFName.of('N')) as PDFRef, PDFStream);
+  const content = new TextDecoder('latin1').decode(form.getContents());
+  expect(content).toContain(`(Firmado por ${session.signer.commonName} el `);
+  expect(content).not.toContain('$$');
+  expect(content).toContain('BT /F1 8 Tf 0.5 0.5 0.5 rg');
+  const font = form.dict.lookup(PDFName.of('Resources'), PDFDict).lookup(PDFName.of('Font'), PDFDict);
+  const fontRef = font.get(PDFName.of('F1')) as PDFRef;
+  expect(document.context.lookup(fontRef, PDFDict).lookup(PDFName.of('BaseFont'), PDFName).asString()).toBe('/Helvetica-Oblique');
  });
 });
 

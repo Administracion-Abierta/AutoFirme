@@ -98,8 +98,11 @@ extension performs the pre-sign and post-sign calls while the private key stays
 local; RSA/SHA-256 and RSA/SHA-512 are supported.
 Explicit XAdES stays outside the contract because the engine only emits enveloped
 signatures. Unsupported methods, filters, sticky identities, other `*Tri` formats
-and custom stores use the original AutoFirma implementation. The full app retains
-its broader interactive format support.
+and custom stores use the original AutoFirma implementation. PAdES requests may
+carry AutoFirma's visible-stamp bag (`signaturePage`, `signaturePositionOnPage*`,
+`signatureRubricImage`, `layer2*`, reason/city/contact); it is mapped to the local
+appearance, while a non-zero `signatureRotation` falls back to native. The full app
+retains its broader interactive format support.
 
 Page ports use the name `autofirme-page`. A request carries `{id, request}`; a
 reply carries `{id, response}`. The background uses Chrome's sender metadata to

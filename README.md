@@ -358,6 +358,8 @@ incremental update — so the drawn bytes are covered by `/ByteRange`, and the b
 invalidate the signature:
 
 - placed by page and corner (24 pt margin, 200×70 pt by default) or by explicit coordinates;
+  AutoScript stamp parameters (`signaturePage`, `signaturePositionOnPage*`, `layer2*`,
+  `signatureRubricImage`) reuse the same placement and appearance code;
 - the block carries an uploaded **PNG or JPEG** signature image (alpha honoured through `/SMask`),
   plus text lines: the signer's CN and the signing date, wrapped rather than cut.
 - the sign panel exposes it as an off-by-default toggle with image upload, page number and corner

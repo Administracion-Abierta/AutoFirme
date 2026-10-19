@@ -37,6 +37,82 @@ export function certificateProblem(cert: SignerCert, now = Date.now()): Certific
  return null;
 }
 const FORMATS: Record<string, true> = { CAdES: true, PAdES: true, XAdES: true };
+const FONT_COLORS: Record<string, [number, number, number]> = {
+	black: [0, 0, 0],
+	white: [1, 1, 1],
+	gray: [0.5, 0.5, 0.5],
+	lightGray: [0.75, 0.75, 0.75],
+	darkGray: [0.25, 0.25, 0.25],
+	red: [1, 0, 0],
+	pink: [1, 0.75, 0.8]
+};
+const two = (value: number) => String(value).padStart(2, '0');
+/** The `$$SIGNDATE$$` subset of Java's SimpleDateFormat used by public portals. */
+function formatSignDate(date: Date, pattern?: string): string {
+	if (!pattern) return new Intl.DateTimeFormat('es-ES', { dateStyle: 'short', timeStyle: 'medium' }).format(date);
+	const names = new Intl.DateTimeFormat('es-ES', { timeZoneName: 'short' }).formatToParts(date);
+	const zone = names.find((part) => part.type === 'timeZoneName')?.value ?? '';
+	const tokens: Record<string, string> = {
+		yyyy: String(date.getFullYear()),
+		yy: two(date.getFullYear() % 100),
+		MM: two(date.getMonth() + 1),
+		dd: two(date.getDate()),
+		HH: two(date.getHours()),
+		mm: two(date.getMinutes()),
+		ss: two(date.getSeconds()),
+		z: zone
+	};
+	return pattern.replace(/yyyy|yy|MM|dd|HH|mm|ss|z/g, (token) => tokens[token]);
+}
+function layerText(text: string, cert: SignerCert, date: Date, params: Record<string, string>): string[] {
+	const serial = cert.serial ? BigInt(`0x${cert.serial}`).toString() : '';
+	const expanded = text
+		.replaceAll('$$SUBJECTCN$$', cert.commonName)
+		.replaceAll('$$SUBJECTDN$$', cert.subject)
+		.replaceAll('$$ISSUERCN$$', cert.issuer)
+		.replaceAll('$$CERTSERIAL$$', serial)
+		.replaceAll('$$REASON$$', params.signReason ?? '')
+		.replaceAll('$$LOCATION$$', params.signatureProductionCity ?? '')
+		.replaceAll('$$CONTACT$$', params.signerContact ?? '')
+		.replace(/\$\$SIGNDATE(?:=([^$]*))?\$\$/g, (_, pattern: string | undefined) => formatSignDate(date, pattern));
+	return expanded.split(/\r?\n/);
+}
+function defaultLines(cert: SignerCert, date: Date, params: Record<string, string>): string[] {
+	const lines = [`Firmado por ${cert.commonName}`, `Fecha: ${formatSignDate(date)}`];
+	if (params.signReason) lines.push(`Motivo: ${params.signReason}`);
+	if (params.signatureProductionCity) lines.push(`Lugar: ${params.signatureProductionCity}`);
+	if (params.signerContact) lines.push(`Contacto: ${params.signerContact}`);
+	return lines;
+}
+/** Translate AutoFirma's visible-signature parameters into the local appearance options. */
+function visibleSignature(request: ExtensionRequest, cert: SignerCert, date: Date) {
+	const params = request.params ?? {};
+	if (params.signaturePositionOnPageLowerLeftX === undefined) return undefined;
+	const image = params.signatureRubricImage;
+	// AutoFirma pages are one-based; absent or -1 means the last page. It ignores layer2Text
+	// when a rubric image is present.
+	const page = params.signaturePage === undefined || params.signaturePage === '-1' ? -1 : Number(params.signaturePage) - 1;
+	const lines = image
+		? []
+		: params.layer2Text !== undefined
+			? layerText(params.layer2Text, cert, date, params)
+			: defaultLines(cert, date, params);
+	return {
+		page,
+		autoFirmaRect: [
+			Number(params.signaturePositionOnPageLowerLeftX),
+			Number(params.signaturePositionOnPageLowerLeftY),
+			Number(params.signaturePositionOnPageUpperRightX),
+			Number(params.signaturePositionOnPageUpperRightY)
+		] as [number, number, number, number],
+		lines,
+		...(image ? { image: Uint8Array.from(atob(image), (character) => character.charCodeAt(0)) } : {}),
+		...(params.layer2FontFamily !== undefined ? { fontFamily: Number(params.layer2FontFamily) as 0 | 1 | 2 } : {}),
+		...(params.layer2FontSize !== undefined ? { fontSize: Number(params.layer2FontSize) } : {}),
+		...(params.layer2FontStyle !== undefined ? { fontStyle: Number(params.layer2FontStyle) as 0 | 1 | 2 | 3 } : {}),
+		...(params.layer2FontColor ? { fontColor: FONT_COLORS[params.layer2FontColor] } : {})
+	};
+}
 function decodeContent(request: ExtensionRequest): Bytes {
  if (request.operation !== 'sign' || !Object.hasOwn(FORMATS, request.format ?? '') || !['explicit', 'implicit'].includes(request.mode ?? '')) throw new Error('Unsupported request');
  const value = request.data;
@@ -58,12 +134,18 @@ export async function signRequest(request: ExtensionRequest, cert: SignerCert, c
   signature = await signCadesTriPhase(request, cert, chain, content);
  } else if (request.format === 'PAdES') {
   if (!cert.key) throw new Error('The signing certificate has no private key');
+  const signingTime = new Date();
+  const params = request.params ?? {};
   signature = await signPdf(content, {
    certificate: cert.der,
    chain: chain.filter((entry) => entry !== cert).map((entry) => entry.der),
    privateKey: cert.key,
-   signingTime: new Date(),
+   signingTime,
    name: cert.commonName,
+   reason: params.signReason,
+   location: params.signatureProductionCity,
+   contact: params.signerContact,
+   visible: visibleSignature(request, cert, signingTime),
   });
  } else if (request.format === 'XAdES') {
   const xml = await signXades({

@@ -28,6 +28,65 @@ test('contract accepts supported RSA formats and resolves AUTO from the content'
   assert.deepEqual(publicResult({certificate:'YQ==',signature:'Yg==',privateKey:'secret'},'sign'),{kind:'result',certificate:'YQ==',signature:'Yg=='});
 });
 
+test('accepts AutoFirma visible-signature parameters for PDF only', () => {
+  const call=(data,algorithm,format,params)=>parseCall('sign',[data,algorithm,format,params,()=>{},()=>{}]);
+  const pdf='JVBERi0xLjM=';
+  const png='iVBORw0KGgo=';
+  const stamp=[
+    'visibleSignature=want',
+    'signaturePositionOnPageLowerLeftX=45',
+    'signaturePositionOnPageLowerLeftY=80',
+    'signaturePositionOnPageUpperRightX=560',
+    'signaturePositionOnPageUpperRightY=140',
+    'signaturePage=-1',
+    'layer2Text=Firmado por $$SUBJECTCN$$ el $$SIGNDATE=dd/MM/yyyy (HH:mm:ss)$$',
+    'layer2FontFamily=1',
+    'layer2FontSize=8',
+    'layer2FontStyle=2',
+    'layer2FontColor=gray',
+    'signReason=Conforme',
+    'signatureProductionCity=Madrid',
+    'signerContact=signer@example.test'
+  ].join('\n');
+  const expected={...sign,data:pdf,format:'PAdES',params:{
+    visibleSignature:'want',
+    signaturePositionOnPageLowerLeftX:'45',
+    signaturePositionOnPageLowerLeftY:'80',
+    signaturePositionOnPageUpperRightX:'560',
+    signaturePositionOnPageUpperRightY:'140',
+    signaturePage:'-1',
+    layer2Text:'Firmado por $$SUBJECTCN$$ el $$SIGNDATE=dd/MM/yyyy (HH:mm:ss)$$',
+    layer2FontFamily:'1',
+    layer2FontSize:'8',
+    layer2FontStyle:'2',
+    layer2FontColor:'gray',
+    signReason:'Conforme',
+    signatureProductionCity:'Madrid',
+    signerContact:'signer@example.test'
+  }};
+  const parsed=call(pdf,'SHA256withRSA','PAdES',stamp);
+  assert.deepEqual(parsed,expected);
+  assert.deepEqual(validateRequest(parsed),expected);
+  assert.equal(/** @type {any} */ (call(pdf,'SHA256withRSA','PAdES',stamp+'\nsignatureRubricImage='+png))?.params?.signatureRubricImage,png);
+  const largeImage=Buffer.concat([Buffer.from(png,'base64'),Buffer.alloc(4096)]).toString('base64');
+  assert.equal(/** @type {any} */ (call(pdf,'SHA256withRSA','PAdES',stamp+'\nsignatureRubricImage='+largeImage))?.params?.signatureRubricImage,largeImage);
+  assert.equal(/** @type {any} */ (call(pdf,'SHA256withRSA','PAdES','signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4'))?.params?.signaturePage,'-1');
+  for(const params of [
+    'visibleSignature=want',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3',
+    'signaturePositionOnPageLowerLeftX=10\nsignaturePositionOnPageLowerLeftY=20\nsignaturePositionOnPageUpperRightX=5\nsignaturePositionOnPageUpperRightY=30',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nsignaturePage=0',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nsignaturePage=1\nsignaturePages=1',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nsignatureRotation=90',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nlayer2FontFamily=9',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nlayer2FontColor=blue',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nsignatureRubricImage=not-base64',
+  ]) assert.equal(call(pdf,'SHA256withRSA','PAdES',params),null,params);
+  assert.equal(call(pdf,'SHA256withRSA','AUTO',stamp)?.format,'PAdES');
+  assert.equal(call('YQ==','SHA256withRSA','CAdES',stamp),null);
+  assert.equal(call(pdf,'SHA256withRSA','CAdES',stamp),null);
+});
+
 test('accepts CARM aliases and tri-phase calls without widening local formats', () => {
   const call=(data,algorithm,format,params)=>parseCall('sign',[data,algorithm,format,params,()=>{},()=>{}]);
   const pdf='JVBERi0xLjM=';

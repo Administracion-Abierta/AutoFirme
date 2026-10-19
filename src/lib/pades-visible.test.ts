@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
-import { buildAppearance, rectForCorner } from './pades-visible';
+import { buildAppearance, mapAutoFirmaRect, rectForCorner } from './pades-visible';
 
 const A4 = { width: 595.28, height: 841.89 };
 
@@ -33,5 +33,26 @@ describe('visible signature block', () => {
 				image: new Uint8Array([0x47, 0x49, 0x46, 0x38])
 			})
 		).rejects.toThrow(/PNG or JPEG/);
+	});
+
+	it('maps AutoFirma coordinates through the page rotation', () => {
+		const box = { x: 0, y: 0, width: 600, height: 800 };
+		expect(mapAutoFirmaRect(box, 0, [10, 20, 110, 70])).toEqual([10, 20, 110, 70]);
+		expect(mapAutoFirmaRect(box, 90, [10, 20, 110, 70])).toEqual([530, 10, 580, 110]);
+		expect(mapAutoFirmaRect(box, 180, [10, 20, 110, 70])).toEqual([490, 730, 590, 780]);
+		expect(mapAutoFirmaRect(box, 270, [10, 20, 110, 70])).toEqual([20, 690, 70, 790]);
+	});
+
+	it('embeds the selected standard font in the appearance', async () => {
+		const document = await PDFDocument.create();
+		const appearance = await buildAppearance(document, [0, 0, 200, 70], {
+			lines: ['signer'],
+			fontFamily: 2,
+			fontSize: 10,
+			fontStyle: 1,
+			fontColor: [1, 0, 0]
+		});
+		expect(appearance.fontBase).toBe('Times-Bold');
+		expect(appearance.content).toContain('BT /F1 10 Tf 1 0 0 rg');
 	});
 });
