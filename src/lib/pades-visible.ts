@@ -237,7 +237,6 @@ export async function buildAppearance(
 
 	const content = [
 		'q',
-		`0.97 0.97 0.97 rg 0 0 ${width} ${height} re f`,
 		'0.55 0.55 0.55 RG 0.5 w',
 		`0.25 0.25 ${Math.max(width - 0.5, 0)} ${Math.max(height - 0.5, 0)} re S`,
 		...(imageCommand ? [imageCommand] : []),

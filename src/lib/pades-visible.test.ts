@@ -43,6 +43,13 @@ describe('visible signature block', () => {
 		expect(mapAutoFirmaRect(box, 270, [10, 20, 110, 70])).toEqual([20, 690, 70, 790]);
 	});
 
+	it('leaves the stamp background transparent', async () => {
+		const document = await PDFDocument.create();
+		const appearance = await buildAppearance(document, [0, 0, 200, 70], { lines: ['signer'] });
+		expect(appearance.content).not.toMatch(/\bre f\b/);
+		expect(appearance.content).toContain('re S');
+	});
+
 	it('embeds the selected standard font in the appearance', async () => {
 		const document = await PDFDocument.create();
 		const appearance = await buildAppearance(document, [0, 0, 200, 70], {
