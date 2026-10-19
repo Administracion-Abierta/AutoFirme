@@ -126,7 +126,7 @@ export function base64(bytes: Bytes): string {
  for (let offset = 0; offset < bytes.length; offset += 8192) raw += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
  return btoa(raw);
 }
-export async function signRequest(request: ExtensionRequest, cert: SignerCert, chain: readonly SignerCert[]): Promise<SignatureResult> {
+export async function signRequest(request: ExtensionRequest, cert: SignerCert, chain: readonly SignerCert[], signingTime = new Date()): Promise<SignatureResult> {
  if (request.operation === 'selectCertificate') return { certificate: base64(cert.der) };
  const content = decodeContent(request);
  let signature: Bytes;
@@ -134,7 +134,6 @@ export async function signRequest(request: ExtensionRequest, cert: SignerCert, c
   signature = await signCadesTriPhase(request, cert, chain, content);
  } else if (request.format === 'PAdES') {
   if (!cert.key) throw new Error('The signing certificate has no private key');
-  const signingTime = new Date();
   const params = request.params ?? {};
   signature = await signPdf(content, {
    certificate: cert.der,
@@ -154,10 +153,11 @@ export async function signRequest(request: ExtensionRequest, cert: SignerCert, c
    signer: cert,
    dataObject: { mimeType: 'application/xml' },
    hash: request.algorithm === 'SHA1withRSA' ? 'SHA-1' : undefined,
+   now: signingTime,
   });
   signature = new TextEncoder().encode(xml);
  } else {
-  signature = await signCadesDetached(cert, content, { attached: request.mode === 'implicit', chain });
+  signature = await signCadesDetached(cert, content, { attached: request.mode === 'implicit', chain, signingTime });
  }
  return { certificate: base64(cert.der), signature: base64(signature) };
 }
@@ -171,7 +171,7 @@ export async function confirmRequest(request: ExtensionRequest, cert: SignerCert
  }
  await send({ type: 'request:begin', id: request.id });
  try {
-  const result = await sign(request, cert, chain);
+  const result = await sign(request, cert, chain, request.signingTime ? new Date(request.signingTime) : undefined);
   await send({ type: 'request:complete', id: request.id, result });
  } catch (error) {
   try { await send({ type: 'request:fail', id: request.id }); } catch { /* Worker loss is already terminal; never replay. */ }

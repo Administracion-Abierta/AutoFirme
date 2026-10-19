@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createBridge} from '../background.js';
+import {createBridge,bridgeUrl} from '../background.js';
 import {MAX_GLOBAL_REQUESTS} from '../core/coordinator.js';
 
 const event = () => ({listeners: /** @type {((...args: any[]) => any)[]} */ ([]),addListener(fn){this.listeners.push(fn);},async emit(...args){return Promise.all(this.listeners.map(fn=>fn(...args)));}});
@@ -296,4 +296,59 @@ test('a chooser reloaded mid-signing exits through cancel and stays dead exactly
   assert.deepEqual(replies.map(r=>r.response.kind),['cancel']);
   await assert.rejects(env.bridge.handleMessage({type:'request:cancel',id:item.id},reloaded),/expired/i);
   assert.equal(env.state.removed.includes(item.windowId),true,'the resolved request closed its own chooser window');
+});
+
+test('derives the bridge beside a prefixed endpoint',()=>{
+  assert.equal(bridgeUrl({url:'https://host.test/autofirme/mcp/',token:'t'}),'wss://host.test/autofirme/bridge?token=t');
+  assert.equal(bridgeUrl({url:'http://host.test/mcp',token:'t'}),'ws://host.test/bridge?token=t');
+});
+test('the MCP bridge authenticates, opens a chooser and returns the finished signature',async()=>{
+  const original=globalThis.WebSocket;
+  class FakeSocket {
+    static instances=[];
+    /** @type {(() => void) | null} */ onclose=null;
+    /** @type {(() => void) | null} */ onopen=null;
+    /** @type {((event: {data: string}) => void) | null} */ onmessage=null;
+    constructor(url,protocol){this.url=url;this.protocol=protocol;this.readyState=0;this.sent=[];FakeSocket.instances.push(this);}
+    send(raw){this.sent.push(JSON.parse(raw));}
+    close(){this.readyState=3;this.onclose?.();}
+    open(){this.readyState=1;this.onopen?.();}
+    message(value){this.onmessage?.({data:JSON.stringify(value)});}
+  }
+  globalThis.WebSocket = /** @type {typeof WebSocket} */ (/** @type {unknown} */ (FakeSocket));
+  try {
+    const env=setup();await env.bridge.ready;
+    env.chrome.runtime.sendMessage=async()=>{};
+    await assert.rejects(env.bridge.handleMessage({type:'mcp:configure',settings:{enabled:true,url:'ftp://mcp.test',token:'t'}},app()),/endpoint/i);
+    await assert.rejects(env.bridge.handleMessage({type:'mcp:configure',settings:{enabled:true,url:'https://mcp.test/mcp',token:''}},app()),/token/i);
+    const status=await env.bridge.handleMessage({type:'mcp:configure',settings:{enabled:true,url:'https://mcp.test/mcp?stale=1',token:'secret'}},app());
+    assert.deepEqual(status,{enabled:true,online:false,error:''});
+    const socket=FakeSocket.instances.at(-1);
+    assert.equal(socket.url,'wss://mcp.test/bridge?token=secret');
+    assert.equal(socket.protocol,'autofirme-bridge.v1');
+    socket.open();
+    assert.equal((await env.bridge.handleMessage({type:'mcp:status'},app())).online,true);
+
+    const signingTime='2026-10-20T12:34:56.000Z';
+    socket.message({type:'sign',id:'job-1',protocol:'autofirme-bridge.v1',format:'cades',certId:'cert-1',data:'YQ==',signingTime});
+    await new Promise(resolve=>setTimeout(resolve,20));
+    const item=[...env.bridge.coordinator.requests.values()][0];
+    assert.ok(item,'the bridge opened a consent request');
+    assert.equal(item.bridge,true);assert.equal(item.origin,'mcp');assert.equal(item.certId,'cert-1');
+    assert.equal(item.signingTime,signingTime);
+    const view=await env.bridge.handleMessage({type:'request:get',id:item.id},chooser(item));
+    assert.equal(view.bridge,true);assert.equal(view.certId,'cert-1');assert.equal(view.signingTime,signingTime);
+    assert.equal(view.data,'YQ==');
+    await env.bridge.handleMessage({type:'request:begin',id:item.id},chooser(item));
+    await env.bridge.handleMessage({type:'request:complete',id:item.id,result:{certificate:'YQ==',signature:'Yg=='}},chooser(item));
+    await new Promise(resolve=>setTimeout(resolve,20));
+    assert.deepEqual(socket.sent.at(-1),{type:'result',id:'job-1',ok:true,value:{signed_b64:'Yg=='}});
+    assert.equal(env.bridge.coordinator.requests.size,0);
+    assert.ok(env.state.removed.includes(item.windowId),'the chooser closes after the answer');
+
+    const offline=await env.bridge.handleMessage({type:'mcp:configure',settings:{enabled:false,url:'https://mcp.test/mcp',token:'secret'}},app());
+    assert.deepEqual(offline,{enabled:false,online:false,error:''});
+  } finally {
+    globalThis.WebSocket=original;
+  }
 });

@@ -19,7 +19,9 @@ export const extensionCopy = {
   tsaUrl:'URL de TSA', grantTsa:'Autorizar TSA', granted:'Permiso concedido.', close:'Cerrar',
   invalid:'El certificado no es válido.', expired:'El certificado ha caducado.', notYetValid:'El certificado aún no es válido.',
   privateKey:'Desbloquea un certificado con clave privada.', rsa:'Se requiere un certificado RSA de al menos 2048 bits con SHA-256.',
-  ca:'Selecciona un certificado de firma personal, no una autoridad certificadora.', keyUsage:'El certificado no permite firmar documentos.'
+  ca:'Selecciona un certificado de firma personal, no una autoridad certificadora.', keyUsage:'El certificado no permite firmar documentos.',
+  mcpOrigin:'Agente MCP',
+  mcpWrongCertificate:'El agente MCP solicitó otra identidad. Vuelve a seleccionar la identidad indicada.'
  },
  en: {
   requestDetails:'Request details', certDetails:'Certificate details', copyDigest:'Copy SHA256', digestCopied:'SHA256 copied', copyFailed:'Could not copy SHA256. You can find it in the request details.',
@@ -37,7 +39,9 @@ export const extensionCopy = {
   tsa:'Timestamp network permission', tsaHint:'If Chrome restricts website access, authorize your TSA origin to use timestamping.',
   tsaUrl:'TSA URL', grantTsa:'Authorize TSA', granted:'Permission granted.', close:'Close', invalid:'The certificate is invalid.', expired:'The certificate has expired.',
   notYetValid:'The certificate is not yet valid.', privateKey:'Unlock a certificate with its private key.', rsa:'An RSA certificate of at least 2048 bits with SHA-256 is required.',
-  ca:'Choose a personal signing certificate, not a certificate authority.', keyUsage:'The certificate does not permit document signing.'
+  ca:'Choose a personal signing certificate, not a certificate authority.', keyUsage:'The certificate does not permit document signing.',
+  mcpOrigin:'MCP agent',
+  mcpWrongCertificate:'The MCP agent requested a different identity. Select the requested identity again.'
  }
 };
 // Worker and runtime errors arrive as fixed English sentences; translate the known ones and pass anything else through.

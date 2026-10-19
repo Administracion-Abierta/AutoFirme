@@ -5,6 +5,7 @@
 		"checkJs": true,
 		"strict": true,
 		"noImplicitAny": false,
-		"moduleResolution": "bundler"
+		"moduleResolution": "bundler",
+		"paths": { "#lib/*": ["./src/lib/*"] }
 	}
 }

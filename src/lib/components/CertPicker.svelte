@@ -14,6 +14,13 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import type { Copy } from '#lib/i18n';
 	import { loadSignerSession } from '#lib/keystore';
+	import {
+		forgetPin,
+		readPinMemorySettings,
+		rememberedPin,
+		rememberPin as cachePin,
+		savePinMemorySettings
+	} from '#lib/pin-memory';
 	import { Pkcs12Error } from '#lib/pkcs12';
 	import type { SignerCert, SignerSession } from '#lib/sign';
 	import { cn } from '#lib/utils.js';
@@ -32,10 +39,21 @@
 		cert: SignerCert | null;
 		/** Client-side store of saved identities (#29). */
 		vault: Vault;
-		onpick: (cert: SignerCert | null, chain: readonly SignerCert[]) => void;
+		/** Cert, chain, and saved-identity id (null for a freshly imported container). */
+		onpick: (cert: SignerCert | null, chain: readonly SignerCert[], identityId?: string | null) => void;
+		/** Identity an extension request asks for; the picker opens its PIN prompt directly. */
+		initialId?: string | null;
 	}
 
-	let { copy, cert, vault, onpick, compact = false, detailsLabel = 'Certificate details' }: Props = $props();
+	let {
+		copy,
+		cert,
+		vault,
+		onpick,
+		compact = false,
+		detailsLabel = 'Certificate details',
+		initialId = null
+	}: Props = $props();
 
 	let file = $state<File | null>(null);
 	// A picked file already counts as a chosen signature: the dotted dim look is only the empty state.
@@ -44,7 +62,10 @@
 	let pickedName = $state('');
 	let pickerOpen = $state(false);
 	let identities = $state<IdentityMeta[]>([]);
-	const visibleIdentities = $derived(compact ? identities.filter(entry => entry.id !== usedId) : identities);
+	// An MCP job names one identity: hide every other row and the import/remove paths, so the
+	// operator cannot hand the agent a certificate it did not ask for.
+	const offered = $derived(initialId ? identities.filter(entry => entry.id === initialId) : identities);
+	const visibleIdentities = $derived(compact ? offered.filter(entry => entry.id !== usedId) : offered);
 	// `vault.persistent` is a plain getter: the store can fall back to memory at any moment, and
 	// only a state of our own makes the notice appear when it does.
 	let persistent = $state(true);
@@ -56,6 +77,10 @@
 	/** PIN of the sign being added from the modal — distinct from `storePin`, which unlocks saved ones. */
 	let addPin = $state('');
 	let adding = $state(false);
+	const pinSettings = readPinMemorySettings();
+	let rememberPin = $state(pinSettings.remember);
+	const rememberLabel = $derived(copy.rememberPin.replace('{minutes}', String(pinSettings.minutes)));
+	let autoSelected = $state(false);
 	/**
 	 * Sessions opened this visit, keyed by identity id: a sign already unsealed can be selected
 	 * again without its PIN, so the next click on it just picks it and closes the modal.
@@ -95,6 +120,24 @@
 		void refresh();
 	});
 
+	// A request from an MCP agent names the certificate it wants: open that identity at once,
+	// reusing a remembered PIN when the operator opted in.
+	$effect(() => {
+		if (!initialId || autoSelected || !identities.some((entry) => entry.id === initialId)) return;
+		autoSelected = true;
+		void selectInitial(initialId);
+	});
+
+	function persistRemember(): void {
+		savePinMemorySettings({ ...pinSettings, remember: rememberPin });
+	}
+
+	async function selectInitial(id: string): Promise<void> {
+		const pin = await rememberedPin(id);
+		if (pin !== null) await unlock(id, pin, true);
+		else openId = id;
+	}
+
 	function reasonText(reason: unknown): string {
 		if (reason instanceof StoreError) return copy.storeErrors[reason.code];
 		// An insecure origin (http away from localhost): the browser hides `crypto.subtle` and the
@@ -120,7 +163,7 @@
 		session = null;
 		addPin = '';
 		usedId = null;
-		onpick(null, []);
+		onpick(null, [], null);
 	}
 
 	/**
@@ -138,12 +181,19 @@
 		}
 		openId = openId === identity.id ? null : identity.id;
 		storePin = '';
+		void autoSelect(identity.id);
+	}
+
+	/** Reuse a remembered PIN without showing the prompt; a rejected PIN reopens it. */
+	async function autoSelect(id: string): Promise<void> {
+		const pin = await rememberedPin(id);
+		if (pin !== null) await unlock(id, pin, true);
 	}
 
 	/** Hands an opened session to the app and marks its identity as the sign in use. */
 	function apply(id: string, sign: SignerSession) {
 		session = sign;
-		onpick(sign.signer, sign.certificates);
+		onpick(sign.signer, sign.certificates, id);
 		pickedName = identities.find((entry) => entry.id === id)?.label ?? copy.storeTitle;
 		usedId = id;
 		openId = null;
@@ -159,17 +209,22 @@
 	}
 
 	/** Opens a saved signature: its PIN unseals the blob and opens the container inside it. */
-	async function unlock(id: string) {
+	async function unlock(id: string, pin = storePin, silent = false) {
 		storeError = '';
 		console.debug('[autofirme:picker] unlock start', id);
 		try {
-			const sign = await vault.unlockIdentity(id, storePin);
+			const sign = await vault.unlockIdentity(id, pin);
 			unlockedSessions.set(id, sign);
+			if (rememberPin) await cachePin(id, pin);
+			else await forgetPin(id);
 			apply(id, sign);
 			pickerOpen = false;
 		} catch (reason) {
+			if (silent) await forgetPin(id);
 			storeError = reasonText(reason);
 			persistent = vault.persistent;
+			openId = id;
+			storePin = '';
 			console.error('[autofirme:picker] unlock failed', reason, storeError);
 		}
 	}
@@ -197,6 +252,7 @@
 				pin: enteredPin
 			});
 			unlockedSessions.set(meta.id, sign);
+			if (rememberPin) await cachePin(meta.id, enteredPin);
 			await refresh();
 			// Another file picked while this one was sealed: the record stands, the new pick
 			// drives the panel — selecting the old sign here would override it.
@@ -296,7 +352,9 @@
 		<section id="pkcs12-choices" aria-label={copy.storeTitle} class="grid min-w-0 gap-3">
 			<div id="pkcs12-choices-header" class="flex min-w-0 items-center justify-between gap-2">
 				<h2 class="min-w-0 text-sm font-medium">{copy.storeTitle}</h2>
-				<Button size="sm" variant="outline" class="h-8 shrink-0 gap-1 text-xs" onclick={()=>fileInput?.click()}><PlusIcon class="size-3.5"/>{copy.addSign}</Button>
+				{#if !initialId}
+					<Button size="sm" variant="outline" class="h-8 shrink-0 gap-1 text-xs" onclick={()=>fileInput?.click()}><PlusIcon class="size-3.5"/>{copy.addSign}</Button>
+				{/if}
 			</div>
 			{@render identityContent()}
 		</section>
@@ -356,6 +414,15 @@
 					}}
 				/>
 			</label>
+			<label class="flex items-center gap-2 text-xs">
+				<input
+					type="checkbox"
+					class="accent-primary size-4"
+					bind:checked={rememberPin}
+					onchange={persistRemember}
+				/>
+				{rememberLabel}
+			</label>
 			<div class="flex items-center gap-2">
 				<Button size="sm" class="h-9" onclick={() => unlock(openId!)}
 					>{copy.storeOpen}</Button
@@ -386,15 +453,17 @@
 
 		{#each visibleIdentities as identity (identity.id)}
 			<div class="bg-muted/40 relative rounded-lg">
-				<Button
-					variant="ghost"
-					size="icon"
-					class="absolute end-1 top-1 size-6"
-					aria-label={copy.remove}
-					onclick={() => forget(identity.id)}
-				>
-					<XIcon class="size-3.5" />
-				</Button>
+				{#if !initialId}
+					<Button
+						variant="ghost"
+						size="icon"
+						class="absolute end-1 top-1 size-6"
+						aria-label={copy.remove}
+						onclick={() => forget(identity.id)}
+					>
+						<XIcon class="size-3.5" />
+					</Button>
+				{/if}
 				<button
 					type="button"
 					class={cn(
@@ -452,6 +521,15 @@
 						if (event.key === 'Enter') void saveAdded();
 					}}
 				/>
+			</label>
+			<label class="flex items-center gap-2 pb-2 text-xs">
+				<input
+					type="checkbox"
+					class="accent-primary size-4"
+					bind:checked={rememberPin}
+					onchange={persistRemember}
+				/>
+				{rememberLabel}
 			</label>
 			<Button size="sm" class="h-9" disabled={adding || addPin === ''} onclick={saveAdded}
 				>{adding ? copy.certLoading : copy.storeSave}</Button

@@ -29,6 +29,10 @@ export interface Copy {
 	installApp: string;
 	/** Header button that activates a downloaded update of the installed app (#47). */
 	updateApp: string;
+	/** Settings: optional PIN memory for the signing picker. */
+	pinMemoryTitle: string;
+	pinMemoryHint: string;
+	pinMemoryMinutes: string;
 	/** Selected-files table headers. */
 	colFile: string;
 	colActions: string;
@@ -108,6 +112,8 @@ export interface Copy {
 	/** Badge on the modal cell that mirrors the sign currently loaded in memory. */
 	storeCurrent: string;
 	storePin: string;
+	/** Checkbox under the PIN prompt; `{minutes}` is replaced by the configured duration. */
+	rememberPin: string;
 	storeSave: string;
 	storeUnlock: string;
 	storeOpen: string;
@@ -130,6 +136,18 @@ export interface Copy {
 	mcpCopy: string;
 	mcpCopied: string;
 	mcpCopiedNote: string;
+	/** Extension-only: bridge to the local MCP server. */
+	mcpBridgeTitle: string;
+	mcpBridgeEnable: string;
+	mcpBridgeHint: string;
+	mcpBridgeConnect: string;
+	mcpBridgeOnline: string;
+	mcpBridgeOffline: string;
+	mcpBridgeNeedsToken: string;
+	mcpBridgeBadEndpoint: string;
+	mcpBridgeUnreachable: string;
+	/** Extension chooser label when the request comes from an MCP agent. */
+	mcpOrigin: string;
 }
 
 export const copy: Record<Lang, Copy> = {
@@ -146,6 +164,10 @@ export const copy: Record<Lang, Copy> = {
 		sourceCode: 'Código fuente',
 		installApp: 'Instalar app',
 		updateApp: 'Actualizar versión',
+		pinMemoryTitle: 'PIN en memoria',
+		pinMemoryHint:
+			'La casilla junto al PIN lo recuerda solo en memoria (nunca en disco) durante el tiempo indicado. Cerrar el navegador lo borra. Si no la marcas, se pide cada vez.',
+		pinMemoryMinutes: 'Minutos que se recuerda',
 		settingsLabel: 'Ajustes y ayuda',
 		settingsTitle: 'Ajustes y ayuda',
 		colFile: 'Fichero',
@@ -235,16 +257,18 @@ export const copy: Record<Lang, Copy> = {
 			signerCert: 'Certificado del firmante',
 			certValidity: 'Vigencia del certificado',
 			certChain: 'Cadena de confianza',
-			signingTime: 'Fecha de firma'
+			signingTime: 'Fecha de firma',
+			unsupported: 'Formato no comprobable en este entorno'
 		},
 		storeTitle: 'Firmas guardadas',
 		storeHint:
-			'Guarda tu fichero PKCS#12 cifrado en este navegador para no volver a subirlo. El PIN no se guarda: solo tú puedes abrirlo.',
+			'Guarda tu fichero PKCS#12 cifrado en este navegador para no volver a subirlo. El PIN no se escribe en disco; puedes recordarlo en memoria durante unos minutos si lo marcas al abrirlo.',
 		storeEmpty: 'No hay ninguna firma guardada.',
 		storeEphemeral:
 			'Este navegador no puede guardar datos ahora mismo: las firmas se quedan solo en esta sesión. Cierra las otras pestañas de la app y recarga.',
 		storeCurrent: 'En uso',
 		storePin: 'PIN de la firma',
+		rememberPin: 'Recordar el PIN {minutes} min (solo en memoria)',
 		storeReset: 'Reiniciar el almacén',
 		storeBack: 'Volver',
 		storeSave: 'Guardar',
@@ -272,10 +296,21 @@ export const copy: Record<Lang, Copy> = {
 		mcpUrlHint: 'Se copia tal cual en la configuración del agente, normalmente `https://tu-dominio/mcp`.',
 		mcpTokenLabel: 'Token de acceso',
 		mcpTokenHint:
-			'Es el valor de AUTOFIRME_MCP_TOKEN del servidor: el agente debe enviarlo como cabecera `Authorization: Bearer …`. Se guarda en este navegador; la aplicación no lo envía a ningún sitio.',
+			'Es el valor de AUTOFIRME_MCP_TOKEN del servidor: el agente lo envía como cabecera `Authorization: Bearer …`. Se guarda en este navegador y solo lo usa la extensión para conectar el puente MCP.',
 		mcpCopy: 'Copiar dirección',
 		mcpCopied: 'Copiado',
-		mcpCopiedNote: 'Dirección copiada al portapapeles.'
+		mcpCopiedNote: 'Dirección copiada al portapapeles.',
+		mcpBridgeTitle: 'Puente MCP (extensión)',
+		mcpBridgeEnable: 'Permitir que los agentes MCP pidan firmas',
+		mcpBridgeHint:
+			'La extensión usa la dirección y el token de arriba (los del servidor) y abre aquí una ventana de confirmación por cada firma.',
+		mcpBridgeConnect: 'Conectar',
+		mcpBridgeOnline: 'Conectado al servidor MCP.',
+		mcpBridgeOffline: 'Sin conexión con el servidor MCP.',
+		mcpBridgeNeedsToken: 'Falta el token de acceso.',
+		mcpBridgeBadEndpoint: 'La dirección debe ser http(s)://…/mcp, sin usuario ni contraseña.',
+		mcpBridgeUnreachable: 'No se pudo abrir el puente: ¿está el servidor MCP en marcha y publicado por TLS?',
+		mcpOrigin: 'Agente MCP'
 	},
 	en: {
 		langLabel: 'Language',
@@ -290,6 +325,10 @@ export const copy: Record<Lang, Copy> = {
 		sourceCode: 'Source code',
 		installApp: 'Install app',
 		updateApp: 'Update version',
+		pinMemoryTitle: 'PIN in memory',
+		pinMemoryHint:
+			'The box next to the PIN keeps it in memory only (never on disk) for the time shown. Closing the browser clears it. Leave it unticked to ask every time.',
+		pinMemoryMinutes: 'Minutes to remember it',
 		settingsLabel: 'Settings and help',
 		settingsTitle: 'Settings and help',
 		colFile: 'File',
@@ -379,16 +418,18 @@ export const copy: Record<Lang, Copy> = {
 			signerCert: 'Signer certificate',
 			certValidity: 'Certificate validity',
 			certChain: 'Trust chain',
-			signingTime: 'Signing time'
+			signingTime: 'Signing time',
+			unsupported: 'Format not checkable in this environment'
 		},
 		storeTitle: 'Saved signatures',
 		storeHint:
-			'Keep your PKCS#12 encrypted in this browser so you do not upload it again. Each signature uses its own PIN, which is never stored.',
+			'Keep your PKCS#12 encrypted in this browser so you do not upload it again. The PIN is never written to disk; you can keep it in memory for a few minutes by ticking the box when opening it.',
 		storeEmpty: 'No saved signature yet.',
 		storeEphemeral:
 			'This browser cannot store data right now: signatures stay in this session only. Close the other tabs of the app and reload.',
 		storeCurrent: 'In use',
 		storePin: 'PIN of the signature',
+		rememberPin: 'Remember the PIN for {minutes} min (memory only)',
 		storeReset: 'Reset the store',
 		storeBack: 'Back',
 		storeSave: 'Save',
@@ -416,9 +457,20 @@ export const copy: Record<Lang, Copy> = {
 		mcpUrlHint: 'Paste it as-is into the agent configuration, normally `https://your-domain/mcp`.',
 		mcpTokenLabel: 'Access token',
 		mcpTokenHint:
-			'The server\'s AUTOFIRME_MCP_TOKEN: the agent sends it as an `Authorization: Bearer …` header. It is kept in this browser; the app never sends it anywhere.',
+			'The server\'s AUTOFIRME_MCP_TOKEN: the agent sends it as an `Authorization: Bearer …` header. It is kept in this browser and only the extension uses it to connect the MCP bridge.',
 		mcpCopy: 'Copy address',
 		mcpCopied: 'Copied',
-		mcpCopiedNote: 'Address copied to the clipboard.'
+		mcpCopiedNote: 'Address copied to the clipboard.',
+		mcpBridgeTitle: 'MCP bridge (extension)',
+		mcpBridgeEnable: 'Let MCP agents request signatures',
+		mcpBridgeHint:
+			'The extension uses the address and token above (the server\'s) and opens a confirmation window here for every signature.',
+		mcpBridgeConnect: 'Connect',
+		mcpBridgeOnline: 'Connected to the MCP server.',
+		mcpBridgeOffline: 'Not connected to the MCP server.',
+		mcpBridgeNeedsToken: 'The access token is missing.',
+		mcpBridgeBadEndpoint: 'The address must be http(s)://…/mcp, without a user or password.',
+		mcpBridgeUnreachable: 'Could not open the bridge: is the MCP server running and published over TLS?',
+		mcpOrigin: 'MCP agent'
 	}
 };

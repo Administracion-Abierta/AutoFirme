@@ -107,7 +107,7 @@
  <section id="request-site" class="flex min-w-0 items-center justify-between gap-2">
   <div class="min-w-0">
    <p class="text-muted-foreground text-xs">{t.requestedBy}</p>
-   <p id="request-origin" class="break-all text-sm font-semibold">{request?.origin ?? '…'}</p>
+   <p id="request-origin" class="break-all text-sm font-semibold">{request ? (request.bridge ? t.mcpOrigin : request.origin) : '…'}</p>
   </div>
   {#if request?.operation==='sign' && request.digest}
    <TooltipProvider><Tooltip bind:open={digestHintOpen}><TooltipTrigger>
@@ -131,7 +131,10 @@
    </div>
   </details>
   {#if waiting}
-   <CertPicker copy={copy[lang]} {cert} {vault} compact detailsLabel={t.certDetails} onpick={(picked, certificates)=>{cert=picked;chain=certificates;eligibilityTime=Date.now();error='';}} />
+   <CertPicker copy={copy[lang]} {cert} {vault} compact detailsLabel={t.certDetails} initialId={request.certId} onpick={(picked, certificates, identityId)=>{
+    if (request?.bridge && request.certId && identityId !== request.certId) { cert=null; chain=[]; error=t.mcpWrongCertificate; return; }
+    cert=picked;chain=certificates;eligibilityTime=Date.now();error='';
+   }} />
    {#if problem}<p role="alert" class="text-destructive text-sm">{t[problem]}</p>{/if}
   {/if}
  {/if}
@@ -139,9 +142,11 @@
  {#if phase!=='waiting'}<p role="status" class="text-sm">{phase==='loading' ? t.loading : phase==='signing' ? t.signing : phase==='done' ? t.done : phase==='cancelled' ? t.cancelled : phase==='continued' ? t.continued : t.failed}</p>{/if}
  <footer class="grid gap-2 border-t pt-3">
   <Button id="request-confirm" class="h-10 w-full whitespace-normal text-center leading-tight" disabled={!waiting || !cert || !!problem} onclick={confirm}>{request?.operation==='selectCertificate' ? t.confirmSelect : t.confirm}</Button>
-  <div class="grid grid-cols-2 gap-2">
+  <div class={request?.bridge ? 'grid gap-2' : 'grid grid-cols-2 gap-2'}>
    <Button id="request-cancel" variant="outline" class="h-10 w-full min-w-0 whitespace-normal text-center leading-tight" disabled={!waiting} onclick={()=>finish('cancel')}>{t.cancel}</Button>
-   <Button id="request-fallback" variant="outline" class="h-10 w-full min-w-0 whitespace-normal text-center leading-tight" disabled={!waiting} onclick={()=>finish('fallback')}>{t.fallback}</Button>
+   {#if !request?.bridge}
+    <Button id="request-fallback" variant="outline" class="h-10 w-full min-w-0 whitespace-normal text-center leading-tight" disabled={!waiting} onclick={()=>finish('fallback')}>{t.fallback}</Button>
+   {/if}
   </div>
   <Button id="request-open-app" variant="ghost" class="h-8 w-full whitespace-normal text-center text-xs" onclick={openApp}>{t.fullTab}</Button>
  </footer>

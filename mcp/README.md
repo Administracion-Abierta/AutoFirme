@@ -68,6 +68,20 @@ this is the file a Cloudflare Worker or Deno port would reuse.
 
 **Stateless**: no session id, no server-side session table. One POST is one complete MCP exchange.
 
+### Extension bridge (browser-held identities)
+
+If the operator keeps identities in the AutoFirme Chrome extension, no `.p12` directory or
+`AUTOFIRME_MCP_PIN` is needed. In the extension's MCP settings enter this server's `/mcp` URL and
+`AUTOFIRME_MCP_TOKEN`, then enable **MCP bridge**. The extension connects outbound to
+`WS(S) /bridge` (same host, same token), lists its identities to `autofirma_list_certs`, and opens
+a Chrome consent window for every `autofirma_sign`. The server receives only the public
+certificate and the finished CAdES, which it verifies before answering.
+
+The bridge lives on this HTTP entry; the stdio server has no listening socket and cannot use it.
+The token travels in the WebSocket query string because browsers cannot set an `Authorization`
+header on `WebSocket` — keep tunnel/proxy access logs private. Signing still needs the operator's
+click, but a stolen token can list identities and open consent windows.
+
 Client wiring (remote shape):
 
 ```json

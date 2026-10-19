@@ -47,6 +47,16 @@ webapp and extension are different origins: existing webapp storage does not
 migrate automatically. Import certificates into the extension. The extension does
 not provide operating-system certificate-store access or a native helper.
 
+### MCP bridge
+
+Settings → Servidor MCP (extension builds only) can connect the extension to a deployed
+`autofirma-mcp` HTTP entry. The operator enters the server's `/mcp` address and its
+`AUTOFIRME_MCP_TOKEN`, enables the bridge, and Chrome opens one consent window per
+signature request. The extension lists its saved identities to the agent and signs only
+with the identity the agent requested; the private key, PIN and vault never leave Chrome.
+The socket is outbound to `WS(S) /bridge` (same token), so no inbound port is opened on
+the browser side and stdio MCP servers cannot use it. See `docs/MCP-DESIGN.md`.
+
 ## 3. Signing requests from websites
 
 The extension intercepts every HTTP and HTTPS website from installation: the manifest

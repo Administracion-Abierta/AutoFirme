@@ -53,7 +53,9 @@
 		TableRow
 	} from '#lib/components/ui/table/index.js';
 	import { TooltipProvider } from '#lib/components/ui/tooltip/index.js';
-	import { readMcp, saveMcp, type McpSettings } from '#lib/mcp';
+	import { readMcp, saveMcp, configureMcpBridge, listenMcpBridge, mcpBridgeStatus, type BridgeStatus, type McpSettings } from '#lib/mcp';
+	import { isExtension } from '#lib/extension/runtime';
+	import { readPinMemorySettings, savePinMemorySettings, DEFAULT_MINUTES } from '#lib/pin-memory';
 	import { applyTheme, readTheme, type Theme } from '#lib/theme';
 	import MonitorIcon from '@lucide/svelte/icons/monitor';
 	import MoonIcon from '@lucide/svelte/icons/moon';
@@ -92,8 +94,35 @@
 	let settingsOpen = $state(false);
 	let mcpOpen = $state(false);
 	// Empty until mount, so the prerendered HTML and the hydrated one agree.
-	let mcp = $state<McpSettings>({ url: '', token: '' });
+	let mcp = $state<McpSettings>({ url: '', token: '', enabled: false });
 	let mcpCopied = $state(false);
+	let bridge = $state<BridgeStatus>({ enabled: false, online: false, error: '' });
+	const bridgeError = $derived(
+		bridge.error === 'token required'
+			? t.mcpBridgeNeedsToken
+			: bridge.error === 'Invalid MCP endpoint'
+				? t.mcpBridgeBadEndpoint
+				: bridge.error
+					? t.mcpBridgeUnreachable
+					: ''
+	);
+	let pinMinutes = $state(DEFAULT_MINUTES);
+
+	function updatePinMinutes(value: string): void {
+		const minutes = Number(value);
+		pinMinutes = Number.isInteger(minutes) && minutes >= 1 && minutes <= 120 ? minutes : DEFAULT_MINUTES;
+		savePinMemorySettings({ ...readPinMemorySettings(), minutes: pinMinutes });
+	}
+
+	/** Applies the address/token the operator just typed and reports the socket state. */
+	async function connectBridge(): Promise<void> {
+		if (!isExtension()) return;
+		bridge = await configureMcpBridge(mcp).catch((): BridgeStatus => ({
+			enabled: mcp.enabled,
+			online: false,
+			error: 'connect-failed'
+		}));
+	}
 
 	function updateMcp(patch: Partial<McpSettings>): void {
 		mcp = { ...mcp, ...patch };
@@ -119,7 +148,13 @@
 	onMount(() => {
 		theme = readTheme();
 		mcp = readMcp();
+		pinMinutes = readPinMemorySettings().minutes;
 		void consumeEntry();
+		if (!isExtension()) return;
+		const detach = listenMcpBridge((status) => (bridge = status));
+		void mcpBridgeStatus().then((status) => (bridge = status)).catch(() => {});
+		if (mcp.enabled) void connectBridge();
+		return detach;
 	});
 
 	/** PWA sign entry (#47): share_target, file_handlers, shortcut, portal deep-link. */
@@ -873,6 +908,24 @@
 				</div>
 			</section>
 
+			<!-- PIN en memoria: optional, never written to disk. -->
+			<section class="flex flex-col gap-2">
+				<h3 class="flex items-center gap-2 text-sm font-medium">{t.pinMemoryTitle}</h3>
+				<div class="flex items-center gap-2">
+					<label class="text-sm" for="pin-memory-minutes">{t.pinMemoryMinutes}</label>
+					<Input
+						id="pin-memory-minutes"
+						type="number"
+						min="1"
+						max="120"
+						class="w-20"
+						value={pinMinutes}
+						oninput={(event) => updatePinMinutes(event.currentTarget.value)}
+					/>
+				</div>
+				<p class="text-muted-foreground text-xs">{t.pinMemoryHint}</p>
+			</section>
+
 			{#if extensionSettings}
 				<!-- Acceso a sitios: extension build only; the snippet renders the SiteAccess panel. -->
 				<section class="flex flex-col gap-2">
@@ -939,6 +992,35 @@
 								/>
 								<p class="text-muted-foreground text-xs">{t.mcpTokenHint}</p>
 							</div>
+							{#if isExtension()}
+								<div class="grid gap-2 border-t pt-3">
+									<h4 class="text-sm font-medium">{t.mcpBridgeTitle}</h4>
+									<label class="flex items-center gap-2 text-sm">
+										<input
+											type="checkbox"
+											class="accent-primary size-4"
+											bind:checked={mcp.enabled}
+											onchange={() => {
+												updateMcp({ enabled: mcp.enabled });
+												void connectBridge();
+											}}
+										/>
+										{t.mcpBridgeEnable}
+									</label>
+									<p class="text-muted-foreground text-xs">{t.mcpBridgeHint}</p>
+									<div class="flex items-center gap-3">
+										<Button type="button" variant="outline" size="sm" onclick={connectBridge}>
+											{t.mcpBridgeConnect}
+										</Button>
+										<p class="text-muted-foreground text-xs" role="status">
+											{bridge.online ? t.mcpBridgeOnline : t.mcpBridgeOffline}
+										</p>
+									</div>
+									{#if bridgeError}
+										<p class="text-destructive text-xs" role="alert">{bridgeError}</p>
+									{/if}
+								</div>
+							{/if}
 						</div>
 					{/if}
 				</div>

@@ -10,6 +10,12 @@ export interface ExtensionRequest {
  params?: Record<string, string>;
  data?: string;
  digest?: string;
+ /** Set when an MCP agent (not a website) requested the signature. */
+ bridge?: boolean;
+ /** Identity the agent asked for; the chooser preselects it. */
+ certId?: string | null;
+ /** Agent-supplied ISO signing time, so the MCP response matches the signed attribute. */
+ signingTime?: string;
 }
 export interface SignatureResult { certificate: string; signature?: string }
 export type Message = { type: string; [key: string]: unknown };

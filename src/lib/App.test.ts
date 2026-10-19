@@ -542,8 +542,9 @@ describe('MCP endpoint settings', () => {
 
 		expect(JSON.parse(localStorage.getItem('autofirme-mcp')!)).toEqual({
 			url: 'https://mcp.example.com/mcp',
-			token: 'secreto'
+			token: 'secreto',
+			enabled: false
 		});
-		await screen.findByText(/no lo envía a ningún sitio/);
+		await screen.findByText(/solo lo usa la extensión/);
 	});
 });

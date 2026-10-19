@@ -11,6 +11,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { audit } from './audit';
+import { BridgeHub } from './bridge';
 import { loadConfig, type ServerConfig } from './config';
 import { createHttpHandler } from './http';
 import { loadStore } from './surface';
@@ -54,12 +55,15 @@ function readBody(request: IncomingMessage, limit: number): Promise<Uint8Array<A
 export interface RunningServer {
 	/** `http://host:port` — the real port, so `port: 0` is usable in tests. */
 	url: string;
+	/** Outbound extension bridge, shared by every MCP request on this server. */
+	bridge: BridgeHub;
 	close: () => Promise<void>;
 }
 
 /** Start the HTTP endpoint; resolves once the socket is bound. */
 export async function startHttpServer(config: ServerConfig, store: CertStore): Promise<RunningServer> {
-	const handler = createHttpHandler(config, store);
+	const bridge = new BridgeHub(config);
+	const handler = createHttpHandler(config, store, bridge);
 	const limit = Math.ceil((config.maxBytes * 4) / 3) + 64 * 1024;
 
 	const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
@@ -87,13 +91,16 @@ export async function startHttpServer(config: ServerConfig, store: CertStore): P
 
 	const bound = Promise.withResolvers<void>();
 	server.once('error', bound.reject);
+	bridge.attach(server);
 	server.listen(config.port, config.host, bound.resolve);
 	await bound.promise;
 	const address = server.address();
 	const port = typeof address === 'object' && address ? address.port : config.port;
 	return {
 		url: `http://${config.host}:${port}`,
+		bridge,
 		close: () => {
+			bridge.close();
 			const closed = Promise.withResolvers<void>();
 			server.close((error) => (error ? closed.reject(error) : closed.resolve()));
 			return closed.promise;
