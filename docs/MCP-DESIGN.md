@@ -107,13 +107,19 @@ startup.** Pass-through per call is rejected.
 An operator who already keeps identities in the Chrome extension does not need to export a
 `.p12` or give the server a PIN. When enabled in the app's MCP settings, the extension opens an
 outbound WebSocket to `WS(S) /bridge?token=…` on the same HTTP entry (`mcp/src/bridge.ts`). The
-server then sends two job kinds: `certs` and `sign`. For a signature, the extension opens its own
-consent window, enforces the `cert_id` the agent asked for, unlocks the identity with its PIN and
-returns the finished CAdES container. The server verifies that container against the document
-before answering the tool call, so a broken bridge cannot produce a silently bad artifact.
+server then sends two job kinds: `certs` and `sign`. For a signature, the extension enforces the
+`cert_id` the agent asked for. If that identity has a live PIN in the picker's memory — the
+per-identity "remember this PIN" checkbox the user ticked, kept in `chrome.storage.session` and
+cleared when Chrome closes — the service worker unseals the identity and returns the finished
+CAdES **without opening a window or prompting again**. Otherwise it opens the consent window,
+asks for the PIN, and applies the same certificate checks as a website request. The server
+verifies that container against the document before answering the tool call, so a broken bridge
+cannot produce a silently bad artifact.
 
 The bridge does not weaken the key boundary: the private key stays in the extension, no PIN
-reaches the server, and every job needs a human click in Chrome. It also only exists on the HTTP
+reaches the server, and silent signing is limited to an identity the user already opted into
+remembering for the current browser session. Without that opt-in every job needs a human click.
+It also only exists on the HTTP
 entry — stdio has no listening socket. The token travels in the query string because a browser
 `WebSocket` cannot set an `Authorization` header; keep tunnel/proxy access logs out of shared
 hands, or rotate the token if they might have been exposed. The extension refuses a socket that
@@ -213,7 +219,8 @@ Two deliberate shape decisions:
 | **Audit** | Every `sign`, `verify`, `list_certs`, startup and keystore failure emits a JSON line with timestamp, tool, `cert_id`, format, document SHA-256 and byte count — identifiers and digests, never content, never the PIN. Always on stderr; additionally appended to `AUTOFIRME_MCP_AUDIT_LOG` (mode 0600) when set. |
 | **Expired certificate** | Signing is allowed (a timestamped workflow may legitimately need it) but the result carries `cert_expired: true` and the audit line records it. |
 | **Server compromise** | The process holds live signing keys while running. Accepted: it is the operator's own machine and their own key, and the alternative (a remote key service) is strictly worse. Documented, and the reason stdio stays the local default. |
-| **Stolen bearer token** (remote mode) | The token is the only credential and it authorises signing with the loaded certificate. TLS terminates at the operator's tunnel; the token lives in a k8s Secret, never in a tool argument or a log line; rotating it is a secret update plus a pod restart — the same restart that revokes the loaded key. Constant-time comparison, and an unset token means the HTTP entry refuses to start rather than serving unauthenticated. When the extension bridge is connected the same token also opens `/bridge`; signing there still needs a human confirmation in Chrome, but listing identities and spamming consent windows does not. |
+| **Stolen bearer token** (remote mode) | The token is the only credential and it authorises signing with the loaded certificate. TLS terminates at the operator's tunnel; the token lives in a k8s Secret, never in a tool argument or a log line; rotating it is a secret update plus a pod restart — the same restart that revokes the loaded key. Constant-time comparison, and an unset token means the HTTP entry refuses to start rather than serving unauthenticated. When the extension bridge is connected the same token also opens `/bridge`; signing there needs a human confirmation in Chrome unless the operator ticked "remember this PIN" for the requested identity, in which case that session-scoped opt-in is the standing consent. Listing identities never signs. |
+| **Silent signing with remembered PIN** | The PIN stays in `chrome.storage.session` (memory only, cleared when Chrome closes) and is written only when the user ticks the per-PIN checkbox. The service worker signs only the `cert_id` the agent asked for, only while the certificate passes the same validity/key-usage checks as the chooser, and drops the PIN on the first unlock failure. It cannot auto-sign for a different identity, an expired certificate, or after the session cache is gone. |
 | **Bridge token in proxy logs** | A browser `WebSocket` cannot set `Authorization`, so `/bridge` carries the token in its query string. Server audit lines never include the URL; the operator must treat tunnel/proxy access logs as secret material (or scrub `token=`) and rotate the token if they were exposed. The server checks the token before the upgrade, and the socket must offer `autofirme-bridge.v1`. |
 | **Bridge signs with another identity** | The extension binds every job to the requested `cert_id`: the chooser shows that identity and rejects any other selection or a freshly imported container. The returned CAdES is verified server-side against the document before the tool answers `bridge_invalid`. |
 | **Unauthenticated network scan** (remote mode) | Every request re-checks the bearer header; missing, malformed and wrong credentials all answer `401` with `www-authenticate: Bearer`. Only `POST /mcp` is routed; anything else is `404`. |

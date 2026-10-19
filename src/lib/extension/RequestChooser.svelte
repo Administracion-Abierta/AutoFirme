@@ -10,7 +10,8 @@
  import { applyTheme, readTheme } from '#lib/theme';
  import { rpc, type Rpc, type ExtensionRequest } from './runtime';
  import { extensionCopy, errorCopy } from './copy';
- import { certificateProblem, confirmRequest, RequestValidationError } from './sign-request';
+ import { certificateProblem } from './certificate';
+ import { confirmRequest, RequestValidationError } from './sign-request';
  let { id, vault = browserVault(), send = rpc }: { id:string; vault?:Vault; send?:Rpc } = $props();
  let lang = $state<Lang>('es');
  const t = $derived(extensionCopy[lang]);

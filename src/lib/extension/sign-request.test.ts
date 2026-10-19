@@ -7,7 +7,8 @@ import { createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../../test
 import { loadSignerSession } from '../keystore';
 import type { SignerSession } from '../sign';
 import { objectId, parseDer, seq, tlv, type Bytes } from '../asn1';
-import { confirmRequest, certificateProblem, signRequest } from './sign-request';
+import { certificateProblem } from './certificate';
+import { confirmRequest, signRequest } from './sign-request';
 
 let fixtures: CadesFixtures;
 let session: SignerSession;

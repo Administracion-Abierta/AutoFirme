@@ -30,7 +30,7 @@ async function capture(env) {
   await connected.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
   return {...connected,item:[...env.bridge.coordinator.requests.values()][0]};
 }
-function setup(){const env=browser();env.bridge=createBridge(env.chrome);return env;}
+function setup(deps){const env=browser();env.bridge=createBridge(env.chrome,deps);return env;}
 
 test('a clean install registers the wildcard bridge and captures website calls',async()=>{
   const env=setup();env.state.granted.add('http://*/*');env.state.granted.add('https://*/*');await env.bridge.ready;
@@ -302,6 +302,13 @@ test('derives the bridge beside a prefixed endpoint',()=>{
   assert.equal(bridgeUrl({url:'https://host.test/autofirme/mcp/',token:'t'}),'wss://host.test/autofirme/bridge?token=t');
   assert.equal(bridgeUrl({url:'http://host.test/mcp',token:'t'}),'ws://host.test/bridge?token=t');
 });
+test('the MCP bridge returns a remembered-PIN signature without opening a chooser',async()=>{
+  const env=setup({autoSign:async message=>({signed_b64:message.data})});
+  const result=await env.bridge.bridgeSign({format:'cades',certId:'cert-1',data:'YQ==',signingTime:'2026-10-20T12:34:56.000Z'});
+  assert.deepEqual(result,{signed_b64:'YQ=='});
+  assert.equal(env.state.windows.length,0,'no consent window for an identity whose PIN is remembered');
+  assert.equal(env.bridge.coordinator.requests.size,0);
+});
 test('the MCP bridge authenticates, opens a chooser and returns the finished signature',async()=>{
   const original=globalThis.WebSocket;
   class FakeSocket {
@@ -317,7 +324,7 @@ test('the MCP bridge authenticates, opens a chooser and returns the finished sig
   }
   globalThis.WebSocket = /** @type {typeof WebSocket} */ (/** @type {unknown} */ (FakeSocket));
   try {
-    const env=setup();await env.bridge.ready;
+    const env=setup({autoSign:async()=>null});await env.bridge.ready;
     env.chrome.runtime.sendMessage=async()=>{};
     await assert.rejects(env.bridge.handleMessage({type:'mcp:configure',settings:{enabled:true,url:'ftp://mcp.test',token:'t'}},app()),/endpoint/i);
     await assert.rejects(env.bridge.handleMessage({type:'mcp:configure',settings:{enabled:true,url:'https://mcp.test/mcp',token:''}},app()),/token/i);

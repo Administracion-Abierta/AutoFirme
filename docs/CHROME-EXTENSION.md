@@ -51,9 +51,10 @@ not provide operating-system certificate-store access or a native helper.
 
 Settings → Servidor MCP (extension builds only) can connect the extension to a deployed
 `autofirma-mcp` HTTP entry. The operator enters the server's `/mcp` address and its
-`AUTOFIRME_MCP_TOKEN`, enables the bridge, and Chrome opens one consent window per
-signature request. The extension lists its saved identities to the agent and signs only
-with the identity the agent requested; the private key, PIN and vault never leave Chrome.
+`AUTOFIRME_MCP_TOKEN`, enables the bridge, and the extension signs only with the identity the
+agent requested. If that identity has a PIN remembered from the picker's per-identity checkbox,
+the service worker signs without a window; otherwise Chrome opens one consent window for the
+signature. The private key, PIN and vault never leave Chrome.
 The socket is outbound to `WS(S) /bridge` (same token), so no inbound port is opened on
 the browser side and stdio MCP servers cannot use it. See `docs/MCP-DESIGN.md`.
 

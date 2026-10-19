@@ -10,7 +10,11 @@ for (const name of ['background', 'page', 'content']) {
     publicDir: false,
     build: {
       outDir: 'dist/extension', emptyOutDir: false, target: 'chrome116',
-      lib: { entry: `extension/${name}.js`, formats: [name === 'background' ? 'es' : 'iife'], name: `AutoFirme_${name}`, fileName: () => `${name}.js` }
+      lib: { entry: `extension/${name}.js`, formats: [name === 'background' ? 'es' : 'iife'], name: `AutoFirme_${name}`, fileName: () => `${name}.js` },
+      // The background script is an MV3 service worker, and the HTML specification forbids
+      // `import()` in a ServiceWorkerGlobalScope. A code-split bundle would keep that call and
+      // Chrome would refuse to run it, so the worker bundle must stay in one piece.
+      rollupOptions: { output: { inlineDynamicImports: true } }
     }
   });
 }

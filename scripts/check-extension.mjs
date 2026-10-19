@@ -89,4 +89,16 @@ for (const cssFile of cssFiles) {
   }
 }
 for (const name of ['background.js', 'page.js', 'content.js']) await stat(path.join(root, name));
-console.log('Extension artifact checks passed: full app, local assets, MV3 CSP and no PWA registration.');
+// The background script is an MV3 service worker: the HTML specification forbids `import()` in a
+// ServiceWorkerGlobalScope, so a code-split bundle fails at runtime instead of at build time.
+const worker = await read('background.js');
+const workerSyntax = ts.createSourceFile('background.js', worker, ts.ScriptTarget.Latest, false, ts.ScriptKind.JS);
+function visitWorker(node) {
+  assert.ok(
+    !(ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword),
+    'the service worker bundle keeps a dynamic import(), which Chrome refuses to run'
+  );
+  ts.forEachChild(node, visitWorker);
+}
+visitWorker(workerSyntax);
+console.log('Extension artifact checks passed: full app, local assets, MV3 CSP, single-file worker and no PWA registration.');

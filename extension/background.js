@@ -5,6 +5,8 @@ const SCRIPT_IDS = ['autofirme-content', 'autofirme-page'];
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const BRIDGE_KEY = 'mcpBridge';
 const BRIDGE_PROTOCOL = 'autofirme-bridge.v1';
+/** Chrome suspends an idle MV3 worker after 30 s; app-level traffic keeps the bridge alive. */
+const BRIDGE_HEARTBEAT_MS = 20_000;
 
 /** `ws(s)://…/bridge?token=…`, derived from the endpoint and token the operator configured. */
 export function bridgeUrl(settings) {
@@ -23,7 +25,7 @@ export function bridgeUrl(settings) {
 }
 
 /** Chrome plumbing stays outside the consent and lifecycle state machine. */
-export function createBridge(chrome) {
+export function createBridge(chrome, deps = {}) {
   const coordinator = new Coordinator();
   const root = chrome.runtime.getURL('');
   let scriptsQueue = Promise.resolve();
@@ -33,6 +35,7 @@ export function createBridge(chrome) {
   let bridgeError = '';
   let bridgeAttempt = 0;
   let bridgeRetry = null;
+  let bridgeHeartbeat = null;
   async function disabledOrigins() {
     const {disabledOrigins = []} = await chrome.storage.local.get('disabledOrigins');
     return Array.isArray(disabledOrigins) ? [...new Set(disabledOrigins.filter(origin => {
@@ -105,6 +108,8 @@ export function createBridge(chrome) {
   function connectBridge(settings) {
     clearTimeout(bridgeRetry);
     bridgeRetry = null;
+    clearInterval(bridgeHeartbeat);
+    bridgeHeartbeat = null;
     if (bridgeSocket) {
       const old = bridgeSocket;
       bridgeSocket = null;
@@ -131,6 +136,12 @@ export function createBridge(chrome) {
       if (socket !== bridgeSocket) return;
       bridgeAttempt = 0;
       bridgeError = '';
+      // A text frame every 20 s counts as WebSocket activity, so Chrome does not suspend the
+      // worker mid-session. Control-frame pings from the server do not reset that timer.
+      bridgeHeartbeat = setInterval(() => {
+        if (socket === bridgeSocket && socket.readyState === 1) socket.send(JSON.stringify({type:'ping'}));
+      }, BRIDGE_HEARTBEAT_MS);
+      bridgeHeartbeat.unref?.();
       broadcastBridge();
     };
     socket.onerror = () => {
@@ -141,6 +152,8 @@ export function createBridge(chrome) {
     socket.onclose = () => {
       if (socket !== bridgeSocket) return;
       bridgeSocket = null;
+      clearInterval(bridgeHeartbeat);
+      bridgeHeartbeat = null;
       bridgeError = 'disconnected';
       // Every pending chooser belongs to a server that can no longer receive the result.
       for (const item of coordinator.requests.values()) if (item.bridge) terminate(item,'error');
@@ -183,6 +196,8 @@ export function createBridge(chrome) {
     if (message.format !== 'cades') throw Error('Only CAdES is supported over the MCP bridge');
     if (typeof message.certId !== 'string' || !message.certId) throw Error('certId is required');
     if (typeof message.signingTime !== 'string' || Number.isNaN(Date.parse(message.signingTime))) throw Error('Invalid signing time');
+    const automatic = await (deps.autoSign ?? (await import('#lib/extension/auto-sign')).signRemembered)(message);
+    if (automatic) return automatic;
     const request = {operation:'sign',format:'CAdES',mode:'explicit',algorithm:'SHA256withRSA',data:message.data};
     const signingTime = new Date(message.signingTime).toISOString();
     const {promise,resolve,reject} = Promise.withResolvers();
