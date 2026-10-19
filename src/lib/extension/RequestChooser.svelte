@@ -122,7 +122,7 @@
  {#if request}
   <details id="request-details" class="text-xs">
    <summary class="text-muted-foreground cursor-pointer py-1">{t.requestDetails}</summary>
-   <div class="bg-muted/50 mt-1 grid gap-2 rounded-lg border p-2">
+   <div class="bg-muted/50 mt-1 grid gap-2 rounded-lg p-2">
     <p>{request.operation==='sign' ? `${request.format}${request.serverUrl ? ' · ' + t.server : ''} · ${hash} · ${request.mode}` : t.select}</p>
     {#if request.operation==='sign'}
      <p class="text-muted-foreground">{t.digest}</p>

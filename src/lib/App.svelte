@@ -960,7 +960,7 @@
 						{t.mcpMenu}
 					</Button>
 					{#if mcpOpen}
-						<div class="grid gap-4 rounded-lg border p-3">
+						<div class="bg-muted/40 grid gap-4 rounded-lg p-3">
 							<p class="text-muted-foreground text-sm">{t.mcpHint}</p>
 							<div class="grid gap-2">
 								<label class="text-sm font-medium" for="mcp-url">{t.mcpUrlLabel}</label>
