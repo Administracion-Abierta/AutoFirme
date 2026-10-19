@@ -92,7 +92,25 @@
 	// signature can be produced or verified here until the page is served over https.
 	const secure = $derived(globalThis.crypto?.subtle !== undefined);
 	let settingsOpen = $state(false);
-	let mcpOpen = $state(false);
+	const SETTINGS_TABS = ['general', 'mcp', 'help'] as const;
+	let settingsTab = $state<(typeof SETTINGS_TABS)[number]>('general');
+	function moveSettingsTab(event: KeyboardEvent): void {
+		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+		event.preventDefault();
+		const focused = SETTINGS_TABS.findIndex(
+			(tab) => event.target instanceof HTMLElement && event.target.id === `settings-tab-${tab}`
+		);
+		const current = focused >= 0 ? focused : SETTINGS_TABS.indexOf(settingsTab);
+		const next =
+			event.key === 'Home'
+				? 0
+				: event.key === 'End'
+					? SETTINGS_TABS.length - 1
+					: (current + (event.key === 'ArrowRight' ? 1 : -1) + SETTINGS_TABS.length) %
+						SETTINGS_TABS.length;
+		settingsTab = SETTINGS_TABS[next]!;
+		document.getElementById(`settings-tab-${settingsTab}`)?.focus();
+	}
 	// Empty until mount, so the prerendered HTML and the hydrated one agree.
 	let mcp = $state<McpSettings>({ url: '', token: '', enabled: false });
 	let mcpCopied = $state(false);
@@ -864,177 +882,231 @@
 				<DialogTitle>{t.settingsTitle}</DialogTitle>
 			</DialogHeader>
 
-			<!-- Idioma -->
-			<section class="flex flex-col gap-2">
-				<h3 class="flex items-center gap-2 text-sm font-medium">
-					<LanguagesIcon class="size-4" aria-hidden="true" />
-					{t.langLabel}
-				</h3>
-				<div class="bg-muted inline-flex w-fit items-center gap-1 rounded-lg p-1" role="group" aria-label={t.langLabel}>
-					<Button
-						variant={lang === 'es' ? 'default' : 'ghost'}
-						size="sm"
-						class="h-8 px-3"
-						aria-pressed={lang === 'es'}
-						onclick={() => (lang = 'es')}>ES</Button
-					>
-					<Button
-						variant={lang === 'en' ? 'default' : 'ghost'}
-						size="sm"
-						class="h-8 px-3"
-						aria-pressed={lang === 'en'}
-						onclick={() => (lang = 'en')}>EN</Button
-					>
-				</div>
-			</section>
+			<div
+				class="bg-muted grid grid-cols-3 gap-1 rounded-lg p-1"
+				role="tablist"
+				tabindex="-1"
+				aria-label={t.settingsTitle}
+				onkeydown={moveSettingsTab}
+			>
+				<Button
+					id="settings-tab-general"
+					role="tab"
+					variant={settingsTab === 'general' ? 'default' : 'ghost'}
+					size="sm"
+					class="h-8 min-w-0 px-2"
+					aria-selected={settingsTab === 'general'}
+					aria-controls="settings-panel-general"
+					tabindex={settingsTab === 'general' ? 0 : -1}
+					onclick={() => (settingsTab = 'general')}>{t.settingsTab}</Button
+				>
+				<Button
+					id="settings-tab-mcp"
+					role="tab"
+					variant={settingsTab === 'mcp' ? 'default' : 'ghost'}
+					size="sm"
+					class="h-8 min-w-0 px-2"
+					aria-selected={settingsTab === 'mcp'}
+					aria-controls="settings-panel-mcp"
+					tabindex={settingsTab === 'mcp' ? 0 : -1}
+					onclick={() => (settingsTab = 'mcp')}>{t.mcpTab}</Button
+				>
+				<Button
+					id="settings-tab-help"
+					role="tab"
+					variant={settingsTab === 'help' ? 'default' : 'ghost'}
+					size="sm"
+					class="h-8 min-w-0 px-2"
+					aria-selected={settingsTab === 'help'}
+					aria-controls="settings-panel-help"
+					tabindex={settingsTab === 'help' ? 0 : -1}
+					onclick={() => (settingsTab = 'help')}>{t.helpMenu}</Button
+				>
+			</div>
 
-			<!-- Tema -->
-			<section class="flex flex-col gap-2">
-				<h3 class="flex items-center gap-2 text-sm font-medium">{t.themeLabel}</h3>
-				<div class="bg-muted inline-flex w-fit items-center gap-1 rounded-lg p-1" role="group" aria-label={t.themeLabel}>
-					{#each THEMES as option (option.id)}
-						{@const Icon = option.icon}
-						<Button
-							variant={theme === option.id ? 'default' : 'ghost'}
-							size="icon"
-							class="size-8"
-							aria-pressed={theme === option.id}
-							aria-label={option.label}
-							onclick={() => (theme = option.id)}
-						>
-							<Icon class="size-4" />
-						</Button>
-					{/each}
-				</div>
-			</section>
-
-			<!-- PIN en memoria: optional, never written to disk. -->
-			<section class="flex flex-col gap-2">
-				<h3 class="flex items-center gap-2 text-sm font-medium">{t.pinMemoryTitle}</h3>
-				<div class="flex items-center gap-2">
-					<label class="text-sm" for="pin-memory-minutes">{t.pinMemoryMinutes}</label>
-					<Input
-						id="pin-memory-minutes"
-						type="number"
-						min="1"
-						max="120"
-						class="w-20"
-						value={pinMinutes}
-						oninput={(event) => updatePinMinutes(event.currentTarget.value)}
-					/>
-				</div>
-				<p class="text-muted-foreground text-xs">{t.pinMemoryHint}</p>
-			</section>
-
-			{#if extensionSettings}
-				<!-- Acceso a sitios: extension build only; the snippet renders the SiteAccess panel. -->
-				<section class="flex flex-col gap-2">
-					<h3 class="flex items-center gap-2 text-sm font-medium">
-						<GlobeIcon class="size-4" aria-hidden="true" />
-						{extensionCopy[lang].access}
-					</h3>
-					{@render extensionSettings(lang)}
-				</section>
-			{/if}
-
-			<!-- Ayuda -->
-			<section class="flex flex-col gap-3">
-				<h3 class="flex items-center gap-2 text-sm font-medium">{t.helpMenu}</h3>
-				<div class="flex items-start gap-2">
-					<ShieldCheckIcon class="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
-					<div>
-						<p class="text-sm font-medium">{t.privacyTitle}</p>
-						<p class="text-muted-foreground text-sm">{t.privacyNote}</p>
-					</div>
-				</div>
-
-				<div class="flex flex-col gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						class="w-fit"
-						aria-expanded={mcpOpen}
-						onclick={() => (mcpOpen = !mcpOpen)}
-					>
-						<PlugIcon class="size-4" aria-hidden="true" />
-						{t.mcpMenu}
-					</Button>
-					{#if mcpOpen}
-						<div class="bg-muted/40 grid gap-4 rounded-lg p-3">
-							<p class="text-muted-foreground text-sm">{t.mcpHint}</p>
-							<div class="grid gap-2">
-								<label class="text-sm font-medium" for="mcp-url">{t.mcpUrlLabel}</label>
-								<div class="flex gap-2">
-									<Input
-										id="mcp-url"
-										class="font-mono text-sm"
-										placeholder="https://mcp.example.com/mcp"
-										value={mcp.url}
-										oninput={(event) => updateMcp({ url: event.currentTarget.value })}
-									/>
-									<Button type="button" variant="outline" onclick={copyEndpoint}>
-										{mcpCopied ? t.mcpCopied : t.mcpCopy}
-									</Button>
-								</div>
-								<p class="text-muted-foreground text-xs">{t.mcpUrlHint}</p>
-								{#if mcpCopied}
-									<p class="text-primary text-xs" role="status">{t.mcpCopiedNote}</p>
-								{/if}
-							</div>
-							<div class="grid gap-2">
-								<label class="text-sm font-medium" for="mcp-token">{t.mcpTokenLabel}</label>
-								<Input
-									id="mcp-token"
-									type="password"
-									class="font-mono text-sm"
-									value={mcp.token}
-									oninput={(event) => updateMcp({ token: event.currentTarget.value })}
-								/>
-								<p class="text-muted-foreground text-xs">{t.mcpTokenHint}</p>
-							</div>
-							{#if isExtension()}
-								<div class="grid gap-2 border-t pt-3">
-									<h4 class="text-sm font-medium">{t.mcpBridgeTitle}</h4>
-									<label class="flex items-center gap-2 text-sm">
-										<input
-											type="checkbox"
-											class="accent-primary size-4"
-											bind:checked={mcp.enabled}
-											onchange={() => {
-												updateMcp({ enabled: mcp.enabled });
-												void connectBridge();
-											}}
-										/>
-										{t.mcpBridgeEnable}
-									</label>
-									<p class="text-muted-foreground text-xs">{t.mcpBridgeHint}</p>
-									<div class="flex items-center gap-3">
-										<Button type="button" variant="outline" size="sm" onclick={connectBridge}>
-											{t.mcpBridgeConnect}
-										</Button>
-										<p class="text-muted-foreground text-xs" role="status">
-											{bridge.online ? t.mcpBridgeOnline : t.mcpBridgeOffline}
-										</p>
-									</div>
-									{#if bridgeError}
-										<p class="text-destructive text-xs" role="alert">{bridgeError}</p>
-									{/if}
-								</div>
-							{/if}
+			{#if settingsTab === 'general'}
+				<div
+					id="settings-panel-general"
+					role="tabpanel"
+					aria-labelledby="settings-tab-general"
+					tabindex="0"
+					class="flex flex-col gap-4"
+				>
+					<!-- Idioma -->
+					<section class="flex flex-col gap-2">
+						<h3 class="flex items-center gap-2 text-sm font-medium">
+							<LanguagesIcon class="size-4" aria-hidden="true" />
+							{t.langLabel}
+						</h3>
+						<div class="bg-muted inline-flex w-fit items-center gap-1 rounded-lg p-1" role="group" aria-label={t.langLabel}>
+							<Button
+								variant={lang === 'es' ? 'default' : 'ghost'}
+								size="sm"
+								class="h-8 px-3"
+								aria-pressed={lang === 'es'}
+								onclick={() => (lang = 'es')}>ES</Button
+							>
+							<Button
+								variant={lang === 'en' ? 'default' : 'ghost'}
+								size="sm"
+								class="h-8 px-3"
+								aria-pressed={lang === 'en'}
+								onclick={() => (lang = 'en')}>EN</Button
+							>
 						</div>
+					</section>
+
+					<!-- Tema -->
+					<section class="flex flex-col gap-2">
+						<h3 class="flex items-center gap-2 text-sm font-medium">{t.themeLabel}</h3>
+						<div class="bg-muted inline-flex w-fit items-center gap-1 rounded-lg p-1" role="group" aria-label={t.themeLabel}>
+							{#each THEMES as option (option.id)}
+								{@const Icon = option.icon}
+								<Button
+									variant={theme === option.id ? 'default' : 'ghost'}
+									size="icon"
+									class="size-8"
+									aria-pressed={theme === option.id}
+									aria-label={option.label}
+									onclick={() => (theme = option.id)}
+								>
+									<Icon class="size-4" />
+								</Button>
+							{/each}
+						</div>
+					</section>
+
+					<!-- PIN en memoria: optional, never written to disk. -->
+					<section class="flex flex-col gap-2">
+						<h3 class="flex items-center gap-2 text-sm font-medium">{t.pinMemoryTitle}</h3>
+						<div class="flex items-center gap-2">
+							<label class="text-sm" for="pin-memory-minutes">{t.pinMemoryMinutes}</label>
+							<Input
+								id="pin-memory-minutes"
+								type="number"
+								min="1"
+								max="120"
+								class="w-20"
+								value={pinMinutes}
+								oninput={(event) => updatePinMinutes(event.currentTarget.value)}
+							/>
+						</div>
+						<p class="text-muted-foreground text-xs">{t.pinMemoryHint}</p>
+					</section>
+
+					{#if extensionSettings}
+						<!-- Acceso a sitios: extension build only; the snippet renders the SiteAccess panel. -->
+						<section class="flex flex-col gap-2">
+							<h3 class="flex items-center gap-2 text-sm font-medium">
+								<GlobeIcon class="size-4" aria-hidden="true" />
+								{extensionCopy[lang].access}
+							</h3>
+							{@render extensionSettings(lang)}
+						</section>
 					{/if}
 				</div>
-
-				<a
-					class="text-primary flex w-fit items-center gap-1.5 text-sm underline decoration-primary/40 underline-offset-4"
-					href="https://git.eduard3v.com/EduarD3V/AutoFirme"
-					target="_blank"
-					rel="noreferrer"
+			{:else if settingsTab === 'mcp'}
+				<div
+					id="settings-panel-mcp"
+					role="tabpanel"
+					aria-labelledby="settings-tab-mcp"
+					tabindex="0"
+					class="flex flex-col gap-3"
 				>
-					<CodeIcon class="size-4" aria-hidden="true" />
-					{t.sourceCode}
-				</a>
-			</section>
+					<h3 class="flex items-center gap-2 text-sm font-medium">
+						<PlugIcon class="size-4" aria-hidden="true" />
+						{t.mcpMenu}
+					</h3>
+					<p class="text-muted-foreground text-sm">{t.mcpHint}</p>
+					<div class="bg-muted/40 grid gap-4 rounded-lg p-3">
+						<div class="grid gap-2">
+							<label class="text-sm font-medium" for="mcp-url">{t.mcpUrlLabel}</label>
+							<div class="flex gap-2">
+								<Input
+									id="mcp-url"
+									class="font-mono text-sm"
+									placeholder="https://mcp.example.com/mcp"
+									value={mcp.url}
+									oninput={(event) => updateMcp({ url: event.currentTarget.value })}
+								/>
+								<Button type="button" variant="outline" onclick={copyEndpoint}>
+									{mcpCopied ? t.mcpCopied : t.mcpCopy}
+								</Button>
+							</div>
+							<p class="text-muted-foreground text-xs">{t.mcpUrlHint}</p>
+							{#if mcpCopied}
+								<p class="text-primary text-xs" role="status">{t.mcpCopiedNote}</p>
+							{/if}
+						</div>
+						<div class="grid gap-2">
+							<label class="text-sm font-medium" for="mcp-token">{t.mcpTokenLabel}</label>
+							<Input
+								id="mcp-token"
+								type="password"
+								class="font-mono text-sm"
+								value={mcp.token}
+								oninput={(event) => updateMcp({ token: event.currentTarget.value })}
+							/>
+							<p class="text-muted-foreground text-xs">{t.mcpTokenHint}</p>
+						</div>
+						{#if isExtension()}
+							<div class="grid gap-2 border-t pt-3">
+								<h4 class="text-sm font-medium">{t.mcpBridgeTitle}</h4>
+								<label class="flex items-center gap-2 text-sm">
+									<input
+										type="checkbox"
+										class="accent-primary size-4"
+										bind:checked={mcp.enabled}
+										onchange={() => {
+											updateMcp({ enabled: mcp.enabled });
+											void connectBridge();
+										}}
+									/>
+									{t.mcpBridgeEnable}
+								</label>
+								<p class="text-muted-foreground text-xs">{t.mcpBridgeHint}</p>
+								<div class="flex items-center gap-3">
+									<Button type="button" variant="outline" size="sm" onclick={connectBridge}>
+										{t.mcpBridgeConnect}
+									</Button>
+									<p class="text-muted-foreground text-xs" role="status">
+										{bridge.online ? t.mcpBridgeOnline : t.mcpBridgeOffline}
+									</p>
+								</div>
+								{#if bridgeError}
+									<p class="text-destructive text-xs" role="alert">{bridgeError}</p>
+								{/if}
+							</div>
+						{/if}
+					</div>
+				</div>
+			{:else}
+				<div
+					id="settings-panel-help"
+					role="tabpanel"
+					aria-labelledby="settings-tab-help"
+					tabindex="0"
+					class="flex flex-col gap-4"
+				>
+					<div class="flex items-start gap-2">
+						<ShieldCheckIcon class="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+						<div>
+							<p class="text-sm font-medium">{t.privacyTitle}</p>
+							<p class="text-muted-foreground text-sm">{t.privacyNote}</p>
+						</div>
+					</div>
+
+					<a
+						class="text-primary flex w-fit items-center gap-1.5 text-sm underline decoration-primary/40 underline-offset-4"
+						href="https://git.eduard3v.com/EduarD3V/AutoFirme"
+						target="_blank"
+						rel="noreferrer"
+					>
+						<CodeIcon class="size-4" aria-hidden="true" />
+						{t.sourceCode}
+					</a>
+				</div>
+			{/if}
 		</DialogContent>
 	</Dialog>
 

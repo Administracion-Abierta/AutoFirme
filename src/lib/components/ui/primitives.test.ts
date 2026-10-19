@@ -89,9 +89,10 @@ describe('shadcn primitives in use', () => {
 		expect(container.querySelector('#sign-hint')?.textContent).toContain('certificado');
 		expect(screen.getByRole('button', { name: t.next }).hasAttribute('disabled')).toBe(true);
 
-		// The settings dialog carries the privacy note and the language and theme controls.
+		// The privacy note lives in the Help tab.
 		await fireEvent.click(screen.getByRole('button', { name: t.settingsLabel }));
 		const dialog = await screen.findByRole('dialog');
+		await fireEvent.click(within(dialog).getByRole('tab', { name: t.helpMenu }));
 		expect(within(dialog).getByText(t.privacyTitle)).toBeTruthy();
 		expect(within(dialog).getByText(t.privacyNote)).toBeTruthy();
 	});

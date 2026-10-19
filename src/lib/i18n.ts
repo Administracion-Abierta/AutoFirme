@@ -25,6 +25,9 @@ export interface Copy {
 	/** Header settings button and modal title. */
 	settingsLabel: string;
 	settingsTitle: string;
+	/** Settings modal tabs. */
+	settingsTab: string;
+	mcpTab: string;
 	/** Header button that opens the browser's install prompt (#47). */
 	installApp: string;
 	/** Header button that activates a downloaded update of the installed app (#47). */
@@ -170,6 +173,8 @@ export const copy: Record<Lang, Copy> = {
 		pinMemoryMinutes: 'Minutos que se recuerda',
 		settingsLabel: 'Ajustes y ayuda',
 		settingsTitle: 'Ajustes y ayuda',
+		settingsTab: 'Ajustes',
+		mcpTab: 'MCP',
 		colFile: 'Fichero',
 		colActions: 'Acciones',
 		step1Title: 'Configura la firma',
@@ -331,6 +336,8 @@ export const copy: Record<Lang, Copy> = {
 		pinMemoryMinutes: 'Minutes to remember it',
 		settingsLabel: 'Settings and help',
 		settingsTitle: 'Settings and help',
+		settingsTab: 'Settings',
+		mcpTab: 'MCP',
 		colFile: 'File',
 		remove: 'Remove',
 		colActions: 'Actions',

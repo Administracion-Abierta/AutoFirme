@@ -534,7 +534,7 @@ describe('MCP endpoint settings', () => {
 	it('stores the endpoint and token typed into the settings modal', async () => {
 		render(App);
 		await fireEvent.click(screen.getByRole('button', { name: 'Ajustes y ayuda' }));
-		await fireEvent.click(await screen.findByRole('button', { name: 'Servidor MCP' }));
+		await fireEvent.click(await screen.findByRole('tab', { name: 'MCP' }));
 
 		const url = await screen.findByLabelText('Dirección del endpoint');
 		await fireEvent.input(url, { target: { value: 'https://mcp.example.com/mcp' } });
