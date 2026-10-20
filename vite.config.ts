@@ -31,11 +31,7 @@ export default defineConfig(({ mode }) => mode === 'extension' ? {
 			// `pnpm build:tauri`: the shell serves the same static build from `tauri://localhost`.
 			...(mode === 'tauri' ? { serviceWorker: { register: false } } : {}),
 			prerender: {
-				handleMissingId: ({ id }) => MISSING_ID_ALLOWLIST[id] === true,
-				handleHttpError: ({ path, message }) => {
-					if (path.startsWith('/sidebar-07') || path.includes('/avatars/')) return;
-					throw new Error(`prerender failed: ${path} ${message}`);
-				}
+				handleMissingId: ({ id }) => MISSING_ID_ALLOWLIST[id] === true
 			}
 		})
 	],
