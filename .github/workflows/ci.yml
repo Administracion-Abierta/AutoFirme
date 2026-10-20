@@ -68,10 +68,21 @@ jobs:
     name: mcp check, test, e2e
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Same OpenSSL floor as `checks`: `mcp/test/helpers.ts` builds the shared CAdES fixtures,
+    # whose expired leaf needs `-not_before`/`-not_after` (OpenSSL >= 3.4) — absent on the runner.
+    container:
+      image: debian:trixie
     defaults:
       run:
         working-directory: mcp
     steps:
+      # The image is minimal and checkout needs git, so the toolchain comes first.
+      - name: Toolchain
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends git openssl ca-certificates
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          openssl version
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
