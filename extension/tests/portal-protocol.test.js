@@ -31,6 +31,7 @@ test('Datos generados signs the page payload as explicit detached CAdES', () => 
 	assert.equal(request?.algorithm, 'SHA256withRSA');
 	assert.deepEqual(Buffer.from(request?.data ?? '', 'base64'), payload);
 	assert.equal(sha256Hex(Buffer.from(request?.data ?? '', 'base64')), sha256Hex(payload));
+	// 10 chars doubled 13 times, then the page trims 2: the live page's payload is this size.
 	assert.equal(payload.length, 81_918);
 });
 
