@@ -53,6 +53,8 @@ jobs:
       # the batch archive, openssl/python3 for every fixture (positive and negative).
       - run: pnpm verify:zip
       - run: bash test/fixtures/verify-fixtures.sh
+      # 50 MB PDF, 500-file batch and cold start; absolute ceilings calibrated on a dev box.
+      - run: pnpm perf
       - run: pnpm package:extension
       - uses: actions/upload-artifact@v4
         with:
@@ -61,6 +63,27 @@ jobs:
             dist/autofirme-extension-*.zip
             dist/SHA256SUMS
           if-no-files-found: error
+
+  mcp:
+    name: mcp check, test, e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: mcp/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      # Builds both entry points and verifies a stdio signature with openssl cms -verify.
+      - run: pnpm e2e
 
   deploy:
     name: deploy worker to production

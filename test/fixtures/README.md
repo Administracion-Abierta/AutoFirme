@@ -28,7 +28,9 @@ used at runtime — it only feeds the verification tests.
 bash test/fixtures/generate.sh
 ```
 
-Idempotent, no network, `openssl` + `python3` (stdlib) only. It wipes `ca/`,
+Idempotent, no network, `openssl` + `python3` (stdlib) only. Requires **OpenSSL ≥ 3.4** for the
+pinned `-not_before`/`-not_after` window; the script refuses older builds before touching the
+corpus (CI uses Debian trixie / OpenSSL 3.5). It wipes `ca/`,
 `scratch/` and `c14n/` first, then rewrites everything and self-checks (the XAdES
 digests are recomputed from the finished file and the `SignatureValue` is verified
 against `ca/signer.crt`).

@@ -15,6 +15,7 @@
     "test": "vitest run && node --test extension/tests/*.test.js && node --test scripts/check-extension.test.mjs && node --test scripts/release-workflow.test.mjs",
     "verify:zip": "node scripts/verify-batch-zip.mjs",
     "verify:real": "bash scripts/smoke-real.sh",
+    "perf": "node --import ./scripts/ts-hook.mjs scripts/perf-budget.mjs",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.extension.json",
     "build:extension": "svelte-kit sync && node scripts/build-extension.mjs",
     "check:extension": "node scripts/check-extension.mjs",

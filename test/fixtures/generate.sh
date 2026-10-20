@@ -13,6 +13,17 @@
 #
 set -euo pipefail
 
+# The pinned certificate window uses -not_before/-not_after, which OpenSSL only learned in 3.4.
+# Fail before the rm -rf below: an older tool makes the script fall back to "now" or abort mid-wipe.
+openssl_version=$(openssl version | awk '{print $2}')
+openssl_major=${openssl_version%%.*}
+openssl_rest=${openssl_version#*.}
+openssl_minor=${openssl_rest%%.*}
+if (( openssl_major < 3 || (openssl_major == 3 && openssl_minor < 4) )); then
+  printf 'generate.sh needs OpenSSL >= 3.4 for -not_before/-not_after (found %s)\n' "$openssl_version" >&2
+  exit 1
+fi
+
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES="$PWD"
 
