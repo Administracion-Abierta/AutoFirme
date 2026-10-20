@@ -123,6 +123,9 @@ export interface Copy {
 	storeUnlock: string;
 	storeOpen: string;
 	storeExpiry: string;
+	/** Alias of a saved signature: the user-chosen name shown instead of the file name. */
+	storeAlias: string;
+	storeRename: string;
 	storeErrors: Record<StoreErrorCode, string>;
 	stepConfigure: string;
 	stepFiles: string;
@@ -284,6 +287,8 @@ export const copy: Record<Lang, Copy> = {
 		storeUnlock: 'Usar',
 		storeOpen: 'Abrir',
 		storeExpiry: 'Caduca',
+		storeAlias: 'Alias',
+		storeRename: 'Cambiar nombre',
 		storeErrors: {
 			'wrong-pin': 'PIN incorrecto.',
 			tampered: 'El PIN no es el correcto, o la firma guardada está alterada.',
@@ -449,6 +454,8 @@ export const copy: Record<Lang, Copy> = {
 		storeUnlock: 'Use',
 		storeOpen: 'Open',
 		storeExpiry: 'Expires',
+		storeAlias: 'Alias',
+		storeRename: 'Rename',
 		storeErrors: {
 			'wrong-pin': 'Wrong PIN.',
 			tampered: 'The PIN is wrong, or the saved signature was altered.',
