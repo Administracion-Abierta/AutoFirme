@@ -3,6 +3,12 @@
  * desktop webview (`tauri://localhost` on WebKitGTK)? The diagnostics page renders the
  * answer; the CI job runs the same probes headlessly.
  *
+ * ANSWERED 2026-10-21 on `ubuntu:24.04`, `webkit2gtk-4.1`, `tauri 2.12.4`, production
+ * mode (`--features tauri/custom-protocol`), driven headlessly under `xvfb-run`:
+ * `isSecureContext=true`, origin `tauri://localhost`, SHA-256("abc") matches the NIST
+ * vector, `importKey(pkcs8)` round-trips a 1218-byte RSA key, AES-CBC and RSA-PSS both
+ * succeed. The `axum` fallback is not needed.
+ *
  * Each probe is something the signing engine really does: SHA-256 digests, PKCS#8 key
  * import, AES-CBC (PKCS#12 PBE output) and RSA-PSS (signature algorithm).
  */

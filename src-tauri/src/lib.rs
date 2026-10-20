@@ -33,6 +33,19 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![save_file])
+        // P0.6 smoke (#19): with AUTOFIRME_SMOKE set, print the page the webview finished
+        // loading and exit. The CI job runs the production build under `xvfb-run` and
+        // asserts on the marker, so a webview that cannot boot fails the build. Silent
+        // (the hook stays registered but does nothing) in every normal run.
+        .on_page_load(|_webview, payload| {
+            if std::env::var_os("AUTOFIRME_SMOKE").is_none() {
+                return;
+            }
+            println!("SHELL_SMOKE {:?} {}", payload.event(), payload.url());
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                std::process::exit(0);
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running AutoFirme");
 }

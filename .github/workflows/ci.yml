@@ -104,5 +104,30 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: cargo check --locked --manifest-path src-tauri/Cargo.toml
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      # P0.6 headless smoke: the production build embeds `build/` and serves it over the
+      # `tauri://localhost` custom scheme. The marker proves the webview really booted and
+      # finished a page load; `timeout` fails the job when it never gets there.
+      - run: pnpm build:tauri
+      - name: Headless webview smoke
+        run: |
+          set -o pipefail
+          cargo build --release --locked --features tauri/custom-protocol \
+            --manifest-path src-tauri/Cargo.toml
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1
+          export LIBGL_ALWAYS_SOFTWARE=1 GDK_BACKEND=x11 AUTOFIRME_SMOKE=1
+          timeout 120 xvfb-run -a --server-args="-screen 0 1280x1024x24" \
+            ./src-tauri/target/release/autofirme-desktop | tee smoke.log
+          grep -q "SHELL_SMOKE Finished" smoke.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shell-smoke
+          path: smoke.log
+          if-no-files-found: error
