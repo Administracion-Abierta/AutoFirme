@@ -8,7 +8,7 @@
     "autofirme-mcp": "dist/server.js"
   },
   "scripts": {
-    "build": "esbuild src/server.ts src/server-http.ts --bundle --platform=node --target=node22 --format=esm --outdir=dist --packages=external && chmod +x dist/server.js dist/server-http.js",
+    "build": "esbuild src/server.ts src/server-http.ts --bundle --platform=node --target=node24 --format=esm --outdir=dist --packages=external && chmod +x dist/server.js dist/server-http.js",
     "test": "vitest run",
     "e2e": "pnpm build && node scripts/e2e.mjs",
     "check": "tsc --noEmit",
@@ -24,5 +24,8 @@
     "typescript": "^6.0.3",
     "vitest": "^5.0.4"
   },
-  "packageManager": "pnpm@11.24.0"
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": "24.x"
+  }
 }

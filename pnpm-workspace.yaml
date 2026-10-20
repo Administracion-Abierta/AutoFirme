@@ -1,3 +1,9 @@
+# `mcp/` is part of this workspace so CI can type-check, build and test it with
+# the same install; it was previously an island that no workflow ever ran.
+packages:
+  - '.'
+  - 'mcp'
+
 allowBuilds:
   esbuild: true
   workerd: true
