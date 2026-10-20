@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Regenerates every fixture in test/fixtures/:
+# Regenerates the generated fixtures in test/fixtures/ (the app-produced `pades-*` golden
+# is not generated here — see README.md):
 #
 #   ca/            throwaway test PKI (root -> intermediate -> signer)
 #   document.txt   invoice text, + document-tampered.txt
