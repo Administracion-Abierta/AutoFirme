@@ -84,7 +84,7 @@ jobs:
   # so the shell is checked on the 24.04 runner (webkit2gtk-4.1). The image also
   # declares the test oracles the parity gate relies on.
   shell:
-    name: tauri shell cargo check
+    name: tauri shell check and webview smoke
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
