@@ -5,8 +5,10 @@
  *
  * Measures a cold import of the signing core, a PAdES signature over a structurally minimal
  * 50 MB PDF (the byte range covers all of it), and a 500-file CAdES batch through the real queue.
- * Budgets are absolute ceilings roughly 10× the observed times on a developer machine, so runner
- * noise cannot flip them while a real regression (quadratic scan, per-file key import) still does.
+ * Budgets are absolute ceilings set above the observed times on a developer machine (cold start
+ * ≈0.4 s, 50 MB PDF ≈0.3 s, 500-file batch ≈0.7-2 s), so runner noise cannot flip them while a
+ * real regression still does: reloading the PKCS#12 per file costs ≈31 s (62 ms × 500) and
+ * breaches the batch ceiling.
  *
  * Node's type stripping plus `scripts/ts-hook.mjs` let this import the app's TypeScript directly.
  */
@@ -15,7 +17,7 @@ import { rmSync } from 'node:fs';
 const BUDGET_MS = {
 	coldStart: 3_000,
 	pdf50mb: 30_000,
-	batch500: 60_000,
+	batch500: 20_000,
 };
 const MIB = 1024 * 1024;
 
