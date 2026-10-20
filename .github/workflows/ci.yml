@@ -77,7 +77,10 @@ jobs:
         working-directory: mcp
     steps:
       # The image is minimal and checkout needs git, so the toolchain comes first.
+      # This step must run from the workspace root: the job-wide `working-directory: mcp`
+      # only exists after checkout, and the runner `docker exec`s with that cwd (no mkdir).
       - name: Toolchain
+        working-directory: .
         run: |
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends git openssl ca-certificates
