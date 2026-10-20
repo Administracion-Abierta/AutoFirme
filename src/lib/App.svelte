@@ -66,6 +66,7 @@
 	import LanguagesIcon from '@lucide/svelte/icons/languages';
 	import CodeIcon from '@lucide/svelte/icons/code';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import PlugIcon from '@lucide/svelte/icons/plug';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
@@ -1105,6 +1106,14 @@
 					>
 						<CodeIcon class="size-4" aria-hidden="true" />
 						{t.sourceCode}
+					</a>
+
+					<a
+						class="text-primary flex w-fit items-center gap-1.5 text-sm underline decoration-primary/40 underline-offset-4"
+						href="/diagnostics"
+					>
+						<ActivityIcon class="size-4" aria-hidden="true" />
+						{t.diagnosticsLink}
 					</a>
 				</div>
 			{/if}
