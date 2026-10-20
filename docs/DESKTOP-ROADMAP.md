@@ -12,6 +12,10 @@ Status: **approved plan, not started**. No code exists yet. This document supers
 | 3 | **Desktop and extension are separate products.** Extension ships standalone: in-extension PKCS#12 signing and its own portal interception, no desktop dependency. The optional bridge between them is a **native messaging host**, never a localhost API. | No `triphase.ts` retarget. The extension keeps its own MCP bridge (agents → browser-confirmed signature). The desktop app gets its own MCP. They share the engine source, not a runtime. |
 | 4 | Certificate store: **OS keystore + PKCS#11 authoritative; PKCS#12 import kept; IndexedDB demoted to migration-only.** | One-time migration path; every cert shows its source. Divergence between stores becomes a bug class, not a feature. |
 | 5 | **P2P slice 1 = LAN + Tailscale only**, no relays. | Nothing to operate. File-out fallback always present. |
+| 6 | **No hosted presence at all.** No docs site, no landing page, no demo host. | Docs live in the repo. Nothing to deploy, nothing to keep green. |
+| 7 | **Firefox after Windows.** | Firefox `userScripts` (#18) stays `fleet:hold` until the Windows MSI exists. |
+| 8 | **macOS committed from the start, notarization included.** | Apple Developer Program purchase moves into the P7 budget, not "someday". Keychain provider is mandatory, not optional. |
+| 9 | **GitHub Releases is the only distribution channel.** | No apt/dnf repo, no Forgejo pages, no third-party store as primary. Packages are attached assets + `SHA256SUMS`, minisign signatures. |
 
 ## 2. Product shape
 
@@ -54,7 +58,7 @@ CAdES/XAdES/PAdES and never learns where the key lives.
 
 | Phase | Features | Effort | Exit criteria |
 |---|---|---|---|
-| **P0** Shell + parity gate | Tauri v2 scaffold, secure-context resolution, 12-item engine smoke, CI `cargo check` + headless smoke | 8–12 d | all 12 green on Linux; one signed PDF validates in Acrobat |
+| **P0** Shell + parity gate | Tauri v2 scaffold, secure-context resolution, 12-item engine smoke, CI `cargo check` + headless smoke, **plus audit fixes §9.1–9.6: delete wrangler/Containerfile/Caddyfile + deploy jobs, pin Node, disable the service worker, add the `mcp` CI job, extend `check-versions`** | 10–14 d | all 12 green on Linux; one signed PDF validates in Acrobat; CI has no deploy job and no untested project |
 | **P1** Key layer | `KeyProvider` seam, PKCS#11 modules, OS stores, smartcard autodetect + native PIN, hot-plug | 15–20 d | DNIe 3.x signs CAdES with PIN prompted natively, key non-exportable |
 | **P2** Portal + native messaging | `afirma://` registration, local sign server (protocol 3 + 4), native messaging host + manifests, extension optional upgrade | 13–17 d | real sede completes a signature end to end, twice: extension-only, and via desktop |
 | **P3** Format parity | OOXML wired, XAdES-T, FacturaE 3.0/3.1/3.2.2, co-sign/counter-sign, ASiC-S, XAdES detached/enveloping, ODF, XMLDSig | 25–30 d | PARITY P0/P1 rows green |
@@ -199,9 +203,82 @@ for exactly that user.
 
 ## 8. Open questions
 
-1. Does the project keep any hosted presence at all (docs site, landing page) once the Worker
-   is retired? Currently the answer is "nothing", which also removes the demo.
-2. Firefox: extension parity before or after Windows support? (issue #18 is `fleet:hold`.)
-3. macOS: skip entirely for v1.0 and revisit, or commit to notarization from the start?
-4. Who signs releases (GPG/minisign key custody) and where do apt/dnf repos live — Forgejo
-   pages, GitHub Releases, or both?
+Resolved 2026-10-20 — see decisions 6–9. Nothing hosted, Firefox after Windows, macOS committed,
+GitHub Releases only.
+
+## 9. Stack audit (2026-10-20, before any code)
+
+Findings from reading the tree at `ef5f92f`, plus a real run of the suites: `pnpm check` clean
+(0 errors, 0 warnings), vitest 244 passed / 1 skipped, node --test 19 + 8 passed. The stack is
+healthy; what follows is drift and plan-breaking coupling, not rot. The first six land in **P0**,
+not P8, because they make CI or the desktop build lie.
+
+### Blocker-class
+
+1. **CI deploy job is already broken.** `ci.yml:84-88` runs `pnpm exec wrangler deploy`, but
+   `wrangler` appears 0 times in `package.json` (grep count 0). The job cannot succeed as written
+   and nobody noticed because it only runs on `main`. Delete it in P0 together with
+   `wrangler.jsonc`, `Caddyfile`, and `Containerfile` (all three still tracked in git), and drop
+   the `image` + static-tarball steps from `release-develop.yml`. **Order matters:**
+   `scripts/release-workflow.test.mjs` asserts those exact jobs exist ("the image job publishes the
+   Containerfile to ghcr.io", "develop artifacts job publishes … extension zip and checksums"), so
+   the workflow edit and the test rewrite are one commit or CI goes red on purpose.
+2. **Four different Node versions in one repo.** `.nvmrc` = `22.22.0`, CI = `24`
+   (`ci.yml:41`, `release.yml`, `release-develop.yml`), local = `26.7.0`, `mcp` esbuild
+   `--target=node22`. No `engines` field in either `package.json`. Fix: pin one LTS (24) via
+   `.nvmrc` + `engines.node` in both packages, and build the MCP sidecar with the same major it
+   is tested on. A sidecar built against a version nobody runs is a P5 bug factory.
+3. **The service worker must be switched off for desktop.** `src/service-worker.ts` (6.4 KB)
+   exists and SvelteKit auto-registers it; `tsconfig.json:4` excludes it from type-checking.
+   WebKitGTK/Tauri has no service worker, so registration fails and cached assets can go stale in
+   dev. Set `serviceWorker: { register: false }` for the desktop build, hide
+   `PwaControls` (`App.svelte:462`), and drop the file once the web build is gone.
+4. **`mcp/` is never tested in CI.** Zero `mcp` references in `.github/workflows`, and
+   `mcp/node_modules` is absent locally, so `pnpm test` covers none of it. It is a separate pnpm
+   project (own lockfile, not a root workspace member). Before P5 turns it into a shipped binary:
+   add a CI job (`pnpm -C mcp install --frozen-lockfile && check && test && e2e`), or promote
+   `mcp` into the root workspace so one install covers both.
+5. **Version single-source doesn't know the desktop app.** `scripts/check-versions.mjs` compares
+   only `package.json` ↔ `extension/manifest.json`. Once `src-tauri/tauri.conf.json` and
+   `Cargo.toml` exist, drift is silent and release-please won't touch them. Extend the script and
+   `release-please-config.json` `extra-files` before the first tag.
+6. **Do not extend the reproducibility gate to Rust.** `release.yml` builds twice and diffs
+   `SHA256SUMS`. Cargo output is not byte-reproducible by default (build paths, timestamps, build
+   id), so adding Tauri artifacts to that check would block every release. Keep the gate
+   extension-only and say so in the workflow comment.
+
+### Medium
+
+7. **`pdf-lib@1.17.1` is unmaintained** (last real release 2021) and is the load-bearing
+   dependency for PAdES B-LT/LTA and the form-modification checks in P4.4. `@cantoo/pdf-lib` is a
+   drop-in fork carrying the PDFBox-tested fixes. Decide before P3; if you keep 1.17.1, budget
+   extra days for incremental-update work.
+8. **Engine purity is confirmed good.** Every `node:` import and every `Buffer` use in `src/lib`
+   lives in `*.test.ts` files only; no `process.env` in the engine. The same sources run unchanged
+   in a webview and in the Node sidecar — P0.2 and P5 need no rewrite.
+9. **Two browser-only couplings to replace in P0/P1:** anchor-click downloads
+   (`App.svelte:311`, `FileCard.svelte:47`) → Tauri `dialog.save` + `fs.writeFile`, keeping the
+   anchor as fallback; and `navigator.clipboard` (`App.svelte:154`), which is fine.
+10. **`localStorage` holds the MCP bearer token** (`src/lib/mcp.ts:34,51`). In the desktop app the
+    MCP direction reverses, but a token still needs a home: OS keyring / `tauri-plugin-stronghold`
+    in P5.4, never `localStorage`.
+11. **`pin-memory.ts` is sound as written** — outside the extension it is a module-level `Map`,
+    so no PIN touches disk. Constraint for P1: card PINs must never pass through this module; they
+    go native dialog → PKCS#11 session and stay in Rust.
+12. **Extension changes P2 will force:** `nativeMessaging` permission and `externally_connectable`
+    (neither present in `extension/manifest.json`), host manifest install paths
+    (`~/.config/{google-chrome,chromium}/NativeMessagingHosts/` on Linux,
+    `/usr/lib/mozilla/native-messaging-hosts/` + registry key on Windows), and a signed host
+    binary on Windows/macOS or the browser refuses to launch it.
+
+### Hygiene
+
+13. Two package managers on disk: gitignored `bun.lock` at root (delete), `mcp/pnpm-lock.yaml`
+    inside a non-workspace project (see #4).
+14. `vite.config.ts:25` prerender `handleMissingId: ({ id }) => id.startsWith('/') || id === ''`
+    silently accepts broken links; tighten to an allowlist when P0.3 lands, or desktop asset-path
+    bugs hide behind it.
+15. Test oracles (`openssl` >= 3.4, `xmlsec1`, `xmllint`, Info-ZIP) are installed ad hoc in the CI
+    container and are undeclared. Put them in the P0.6 builder image so local and CI agree; local
+    host currently has OpenSSL 4.0.3 against CI's 3.5.
+
