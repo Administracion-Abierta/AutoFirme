@@ -1,8 +1,9 @@
 # Deploy (static build, any host)
 
 Static build, zero backend. Signing runs in the browser; the host serves files only.
-There is no Worker, no edge code and no container in this repository: `pnpm build`
-emits `build/` and any nginx/Caddy/static host serves it.
+There is no Worker and no edge code in this repository: `pnpm build` emits `build/` and any
+nginx/Caddy/static host serves it. The only container here is `mcp/Containerfile`, for the
+optional MCP server.
 
 ## What the host must do
 
