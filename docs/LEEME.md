@@ -92,7 +92,7 @@ pnpm install
 pnpm dev                  # servidor de desarrollo
 pnpm build                # sitio estático en build/
 pnpm preview              # servir build/
-pnpm test                 # 235 pruebas (vitest) + 69 de Node
+pnpm test                 # 244 pruebas (vitest) + 81 de Node
 pnpm check                # svelte-check + tsc
 pnpm perf                 # presupuestos de rendimiento (frío, PDF 50 MB, lote de 500)
 pnpm build:extension      # extensión en dist/extension
@@ -104,7 +104,7 @@ pnpm demo:registradores        # prueba en la web real de los registradores (Pla
 
 ## Pruebas y evidencia
 
-304 pruebas automatizadas (235 vitest, 43 de puente web, 18 de artefactos, 8 de flujo de publicación).
+325 pruebas automatizadas (244 vitest, 54 de puente web, 19 de artefactos, 8 de flujo de publicación).
 Toda la cripto se contrasta con herramientas independientes: `openssl cms -verify`, `openssl ts`,
 `pdfsig`, `qpdf`, `unzip -t` y recomputación de resumenes en Python. Además, la extensión se probó
 contra la página de pruebas del Colegio de Registradores
