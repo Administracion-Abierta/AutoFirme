@@ -13,6 +13,11 @@ assert.equal(manifest.action.default_popup, undefined, 'signing must survive foc
 assert.equal(manifest.options_page, 'index.html');
 assert.equal(manifest.optional_permissions, undefined, 'site access is requested as host patterns, not API permissions');
 assert.deepEqual(manifest.host_permissions, ['http://*/*', 'https://*/*'], 'all-sites interception is the install-time default; disabled origins narrow it');
+for (const [size, file] of Object.entries(manifest.icons ?? {})) {
+  const png = await readFile(path.join(root, file));
+  assert.equal(png.subarray(1, 4).toString(), 'PNG', `${file} is not a PNG`);
+  assert.deepEqual([png.readUInt32BE(16), png.readUInt32BE(20)], [Number(size), Number(size)], `${file} must be ${size}x${size}`);
+}
 const html = await read('index.html');
 assert.ok(!/<script\b(?![^>]*\bsrc=)[^>]*>\s*\S/i.test(html), 'inline executable script');
 assert.ok(!/\son\w+\s*=/i.test(html), 'inline event handler');

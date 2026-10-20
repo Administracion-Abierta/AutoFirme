@@ -22,6 +22,7 @@
   },
   "options_page": "index.html",
   "icons": {
+    "128": "icon-128.png",
     "192": "icon-192.png",
     "512": "icon-512.png"
   },

@@ -21,7 +21,7 @@ for (const name of ['background', 'page', 'content']) {
 await copyFile('extension/manifest.json', 'dist/extension/manifest.json');
 // Only assets the extension HTML and manifest actually reference. Copying all of
 // static/ leaks the web app's PWA manifest and _headers into the Chrome package.
-for (const name of ['favicon.svg', 'icon-192.png', 'icon-512.png', 'theme-bootstrap.js']) {
+for (const name of ['favicon.svg', 'icon-128.png', 'icon-192.png', 'icon-512.png', 'theme-bootstrap.js']) {
   await copyFile(`static/${name}`, `dist/extension/${name}`);
 }
 await import('./check-extension.mjs');
