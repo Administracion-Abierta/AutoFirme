@@ -3,7 +3,7 @@ name = "autofirme-desktop"
 version = "0.1.2"
 description = "AutoFirme Web desktop shell"
 edition = "2021"
-rust-version = "1.77.2"
+rust-version = "1.90"
 
 [lib]
 name = "autofirme_desktop_lib"
