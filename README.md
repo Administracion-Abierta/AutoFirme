@@ -162,7 +162,7 @@ permiso y exige una confirmación humana antes de firmar.
 
 ![Ajustes de la extensión](docs/images/extension-ajustes.png)
 
-Requisitos: Chrome/Chromium 116+ y Node 22+ para compilar. Firefox está pendiente
+Requisitos: Chrome/Chromium 116+ y Node 24 para compilar. Firefox está pendiente
 ([issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18)).
 
 ```bash
@@ -212,7 +212,7 @@ Configuración, transporte remoto y modelo de amenaza:
 
 ## Empezar en local
 
-Requisitos: **Node 22+** (probado con Node 24), **pnpm 11.24.0** y un navegador moderno con
+Requisitos: **Node 24** (el `.nvmrc` y `engines.node` lo fijan), **pnpm 11.24.0** y un navegador
 WebCrypto.
 
 ```bash
@@ -232,12 +232,13 @@ pnpm build          # genera build/
 pnpm preview        # sirve el resultado localmente
 ```
 
-Puedes servir `build/` con cualquier nginx, Caddy o alojamiento estático. El repositorio incluye un
-`Caddyfile` con *fallback* para la SPA y un `Containerfile` multi-stage (Node → Caddy):
+Puedes servir `build/` con cualquier nginx, Caddy o alojamiento estático. La app es una SPA con
+entradas profundas (`/?entry=sign`, `/?op=sign…`, `/?shared=1`), así que el host debe reenviar las
+rutas desconocidas a `build/404.html`. Ejemplo mínimo para nginx:
 
-```bash
-docker build -f Containerfile -t autofirme-web .
-docker run --rm -p 8080:80 autofirme-web
+```nginx
+root /srv/autofirme/build;
+location / { try_files $uri $uri/ /404.html; }
 ```
 
 Para producción, sirve siempre por **HTTPS**: lo exigen tanto el service worker como la instalación

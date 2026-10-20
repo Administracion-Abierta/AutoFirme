@@ -52,10 +52,11 @@ decompiled*/         # jadx output — untracked reference, gitignored (tag refe
 docs/                # architecture.md (signing-core map), REVERSING-NOTES.md
 src/, static/        # the product — SvelteKit SPA (Svelte 5 + Tailwind v4)
 test/                # fixtures + cross-check scripts (openssl / xmlsec1)
-Containerfile        # multi-stage build: node build -> caddy serve (context = repo root)
+src-tauri/          # optional desktop shell (Tauri v2, Linux); the web build is the product
+mcp/                 # MCP server (own Containerfile, build context = repo root)
 ```
 
-Build/test from the repo root (pnpm is canonical; the lockfile and `Containerfile` use it):
+Build/test from the repo root (pnpm is canonical; the root `pnpm-lock.yaml` covers `mcp/` too):
 `pnpm install && pnpm test && pnpm build`.
 
 ## Agent workflow

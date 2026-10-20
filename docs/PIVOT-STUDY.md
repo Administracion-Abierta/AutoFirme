@@ -18,7 +18,7 @@ exists too. Today's tree is **one engine, four shells**:
 |---|---|---|---|
 | SvelteKit SPA / PWA | `build/` 1.6 MB | yes — `pnpm build`, static, self-hostable | `AGENTS.md` layout, `static/manifest.webmanifest` |
 | Chrome MV3 extension | `dist/extension/` 1.4 MB, 911 lines of extension-only runtime | yes — packaged zip, dev pre-releases | `extension/`, `docs/CHROME-EXTENSION.md` |
-| MCP server (stdio + Streamable HTTP, Node 22) | 894 lines `mcp/src/` | yes — own `Containerfile`, `deploy/k3s.yaml` | `docs/MCP-DESIGN.md`, `mcp/README.md` |
+| MCP server (stdio + Streamable HTTP, Node 24) | 894 lines `mcp/src/` | yes — own `Containerfile`, `deploy/k3s.yaml` | `docs/MCP-DESIGN.md`, `mcp/README.md` |
 | Desktop app | — | **no** | `docs/PARITY.md:209-210` calls it "a product decision, not a code port" |
 
 Shared core: 6,489 lines of engine (`src/lib/*.ts`, `src/lib/verify/*.ts`, tests excluded) +
@@ -102,7 +102,7 @@ signing daemon … breaks on every UI refactor") and rejects re-porting to Java.
   certificate lives on the card issued with their DNI, a browser app simply cannot sign.
 - **Reuses the engine almost for free.** The module-by-module platform audit
   (`docs/MCP-DESIGN.md:20-31`) shows everything Node-clean already: `cms.ts`, `pades.ts`,
-  `pkcs12.ts`, `keystore.ts`, `zip.ts`, `verify/*` run on Node 22 with zero changes; only
+  `pkcs12.ts`, `keystore.ts`, `zip.ts`, `verify/*` run on Node 24 with zero changes; only
   `xades.ts`, `ooxml.ts`, `verify/xades.ts` need a DOM (`DOMParser`/`XMLSerializer`), and
   `batch.ts` needs the Svelte store. A desktop app is a webview around the existing static `build/`
   plus a small native sidecar — not a rewrite.
@@ -142,7 +142,7 @@ signing daemon … breaks on every UI refactor") and rejects re-porting to Java.
   real install prompts (`docs/CHROME-EXTENSION-VERIFICATION.md:111-118`); a desktop build multiplies
   the untested surface, not divides it.
 
-**Cheapest credible desktop shape** if it happens: not Electron. A Node 22 sidecar (the existing
+**Cheapest credible desktop shape** if it happens: not Electron. A Node 24 sidecar (the existing
 `mcp/` engine, extended to XAdES/PAdES) exposing PKCS#11/PC/SC + OS store, driving either
 `dnie-remote`-style flows or a local webview of the already-built SPA. That keeps one engine and
 adds only native keystore code. The precedent for the "no key export" boundary is already written

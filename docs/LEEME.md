@@ -72,12 +72,13 @@ responsive de 320 a 1280 px, navegación por teclado y roles ARIA en pestañas y
   muestra **Instalar aplicación** cuando el navegador dispara `beforeinstallprompt` y
   **Actualizar versión** cuando hay un nuevo *worker*. La shell se precachea: **firmar funciona sin
   red**. Nunca se guarda en caché nada generado (solo `GET` del mismo origen, sin `cache.put`).
-- **Autoalojo:** artefacto estático en `build/`, servible por cualquier nginx/k3s; `Caddyfile` y
-  `Containerfile` incluidos (node → caddy). Requiere **HTTPS** para el servicio y para instalar.
+- **Autoalojo:** artefacto estático en `build/`, servible por cualquier nginx/k3s; el host debe
+  reenviar las rutas desconocidas a `404.html` (ver `README.md`). Requiere **HTTPS** para el servicio
+  y para instalar.
 - **Extensión Chrome MV3 (#24):** la aplicación completa más un puente que intercepta `AutoScript` en
   cualquier sitio HTTP/HTTPS desde la instalación, con selector origin-bound y confirmación explícita;
   excepciones por sitio y TSA con permiso propio. Solo Chrome por ahora (Firefox en #18).
-- **Servidor MCP (#28, #46):** mismo motor bajo Node 22, transporte stdio y HTTP, herramientas
+- **Servidor MCP (#28, #46):** mismo motor bajo Node 24, transporte stdio y HTTP, herramientas
   `autofirma_list_certs`, `autofirma_sign`, `autofirma_verify` (CAdES); contenedor y `deploy/k3s.yaml`.
 
 ## Privacidad
