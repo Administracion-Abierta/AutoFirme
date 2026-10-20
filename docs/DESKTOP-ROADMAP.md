@@ -309,3 +309,29 @@ not P8, because they make CI or the desktop build lie.
     container and are undeclared. Put them in the P0.6 builder image so local and CI agree; local
     host currently has OpenSSL 4.0.3 against CI's 3.5.
 
+## 11. Schedule (wave plan, 2026-10-20)
+
+Dates and intra-issue dependencies live in each issue body as a `<!-- bullet-schedule -->` block
+(`start`, `end`, `depends-on`), enforced by bullet's launch gate: `start` parks the issue with its
+label untouched, `depends-on` blocks until the blocker is **closed** (closing = the human merged the
+rolling PR). Milestone `due_on` carries the phase deadline.
+
+| Wave | Start | Issues | Phase | Depends on |
+|---|---|---|---|---|
+| 0 | 2026-10-20 | #19, #28, #35 | P0 shell, E0 extension hardening, X3 test strategy | — |
+| 1 | 2026-11-04 | #20, #22, #27, #33 | P1 native keys, P3 format parity, P8 docs, X1 i18n | #19 |
+| 1e | 2026-11-04 / 11-18 | #29, #31 | E1 portal coverage, E3 extension MCP bridge | #28 |
+| 2 | 2026-11-24 | #21, #34, #25 | P2 portal + native messaging, X2 security, P6 P2P slice 1 | #20 (#22 for #25) |
+| 3 | 2026-12-08 | #23 | P4 validation depth | #22 |
+| 3 | 2026-12-11 | #24, #26, #32 | P5 MCP inside app, P7 distribution, E4 native-messaging client | #20, #21 (+#31) |
+| 4 | 2026-12-25 | #36, #30 | X4 user/enterprise docs, E2 Firefox `userScripts` | #26 (+#29) |
+
+Window ends: #35 10-24 · #27 11-08 · #33 11-10 · #29 11-17 · #20 11-23 · #31 11-27 · #34 11-30 ·
+#22 12-07 · #21 12-10 · #23 01-04 · #24/#32 12-18 · #26 12-24 · #25 01-01 · #36 01-07 · #30 01-08 ·
+#19 11-03 · #28 11-03. Milestone deadlines: v0.1 12-10, v0.2 12-18, v0.4 01-01, v0.3 01-07,
+Extension v1 01-08.
+
+Dependencies encode what a worktree can actually see, not just narrative order: a dependent coder's
+worktree is cut from `develop`, so a blocker sitting on `bullet-develop` is invisible until the human
+merges. Dates encode expected order and are advisory (an overdue issue still launches — a slipped
+plan must not wedge the fleet).

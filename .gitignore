@@ -27,3 +27,7 @@ test-results/
 .claude/
 skills-lock.json
 .vitest/
+.bullet/state/
+.bullet/meta/
+.bullet/worktrees/
+.bullet/logs/
