@@ -37,6 +37,7 @@ for (const entry of [
   ['rejects app subset', { 'assets/app.js': '/* CAdES */' }, 'full application feature absent'],
   ['rejects missing shared utility styles', { 'assets/app.css': 'body{}' }, 'shared app Tailwind utilities absent'],
   ['rejects remote assets', { 'index.html': '<script src="https://host/app.js"></script>' }, 'remote bootstrap asset'],
+  ['rejects a manifest icon missing from the package', { 'manifest.json': JSON.stringify({ ...manifest, icons: { '128': 'icon-128.png' } }) }, 'ENOENT'],
   ['rejects Chrome-reserved underscore names', { '_headers': '/*\n  X-Frame-Options: DENY\n' }, 'Chrome reserves names starting with "_"']
 ]) {
   const [name, changes, message] = /** @type {[string, Record<string, string>, (string | null)]} */ (entry);
