@@ -206,7 +206,34 @@ for exactly that user.
 Resolved 2026-10-20 — see decisions 6–9. Nothing hosted, Firefox after Windows, macOS committed,
 GitHub Releases only.
 
-## 9. Stack audit (2026-10-20, before any code)
+## 9. Issue map (created 2026-10-20)
+
+Epic: **#37**. Every issue carries `fleet:hold`; removing that label is the act of approving it for
+execution.
+
+| Phase | Issue | Milestone |
+|---|---|---|
+| P0 shell + parity gate + audit fixes | #19 | v0.1 |
+| P1 native key layer | #20 | v0.1 |
+| P2 portal interop + native messaging | #21 | v0.1 |
+| P3 format parity | #22 | v0.2 |
+| P4 validation depth | #23 | v0.3 |
+| P5 MCP inside the app | #24 | v0.2 |
+| P6 P2P slice 1 | #25 | v0.4 |
+| P7 distribution | #26 | v0.3 |
+| P8 docs rewrite | #27 | v0.1 |
+| E0 extension v1 hardening | #28 | Extension v1 |
+| E1 portal coverage | #29 | Extension v1 |
+| E2 Firefox `userScripts` (was #18) | #30 | Extension v1 |
+| E3 extension MCP bridge | #31 | Extension v1 |
+| E4 optional native-messaging client | #32 | Extension v1 |
+| X1 i18n parity | #33 | v0.1 |
+| X2 security model doc | #34 | v0.1 |
+| X3 test strategy | #35 | v0.1 |
+| X4 user/enterprise/migration docs | #36 | v0.3 |
+
+
+## 10. Stack audit (2026-10-20, before any code)
 
 Findings from reading the tree at `ef5f92f`, plus a real run of the suites: `pnpm check` clean
 (0 errors, 0 warnings), vitest 244 passed / 1 skipped, node --test 19 + 8 passed. The stack is
