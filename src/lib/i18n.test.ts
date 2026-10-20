@@ -5,6 +5,7 @@
  * `{placeholder}` names.
  */
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { extensionCopy } from './extension/copy';
 import { copy } from './i18n';
@@ -46,5 +47,16 @@ describe('ES/EN copy parity', () => {
 
 	it('keeps the extension copy table complete in both languages', () => {
 		expectParity('extensionCopy', extensionCopy);
+	});
+
+	it('keeps the manifest description bilingual', () => {
+		// Chrome truncates store descriptions past 132 characters.
+		const { description } = JSON.parse(readFileSync('extension/manifest.json', 'utf8'));
+		expect(typeof description).toBe('string');
+		expect(description.length).toBeLessThanOrEqual(132);
+		const [es, en, ...extra] = description.split(' / ');
+		expect(extra, 'manifest description must be exactly ES / EN').toEqual([]);
+		expect(es.trim(), 'manifest description lacks ES').not.toBe('');
+		expect(en.trim(), 'manifest description lacks EN').not.toBe('');
 	});
 });
