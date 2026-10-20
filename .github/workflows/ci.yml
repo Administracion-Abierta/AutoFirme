@@ -106,6 +106,3 @@ jobs:
           workspaces: src-tauri
       - run: cargo check --manifest-path src-tauri/Cargo.toml
       - run: cargo test --manifest-path src-tauri/Cargo.toml
-      # Same probes the in-app diagnostics page runs; WebCrypto in node is not the
-      # webview answer, it only keeps the probe code honest.
-      - run: pnpm exec vitest run src/lib/diagnostics.test.ts

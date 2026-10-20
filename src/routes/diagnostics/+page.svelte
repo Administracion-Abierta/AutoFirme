@@ -4,7 +4,7 @@
 
 	/** The 12-item parity gate of #19, each item mapped to the suite that proves it. */
 	const GATE: { item: string; proof: string }[] = [
-		{ item: 'PKCS#12 import (PBES2 + legacy PBE)', proof: 'src/lib/pkcs12.test.ts, legacy-pbe.test.ts' },
+		{ item: 'PKCS#12 import (PBES2 + legacy PBE)', proof: 'src/lib/pkcs12.test.ts (legacy PBE lives here)' },
 		{ item: 'CAdES-BES', proof: 'src/lib/cms.test.ts' },
 		{ item: 'CAdES-T', proof: 'src/lib/timestamp.test.ts' },
 		{ item: 'XAdES-EPES + c14n', proof: 'src/lib/xades.test.ts, c14n.test.ts' },
