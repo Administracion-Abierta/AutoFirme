@@ -31,6 +31,7 @@
 	import FileCard from '#lib/components/FileCard.svelte';
 	import FileDrop from '#lib/components/FileDrop.svelte';
 	import PwaControls from '#lib/components/PwaControls.svelte';
+	import { isDesktop } from '#lib/desktop';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.js';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -459,7 +460,7 @@
 				<h1 class="font-display text-lg font-semibold tracking-tight">{t.brand}</h1>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
-				<PwaControls copy={t} />
+				{#if !isDesktop()}<PwaControls copy={t} />{/if}
 				<Button
 					variant="ghost"
 					size="icon"

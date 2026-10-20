@@ -5,6 +5,13 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 
+/**
+ * Fragment ids the prerenderer may skip. Empty = `<a href="#">` self-links. Anything
+ * else is a broken anchor and must fail the build (it used to be every id starting
+ * with `/`).
+ */
+const MISSING_ID_ALLOWLIST: Record<string, true> = { '': true };
+
 export default defineConfig(({ mode }) => mode === 'extension' ? {
 	root: 'extension',
 	base: './',
@@ -17,12 +24,14 @@ export default defineConfig(({ mode }) => mode === 'extension' ? {
 } : {
 	plugins: [
 		tailwindcss(),
-		// The sidebar-07 demo renders shadcn's sample data with "#" links; keep the SPA
-		// prerender strict for the real app but lenient for that demo page.
 		sveltekit({
 			adapter: adapter({ fallback: '404.html' }),
+			// A service worker cannot register under a custom scheme, and the desktop shell
+			// has no offline need (the assets ship with the app), so the tauri build omits it.
+			// `pnpm build:tauri`: the shell serves the same static build from `tauri://localhost`.
+			...(mode === 'tauri' ? { serviceWorker: { register: false } } : {}),
 			prerender: {
-				handleMissingId: ({ id }) => id.startsWith('/') || id === '',
+				handleMissingId: ({ id }) => MISSING_ID_ALLOWLIST[id] === true,
 				handleHttpError: ({ path, message }) => {
 					if (path.startsWith('/sidebar-07') || path.includes('/avatars/')) return;
 					throw new Error(`prerender failed: ${path} ${message}`);
