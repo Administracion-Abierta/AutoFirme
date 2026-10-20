@@ -9,6 +9,9 @@ and request protocol, and [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VE
 for the recorded checks and remaining manual tests. En español: las funciones de la
 extensión están en [LEEME.md](LEEME.md) (sección «Extensión Chrome»).
 
+Store submission copy, permission justifications, listing assets and the privacy
+statement live in [STORE-LISTING.md](STORE-LISTING.md) and [PRIVACY.md](PRIVACY.md).
+
 ## 1. Build and install
 
 Use Node 24 (`.nvmrc`, `engines.node`), pnpm 11.24.0, and Chrome/Chromium 116+. The
