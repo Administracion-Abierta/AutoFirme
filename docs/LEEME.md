@@ -94,6 +94,7 @@ pnpm build                # sitio estático en build/
 pnpm preview              # servir build/
 pnpm test                 # 235 pruebas (vitest) + 69 de Node
 pnpm check                # svelte-check + tsc
+pnpm perf                 # presupuestos de rendimiento (frío, PDF 50 MB, lote de 500)
 pnpm build:extension      # extensión en dist/extension
 pnpm check:extension      # comprobaciones del artefacto
 pnpm package:extension    # ZIP + SHA256SUMS
