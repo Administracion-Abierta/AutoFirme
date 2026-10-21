@@ -6,10 +6,8 @@ function stubAnchor() {
 	const click = vi.fn();
 	const link = { click, href: '', download: '' } as unknown as HTMLAnchorElement;
 	vi.spyOn(document, 'createElement').mockReturnValue(link);
-	vi.stubGlobal('URL', {
-		createObjectURL: vi.fn(() => 'blob:x'),
-		revokeObjectURL: vi.fn()
-	});
+	vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:x');
+	vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
 	return { click };
 }
 
