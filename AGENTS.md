@@ -55,7 +55,7 @@ decompiled*/         # jadx output — untracked reference, gitignored (tag refe
 docs/                # architecture.md (signing-core map), REVERSING-NOTES.md
 src/, static/        # the product — SvelteKit SPA (Svelte 5 + Tailwind v4)
 test/                # fixtures + cross-check scripts (openssl / xmlsec1)
-src-tauri/          # optional desktop shell (Tauri v2, Linux); the web build is the product
+src-tauri/           # optional desktop shell (Tauri v2, Linux); the web build is the product
 mcp/                 # MCP server (own Containerfile, build context = repo root)
 ```
 
@@ -69,8 +69,8 @@ Build/test from the repo root (pnpm is canonical; the root `pnpm-lock.yaml` cove
 - Work on branches; `Refs #N` only in commits (never closing keywords).
 - Issues on GitHub (github.com/Administracion-Abierta/AutoFirme) drive the fleet (bullet).
 - Big problems get split into ≤~400-line deliverables per issue; PRs to `main` need CI green
-  (`checks`, `e2e`, `secret-scan`, `dependency-audit`), 1 review, and `CODEOWNERS` sign-off on
-  the crypto paths.
+  (`checks`, `mcp`, `shell`, `secret-scan`, `dependency-audit`), 1 review, and `CODEOWNERS`
+  sign-off on the crypto paths.
 - Versioning is automatic: conventional commits merged into `main` produce a Release Please
   PR that bumps the single product version in `package.json` **and**
   `extension/manifest.json` (Chrome reads the manifest one) plus `CHANGELOG.md`. Never edit
