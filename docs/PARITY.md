@@ -1,7 +1,10 @@
-# PARITY.md — AutoFirma 1.9 vs AutoFirma Web
+# PARITY.md — AutoFirma 1.9 vs AutoFirme (desktop + extension)
 
 Feature-by-feature audit of what the desktop AutoFirma 1.9 does against what this repo actually
-implements, with an explicit verdict for anything that cannot exist in a browser.
+implements, with an explicit verdict per row. Two products share the engine: the **desktop app**
+(Tauri v2, native keys) and the **extension** (MV3, PKCS#12 + portal interception). There is no
+browser-only product anymore, so `browser-moot` now means *moot for both products* — anything the
+desktop revives is `needed` with a desktop note.
 
 **Method.** The original side is the decompiled core at git tag `reference/decompile-1.9`
 (`git checkout reference/decompile-1.9 -- decompiled decompiled-configurador`; jadx command in
@@ -20,9 +23,9 @@ still shows the identifier its row claims.
 
 **Status** = `full` (works for the cases a citizen needs) · `partial` (real code, narrow or
 unwired) · `missing` (nothing in the tree).
-**Verdict** = `needed` (a web app must do it) · `browser-moot` (impossible or pointless in a
-browser — the web-native replacement is named instead). A `missing` + `browser-moot` row is *not*
-a gap.
+**Verdict** = `needed` (one of the two products must do it — the row says which) ·
+`browser-moot` (impossible or pointless in *both* products — the native replacement is named
+instead). A `missing` + `browser-moot` row is *not* a gap.
 
 This doc is the audit of issue #44. The gap list at the end is what the operator converts into
 issues; nothing here is a promise that a gap will be closed.
@@ -104,12 +107,12 @@ Original: `keystores/AOKeyStore.java:13-31` (18 store types), dispatch
 | PKCS#12 / PFX, any OS | `keystores/Pkcs12KeyStoreManager.java:14` | `src/lib/pkcs12.ts`, `src/lib/keystore.ts` (PBES2 + legacy PBES1 DES/RC2/RC4 hand-rolled, container MAC verified, key imported **non-extractable**) | **full** | needed |
 | JKS / JCEKS / JAVACE | `keystores/JavaKeyStoreManager.java:12`; `AOKeyStoreManager.java:150-153` | none | **missing** | needed (low priority — a leftover from Java tooling) |
 | Single cert / PKCS#7 file (`SINGLE`) | `keystores/AOKeyStoreManagerHelperSingle.java:20` | verify accepts a PEM/DER set: `src/lib/verify/roots.ts`, `test/fixtures/ca/` | **partial** (verify side only) | needed (low priority) |
-| Windows CAPI `Windows-MY` + address book + intermediate CAs | `keystores/CAPIKeyStoreManager.java:56`; `CAPIUnifiedKeyStoreManager.java:29`; `AOKeyStoreManagerHelperCapiAddressBook.java:19` | none | **missing** | browser-moot — browsers expose no OS key store to the page; replacement: import the `.p12` from the local disk. **Held by the browser vendor, not by us** — Chrome/Firefox ship `webcrypto` without any OS-store bridge; nothing to do until a Web API appears. |
-| macOS Keychain | `keystores/AppleKeyStoreManager.java:19,60` | none | **missing** | browser-moot (same reason) |
-| Mozilla/NSS profile store (the Linux default) | `keystores/mozilla/NssKeyStoreManager.java:33`; `mozilla/MozillaKeyStoreUtilities{Unix,Windows,OsX}.java` | none | **missing** | browser-moot — the page cannot open the browser's NSS DB; replacement: upload the `.p12` |
-| DNIe / CERES / CardOS / SmartCafe smartcards via vendor PKCS#11 | `keystores/SmartCardUnifiedKeyStoreManager.java:86-89`; `mozilla/MozillaKeyStoreUtilities.java:41` | none | **missing** | browser-moot — no PKCS#11 or PC/SC from a page; replacement: `dnie-remote`/`eID` flows, a local bridge app, or the card's PKCS#12 export. Marked *moot for the SPA*, still a real gap for Spanish DNIe users (§H) |
-| JMulticard pure-Java card stack (APDU over PC/SC) | `keystores/AOKeyStoreManagerHelperFullJava.java:27`; `jmulticard/**` | n/a — not browser-reachable | **missing** | browser-moot |
-| Generic PKCS#11 module picker (`.dll/.so/.dylib`) | `AOKeyStoreManagerHelperPkcs11.java:28`; `AOKeyStoreManagerFactory.java:266` | none | **missing** | browser-moot (WebCrypto cannot load a native module) |
+| Windows CAPI `Windows-MY` + address book + intermediate CAs | `keystores/CAPIKeyStoreManager.java:56`; `CAPIUnifiedKeyStoreManager.java:29`; `AOKeyStoreManagerHelperCapiAddressBook.java:19` | none | **missing** | needed — desktop product (OS keystore via the `KeyProvider` seam; `docs/DESKTOP-ROADMAP.md`) |
+| macOS Keychain | `keystores/AppleKeyStoreManager.java:19,60` | none | **missing** | needed — desktop product (Keychain provider; roadmap: macOS last, notarization included) |
+| Mozilla/NSS profile store (the Linux default) | `keystores/mozilla/NssKeyStoreManager.java:33`; `mozilla/MozillaKeyStoreUtilities{Unix,Windows,OsX}.java` | none | **missing** | needed — desktop product (Linux NSS store via the `KeyProvider` seam) |
+| DNIe / CERES / CardOS / SmartCafe smartcards via vendor PKCS#11 | `keystores/SmartCardUnifiedKeyStoreManager.java:86-89`; `mozilla/MozillaKeyStoreUtilities.java:41` | none | **missing** | needed — desktop product via PKCS#11/PC/SC (`KeyProvider` seam); still a real gap for Spanish DNIe users (§H) |
+| JMulticard pure-Java card stack (APDU over PC/SC) | `keystores/AOKeyStoreManagerHelperFullJava.java:27`; `jmulticard/**` | n/a — not browser-reachable | **missing** | needed — desktop product (native card stack via the `KeyProvider` seam) |
+| Generic PKCS#11 module picker (`.dll/.so/.dylib`) | `AOKeyStoreManagerHelperPkcs11.java:28`; `AOKeyStoreManagerFactory.java:266` | none | **missing** | needed — desktop product (native PKCS#11 module picker) |
 | Several certificates per container, picker, expiry shown | `ui/preferences/PreferencesPanelKeystores.java:57` | `src/lib/components/CertPicker.svelte`, `src/lib/keystore.ts` (`expired`/`notYetValid` per cert) | **full** | needed |
 | Storing identities for reuse (new in the web app, no original equivalent) | — (the original re-reads the OS store each run) | `src/lib/certstore.ts` (IndexedDB, identities sealed with PBKDF2→AES-GCM; #29) | **full** | needed — this is the web replacement for the OS keystore |
 
@@ -122,27 +125,27 @@ The original has two unrelated things called "batch":
 | Local JSON batch definition (`singlesigns[]`, `suboperation`, per-item `result`) | `standalone/protocol/JSONBatchManager.java:20,22,29`; `standalone/protocol/LocalBatchSigner.java:30` | `src/lib/batch.ts` — sequential queue, per-file status, ZIP + `manifest.json` mirroring those field names | **full** for the client-side subset | needed |
 | UI multi-file queue | `standalone/ui/SignPanel.java:684` (`getLoadFiles(…, false, true)` = multi-select), `:780-784` (`SignPanelMultiFilePanel`, `SignPanelMultiFilePanel.java:45,50`) | multi-file queue is **wired**: `src/lib/components/FileDrop.svelte:98` (`multiple`), `src/lib/batch.ts:101 createBatchQueue`, per-file rows and one ZIP in `src/lib/App.svelte`; exercised by `src/lib/App.test.ts:251` | **full** for files | needed |
 | Massive operation types `SIGN/COSIGN/COUNTERSIGN_ALL/COUNTERSIGN_LEAFS` over a directory | `massive/MassiveType.java:4`; `massive/DirectorySignatureHelper.java:88,96` (walks `File.listFiles()`) | none — the multi-file *file* queue above exists, whole-directory input and the co/counter-sign operation types do not (follows §B) | **missing** | needed |
-| Server-side tri-phase batch (`presigner`/`postsigner` URLs, `certs`, `tridata`) | `core/misc/protocol/UrlParametersForBatch.java:11,12` (`batchpresignerurl`/`batchpostsignerurl`); `signers/batch/client/BatchSigner.java:38,39` (`certs`, `tridata`); `TriphaseDataParser.java:31` | none, by design: there is no server holding keys | **missing** | browser-moot — the whole point of the SPA is that the key stays local; a server phase would be a downgrade |
+| Server-side tri-phase batch (`presigner`/`postsigner` URLs, `certs`, `tridata`) | `core/misc/protocol/UrlParametersForBatch.java:11,12` (`batchpresignerurl`/`batchpostsignerurl`); `signers/batch/client/BatchSigner.java:38,39` (`certs`, `tridata`); `TriphaseDataParser.java:31` | none, by design: there is no server holding keys | **missing** | browser-moot — both products keep keys local by design; a server phase would be a downgrade |
 | Batch ZIP container | no batch-specific ZIP exists in the original (`ASiCUtil.java` is ASiC, not batch) | `src/lib/zip.ts` + `scripts/verify-batch-zip.mjs` | **full** (ours, an addition, not parity) | needed |
 
 ## F. Application surface
 
 | Capability | Original evidence | Ours | Status | Verdict |
 |---|---|---|---|---|
-| `afirma://` protocol for web portals: `sign`/`cosign`/`countersign`, `selectcert`, `load`, `save`, `signandsave`, `batch` | `standalone/protocol/ProtocolInvocationLauncher.java:372,203,437,251,306,151`; params `core/misc/protocol/UrlParameters.java:17` | none | **missing** | browser-moot — a page cannot register an OS URI scheme; replacement: the SPA *is* the portal-side flow (file in, signature out, no native hand-off), and for agents the MCP server (`mcp/src/surface.ts:55,66,95` `autofirma_list_certs`, `autofirma_sign`, `autofirma_verify`; remote transport #46) |
-| Local WebSocket/raw-socket server on port 63117 for portal callbacks | `ProtocolInvocationLauncher.java:47,109,132`; `AfirmaWebSocketServerV4.java` | none | **missing** | browser-moot — replaced by direct browser APIs and, where a portal must be scripted, the MCP/HTTP endpoint (#46) |
+| `afirma://` protocol for web portals: `sign`/`cosign`/`countersign`, `selectcert`, `load`, `save`, `signandsave`, `batch` | `standalone/protocol/ProtocolInvocationLauncher.java:372,203,437,251,306,151`; params `core/misc/protocol/UrlParameters.java:17` | none | **missing** | needed — desktop product registers `afirma://` (only if unclaimed); the extension covers portal interception, and for agents the MCP server (`mcp/src/surface.ts:55,66,95` `autofirma_list_certs`, `autofirma_sign`, `autofirma_verify`; remote transport #46) |
+| Local WebSocket/raw-socket server on port 63117 for portal callbacks | `ProtocolInvocationLauncher.java:47,109,132`; `AfirmaWebSocketServerV4.java` | none | **missing** | needed — desktop product (local sign server on 127.0.0.1 + TLS); where a portal must be scripted without desktop, the MCP/HTTP endpoint (#46) |
 | CLI (`listaliases`, `sign`, `cosign`, `countersign`, `verify`, `batchsign`; `-store -alias -format -algorithm -config …`) | `standalone/CommandLineCommand.java:5-11`; `standalone/CommandLineLauncher.java:264`; `standalone/CommandLineParameters.java:10-51` | `mcp/` stdio server (sign cades + verify; `mcp/src/tools.ts:19` refuses xades/pades with a reason) | **partial** | needed (#46) — a scriptable surface is what replaces the CLI |
 | Main window: open, sign (Ctrl+F), verify (Ctrl+V), bulk results | `standalone/SimpleAfirma.java:607`; `standalone/ui/MainMenu.java:54-167` | `src/routes/+page.svelte` + `src/lib/App.svelte` (drop zone, sign panel, verify panel) | **full** for the core flow | needed |
-| Preferences (per-format: visible signature, shadow-attack check, co/counter-sign defaults, policy, hash, proxy, card management) | `standalone/ui/preferences/PreferencesPanel.java:41-66` and its per-format panels | partial: theme switcher (`src/lib/theme.ts`), format picker; no per-format preference tabs | **partial** | needed (low priority — most originals are desktop-only knobs; a web app can hard-code the safe default) |
+| Preferences (per-format: visible signature, shadow-attack check, co/counter-sign defaults, policy, hash, proxy, card management) | `standalone/ui/preferences/PreferencesPanel.java:41-66` and its per-format panels | partial: theme switcher (`src/lib/theme.ts`), format picker; no per-format preference tabs | **partial** | needed (low priority — most originals are desktop-only knobs; hard-code the safe default in the extension) |
 | Signature viewer window (`VisorFirma`) | `standalone/VisorFirma.java:24`; `standalone/ui/VisorPanel.java:63` | `src/lib/verify/` report rendered by the verify panel in `src/lib/App.svelte` | **full** | needed |
 | i18n ES/EN | Java `.properties` bundles | `src/lib/i18n.ts` | **full** | needed |
-| OS installers, localhost SSL cert, root-cert injection into OS/browser stores | `decompiled-configurador/sources/es/gob/afirma/standalone/configurator/ConfiguratorLinux.java:27`; `…/ConfiguratorMacOSX.java:244`; `…/ui/restoreconfig/RestoreConfigFirefox*.java` | none — `Containerfile` (caddy) + static build (#12); deploy docs | **missing** | browser-moot — HTTPS comes from the host; no local CA to install; replacement: the own-domain deploy |
-| Auto-updater (`updateSite`, per-OS versions) | `standalone/updater/Updater.java:22,126`; `SimpleAfirma.java:662` | none; PWA service worker #47 (open) | **missing** | browser-moot — the browser refreshes the app; replacement: cache-busting via the static host, offline shell via #47 |
+| OS installers, localhost SSL cert, root-cert injection into OS/browser stores | `decompiled-configurador/sources/es/gob/afirma/standalone/configurator/ConfiguratorLinux.java:27`; `…/ConfiguratorMacOSX.java:244`; `…/ui/restoreconfig/RestoreConfigFirefox*.java` | none — `Containerfile` (caddy) + static build (#12); deploy docs | **missing** | needed — desktop product (per-OS installers own HTTPS/trust; no deploy exists anymore) |
+| Auto-updater (`updateSite`, per-OS versions) | `standalone/updater/Updater.java:22,126`; `SimpleAfirma.java:662` | none; PWA service worker #47 (open) | **missing** | needed — desktop product (minisign updater path; extension updates ride the store/manual ZIP) |
 | Plugin jars from a `plugins` dir | `standalone/SimpleAfirma.java:92`; `plugins/manager/PluginInfoLoader.java` | none | **missing** | browser-moot — no dynamic native code in a page; replacement: MCP tool servers (#46) |
 | File-system dialogs / "reveal output folder" | `AOUIFactory.getLoadFiles`; `MassiveResultProcessPanel.java:93` `Desktop.getDesktop().open` | native file picker + browser downloads (per-row `Descargar` and the batch ZIP) | **full** | browser-moot — the browser sandbox owns file I/O; the web-native equivalent is in place |
 | Proxy configuration with encrypted password | `ui/preferences/ProxyPanel.java:23,183` | n/a — the browser owns the proxy | **missing** | browser-moot |
 | Look-and-feel / high-contrast / font scaling | `LookAndFeelManager.java`; `MassiveResultProcessPanel.java:74` | Tailwind v4 themes (`src/app.css`, `src/lib/theme.ts`), semantic markup | **partial** | browser-moot — replaced by the browser's own zoom/high-contrast; accessibility is a repo requirement (AGENTS.md), not a parity row |
-| Desktop-app packaging, per-OS JRE handling | `Configurator*.java`; `standalone/updater/**` | static SPA + `Containerfile`; desktop install #47 (open) | **partial** | browser-moot |
+| Desktop-app packaging, per-OS JRE handling | `Configurator*.java`; `standalone/updater/**` | static SPA + `Containerfile`; desktop install #47 (open) | **partial** | needed — desktop product (per-OS packaging; extension ZIP already ships) |
 
 ## G. Gap list — missing **and** needed, prioritized
 
@@ -156,11 +159,9 @@ Each line is issue-sized. `P0` breaks the "drop-in replacement" promise for a no
    ship (`src/lib/verify/pades.ts`). *(New — not covered by an open issue.)*
 2. OOXML signing is written and tested but unreachable from the UI (`src/lib/ooxml.ts`,
    `README.md` "Status"); wire it, with verify-side honesty about the missing validator.
-3. DNIe / CERES smartcard users have no path: `browser-moot` as a *native* driver; the replacement
-   (a local bridge app or an eID/`dnie-remote` flow) needs a product decision. Decision recorded
-   2026-10-16: tracked as a possible improvement (`README.md` "Possible improvements"); the
-   desktop-app route is discarded for now (`docs/PIVOT-STUDY.md` §5), so a no-key-export PKCS#11
-   helper stays out of scope until card support is taken up. *(New.)*
+3. DNIe / CERES smartcard users have no path yet: desktop scope via the `KeyProvider` seam
+   (PKCS#11/PC/SC; `docs/DESKTOP-ROADMAP.md`). Decision recorded 2026-10-20: desktop is the
+   full product, extension keeps PKCS#12-only. *(New.)*
 
 **P1**
 
@@ -192,20 +193,21 @@ Each line is issue-sized. `P0` breaks the "drop-in replacement" promise for a no
    remote transport still open (#46).
 16. Plain XMLDSig signing (`signers/xmldsig/AOXMLDSigSigner.java:124`). *(New.)*
 
-**Deliberately not gaps** (browser-moot with the replacement named): smartcard and OS-keystore
-access, the `afirma://` URI scheme and its local socket server, OS/browser trust-store
-installation, the auto-updater, plugin jars, proxy configuration, JRE packaging, and SHA-1/DSA
-signature algorithms. See the *Verdict* column — the replacement is stated per row.
+**Deliberately not gaps** (browser-moot with the replacement named): server-side tri-phase
+signing, plugin jars, proxy configuration, OOXML/ODF *validation* (the original has none
+either), and SHA-1/DSA signature algorithms. Smartcards, OS keystores, `afirma://`, the local
+sign server, installers and the updater are **gaps owned by the desktop product**, not moot.
+See the *Verdict* column — the owner is stated per row.
 
 ## H. Bottom line
 
-The web app replaces AutoFirma for: **CAdES-BES + CAdES-T** and **XAdES-EPES** signing, **CAdES, XAdES
+The two products replace AutoFirma for: **CAdES-BES + CAdES-T** and **XAdES-EPES** signing, **CAdES, XAdES
 and PAdES verification** (PAdES without form-modification/shadow-attack depth), **PAdES B-B and B-T
 signing with visible signatures**, certificate loading from **PKCS#12**, **batch** signing with a
 manifest, ES/EN UI, and self-hosting. The gap between that and "drop-in replacement" is
 concentrated in four places: **PAdES depth** (LTV, PSA/shadow checks), **office formats** (OOXML
 unwired, ODF absent, FacturaE absent), **long-term validity** (XAdES-T, OCSP/CRL, anchors = FNMT
-only), and **multi-signature** (no co-sign/counter-sign). The desktop-specific half of AutoFirma —
-smartcards, OS keystores, the `afirma://` hand-off, installers — has no browser equivalent by
-construction; recorded product decision: PWA stays the primary surface, desktop discarded for now
-(`docs/PIVOT-STUDY.md` §5).
+only), and **multi-signature** (no co-sign/counter-sign). The desktop half of AutoFirma —
+smartcards, OS keystores, the `afirma://` hand-off, installers, the updater — is owned by the
+desktop product (`docs/DESKTOP-ROADMAP.md`); locked 2026-10-20, superseding the discarded-desktop
+study (`docs/PIVOT-STUDY.md` §5).
