@@ -31,7 +31,10 @@ export default defineConfig(({ mode }) => mode === 'extension' ? {
 			// `pnpm build:tauri`: the shell serves the same static build from `tauri://localhost`.
 			...(mode === 'tauri' ? { serviceWorker: { register: false } } : {}),
 			prerender: {
-				handleMissingId: ({ id }) => MISSING_ID_ALLOWLIST[id] === true
+				handleMissingId: ({ id, path }) => {
+					if (id in MISSING_ID_ALLOWLIST) return;
+					throw new Error(`missing fragment id "${id}" in ${path}`);
+				}
 			}
 		})
 	],
