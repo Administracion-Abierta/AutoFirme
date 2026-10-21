@@ -6,7 +6,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCall } from '../core/contract.js';
+import { parseCall, validateRequest } from '../core/contract.js';
 import { wrapAutoScript } from '../core/adapter.js';
 import {
 	FORMATS,
@@ -57,6 +57,32 @@ test('every format the page offers maps to the documented contract', () => {
 	assert.equal(sign(pdf, 'PAdES', MODE)?.format, 'PAdES');
 	assert.equal(sign(pdf, 'AUTO', MODE)?.format, 'PAdES');
 	assert.deepEqual(FORMATS, ['CAdES', 'XAdES', 'PAdES', 'AUTO']);
+});
+
+test('AUTO with PAdES stamp parameters keeps the full stamp bag across the worker boundary', () => {
+	const pdf = Buffer.from('%PDF-1.7\n');
+	const stamp = [
+		'visibleSignature=want',
+		'signaturePositionOnPageLowerLeftX=45',
+		'signaturePositionOnPageLowerLeftY=80',
+		'signaturePositionOnPageUpperRightX=560',
+		'signaturePositionOnPageUpperRightY=140',
+		'signaturePage=-1',
+		'layer2Text=Firmado por $$SUBJECTCN$$',
+		'signReason=Conforme',
+	].join('\n');
+	const request = sign(pdf, 'AUTO', stamp);
+	assert.equal(request?.format, 'PAdES');
+	// The worker re-validates the forwarded request; the round-trip must be lossless.
+	assert.deepEqual(validateRequest({ ...request }), request);
+	const plain = sign(pdf, 'PAdES', stamp);
+	assert.deepEqual(request?.params, plain?.params, 'AUTO must not drop stamp parameters');
+});
+
+test('AUTO with stamp parameters on a non-PDF payload falls back to desktop AutoFirma', () => {
+	const data = generatedPayload();
+	const stamp = 'visibleSignature=want\nsignaturePage=-1';
+	assert.equal(sign(data, 'AUTO', stamp), null, 'stamp keys are meaningless without a PDF');
 });
 
 test('selectCertificate replays the page call shape', () => {
