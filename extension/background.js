@@ -3,13 +3,39 @@ import {publicResult, REQUEST_TIMEOUT_MS} from './core/contract.js';
 
 const SCRIPT_IDS = ['autofirme-content', 'autofirme-page'];
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const BRIDGE_KEY = 'mcpBridge';
+const BRIDGE_PROTOCOL = 'autofirme-bridge.v1';
+/** Chrome suspends an idle MV3 worker after 30 s; app-level traffic keeps the bridge alive. */
+const BRIDGE_HEARTBEAT_MS = 20_000;
+
+/** `ws(s)://…/bridge?token=…`, derived from the endpoint and token the operator configured. */
+export function bridgeUrl(settings) {
+  const url = new URL(settings.url);
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw Error('Invalid MCP endpoint');
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+  // A deployment under a path prefix serves the bridge beside its `/mcp` entry.
+  const endpoint = new URL(url);
+  endpoint.search = '';
+  endpoint.pathname = endpoint.pathname.replace(/\/+$/, '');
+  url.pathname = new URL('bridge', endpoint).pathname;
+  url.hash = '';
+  url.search = '';
+  url.searchParams.set('token', settings.token);
+  return url.toString();
+}
 
 /** Chrome plumbing stays outside the consent and lifecycle state machine. */
-export function createBridge(chrome) {
+export function createBridge(chrome, deps = {}) {
   const coordinator = new Coordinator();
   const root = chrome.runtime.getURL('');
   let scriptsQueue = Promise.resolve();
   let sitesQueue = Promise.resolve();
+  let bridgeSocket = null;
+  let bridgeSettings = null;
+  let bridgeError = '';
+  let bridgeAttempt = 0;
+  let bridgeRetry = null;
+  let bridgeHeartbeat = null;
   async function disabledOrigins() {
     const {disabledOrigins = []} = await chrome.storage.local.get('disabledOrigins');
     return Array.isArray(disabledOrigins) ? [...new Set(disabledOrigins.filter(origin => {
@@ -59,6 +85,162 @@ export function createBridge(chrome) {
   function closeWindow(item) {
     if (item.windowId != null) chrome.windows.remove(item.windowId).catch(() => {});
   }
+  function normalizeBridgeSettings(value) {
+    if (!value || typeof value !== 'object') throw Error('Invalid MCP bridge settings');
+    const enabled = value.enabled === true;
+    const url = typeof value.url === 'string' ? value.url.trim() : '';
+    const token = typeof value.token === 'string' ? value.token : '';
+    const settings = {enabled,url,token};
+    // Validate even while disabled, so a typo is reported when the operator saves it.
+    if (url || token) bridgeUrl({url:url || 'https://invalid.example',token:token || 'x'});
+    if (enabled && (!url || !token)) throw Error('The MCP bridge needs an endpoint and a token');
+    return settings;
+  }
+  function bridgeStatus() {
+    return {enabled:bridgeSettings?.enabled === true,online:bridgeSocket?.readyState === 1,error:bridgeError};
+  }
+  function broadcastBridge() {
+    chrome.runtime.sendMessage({type:'mcp:status',status:bridgeStatus()}).catch(() => {});
+  }
+  function bridgeReply(socket, id, ok, value, error) {
+    if (socket === bridgeSocket && socket.readyState === 1) socket.send(JSON.stringify({type:'result',id,ok,...(ok ? {value} : {error})}));
+  }
+  function connectBridge(settings) {
+    clearTimeout(bridgeRetry);
+    bridgeRetry = null;
+    clearInterval(bridgeHeartbeat);
+    bridgeHeartbeat = null;
+    if (bridgeSocket) {
+      const old = bridgeSocket;
+      bridgeSocket = null;
+      old.onclose = null;
+      old.onmessage = null;
+      old.close();
+      // Reconfiguring or stopping the bridge strands any consent window under the old socket.
+      for (const item of coordinator.requests.values()) if (item.bridge) terminate(item,'error');
+    }
+    bridgeSettings = settings;
+    bridgeError = '';
+    if (!settings?.enabled) {
+      broadcastBridge();
+      return bridgeStatus();
+    }
+    let url;
+    try { url = bridgeUrl(settings); }
+    catch (error) { bridgeError = error instanceof Error ? error.message : 'invalid-endpoint'; broadcastBridge(); return bridgeStatus(); }
+    let socket;
+    try { socket = new WebSocket(url, BRIDGE_PROTOCOL); }
+    catch { bridgeError = 'connection-failed'; broadcastBridge(); return bridgeStatus(); }
+    bridgeSocket = socket;
+    socket.onopen = () => {
+      if (socket !== bridgeSocket) return;
+      bridgeAttempt = 0;
+      bridgeError = '';
+      // A text frame every 20 s counts as WebSocket activity, so Chrome does not suspend the
+      // worker mid-session. Control-frame pings from the server do not reset that timer.
+      bridgeHeartbeat = setInterval(() => {
+        if (socket === bridgeSocket && socket.readyState === 1) socket.send(JSON.stringify({type:'ping'}));
+      }, BRIDGE_HEARTBEAT_MS);
+      bridgeHeartbeat.unref?.();
+      broadcastBridge();
+    };
+    socket.onerror = () => {
+      if (socket !== bridgeSocket) return;
+      bridgeError = 'connection-failed';
+      broadcastBridge();
+    };
+    socket.onclose = () => {
+      if (socket !== bridgeSocket) return;
+      bridgeSocket = null;
+      clearInterval(bridgeHeartbeat);
+      bridgeHeartbeat = null;
+      bridgeError = 'disconnected';
+      // Every pending chooser belongs to a server that can no longer receive the result.
+      for (const item of coordinator.requests.values()) if (item.bridge) terminate(item,'error');
+      broadcastBridge();
+      const wait = Math.min(30_000, 1_000 * 2 ** bridgeAttempt++);
+      bridgeRetry = setTimeout(() => {
+        if (bridgeSettings?.enabled && !bridgeSocket) connectBridge(bridgeSettings);
+      }, wait);
+      bridgeRetry.unref?.();
+    };
+    socket.onmessage = event => {
+      if (socket !== bridgeSocket || typeof event.data !== 'string') return;
+      // Jobs are independent: a consent window can stay open while the agent lists identities.
+      void handleBridgeJob(socket,event.data);
+    };
+    broadcastBridge();
+    return bridgeStatus();
+  }
+  async function restoreBridge() {
+    const stored = (await chrome.storage.local.get(BRIDGE_KEY))[BRIDGE_KEY];
+    if (!stored) return;
+    try { connectBridge(normalizeBridgeSettings(stored)); } catch { /* Stored before validation. */ }
+  }
+  async function mcpCertificates() {
+    // Loaded lazily: the service worker only needs the vault when an agent asks for it.
+    const {browserVault} = await import('#lib/certstore');
+    const identities = await browserVault().listIdentities();
+    const now = Date.now();
+    return identities.map(identity => {
+      const expires = Date.parse(identity.notAfter);
+      return {
+        cert_id:identity.id, common_name:identity.commonName, subject:identity.commonName,
+        issuer:'', serial:'', not_before:'', not_after:identity.notAfter,
+        expired:Number.isFinite(expires) && expires <= now, not_yet_valid:false, signable:true,
+        container:'AutoFirme extension'
+      };
+    });
+  }
+  async function bridgeSign(message) {
+    if (message.format !== 'cades') throw Error('Only CAdES is supported over the MCP bridge');
+    if (typeof message.certId !== 'string' || !message.certId) throw Error('certId is required');
+    if (typeof message.signingTime !== 'string' || Number.isNaN(Date.parse(message.signingTime))) throw Error('Invalid signing time');
+    const automatic = await (deps.autoSign ?? (await import('#lib/extension/auto-sign')).signRemembered)(message);
+    if (automatic) return automatic;
+    const request = {operation:'sign',format:'CAdES',mode:'explicit',algorithm:'SHA256withRSA',data:message.data};
+    const signingTime = new Date(message.signingTime).toISOString();
+    const {promise,resolve,reject} = Promise.withResolvers();
+    const item = coordinator.captureBridge(request,message.certId,result => {
+      clearTimeout(timer);
+      closeWindow(item);
+      if (result.kind === 'result' && result.signature) resolve({signed_b64:result.signature});
+      else if (result.kind === 'cancel' || result.kind === 'fallback') reject(Error('cancelled by the operator'));
+      else reject(Error('the extension could not sign the document'));
+    });
+    item.signingTime = signingTime;
+    const timer = setTimeout(() => terminate(item,'error'), REQUEST_TIMEOUT_MS);
+    timer.unref?.();
+    try {
+      const bytes = Uint8Array.from(atob(item.request.data), value => value.charCodeAt(0));
+      item.digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)), byte => byte.toString(16).padStart(2,'0')).join('');
+      const win = await chrome.windows.create({url:root + 'index.html?request=' + item.id,type:'popup',width:480,height:520});
+      item.windowId = win.id;
+      item.chooserTabId = win.tabs?.[0]?.id;
+      if (!Number.isInteger(item.chooserTabId)) throw Error('Could not identify the chooser tab');
+      try { await chrome.windows.get(item.windowId); }
+      catch { if (coordinator.get(item.id)) terminate(item,'error'); }
+    } catch (error) {
+      if (coordinator.get(item.id)) terminate(item,'error');
+      else reject(error);
+    }
+    return promise;
+  }
+  async function handleBridgeJob(socket, raw) {
+    let message;
+    try { message = JSON.parse(raw); }
+    catch { return; }
+    if (!message || typeof message.id !== 'string' || socket !== bridgeSocket) return;
+    try {
+      let value;
+      if (message.type === 'certs') value = {certificates:await mcpCertificates()};
+      else if (message.type === 'sign') value = await bridgeSign(message);
+      else throw Error('Unknown bridge job');
+      bridgeReply(socket,message.id,true,value);
+    } catch (error) {
+      bridgeReply(socket,message.id,false,undefined,error instanceof Error ? error.message : String(error));
+    }
+  }
   function terminate(item, kind = 'error') { return coordinator.finish(item.id, {kind}); }
   async function fresh(item) {
     let frame;
@@ -100,17 +282,24 @@ export function createBridge(chrome) {
       if (!message.enabled) for (const item of coordinator.requests.values()) if (item.origin === origin) terminate(item);
       return true;
     }
+    if (message.type === 'mcp:status') return bridgeStatus();
+    if (message.type === 'mcp:configure') {
+      const settings = normalizeBridgeSettings(message.settings);
+      await chrome.storage.local.set({[BRIDGE_KEY]:settings});
+      return connectBridge(settings);
+    }
     const item = coordinator.get(message.id);
     if (!item) throw Error('This request has expired. Return to the website and start again.');
     if (!trustedChooser(sender, item, chrome.runtime.id, root)) throw Error('This chooser is not authorized for the request');
-    await fresh(item);
+    if (!item.bridge) await fresh(item);
     switch (message.type) {
       case 'request:resize':
         if (!Number.isInteger(message.height) || message.height < 320 || message.height > 1200) throw Error('Invalid chooser height');
         await chrome.windows.update(item.windowId,{height:message.height});
         return true;
       case 'request:get':
-        return {id:item.id,origin:item.origin,...item.request,digest:item.digest};
+        return {id:item.id,origin:item.origin,...item.request,digest:item.digest,
+          ...(item.bridge ? {bridge:true,certId:item.certId,signingTime:item.signingTime} : {})};
       case 'request:begin':
         if (!coordinator.start(item.id)) throw Error('Request is no longer waiting for confirmation');
         return true;
@@ -210,17 +399,18 @@ export function createBridge(chrome) {
   chrome.permissions.onAdded.addListener(() => updateScripts().catch(() => {}));
   chrome.permissions.onRemoved.addListener(async () => {
     await updateScripts();
-    for (const item of coordinator.requests.values()) if (!await permitted(item.origin)) terminate(item);
+    for (const item of coordinator.requests.values()) if (!item.bridge && !await permitted(item.origin)) terminate(item);
   });
   chrome.action.onClicked.addListener(tab => {
     let origin = null;
     try { origin = normalizeOrigin(new URL(tab.url).origin); } catch { /* Browser-owned page. */ }
     return openApp(false,origin);
   });
-  chrome.runtime.onInstalled.addListener(() => updateScripts().catch(() => {}));
-  chrome.runtime.onStartup.addListener(() => updateScripts().catch(() => {}));
+  chrome.runtime.onInstalled.addListener(() => { updateScripts().catch(() => {}); restoreBridge().catch(() => {}); });
+  chrome.runtime.onStartup.addListener(() => { updateScripts().catch(() => {}); restoreBridge().catch(() => {}); });
   const ready = chrome.storage.local.setAccessLevel({accessLevel:'TRUSTED_CONTEXTS'}).then(updateScripts);
+  ready.then(restoreBridge).catch(() => {});
   ready.catch(() => {});
-  return {coordinator,handleMessage,updateScripts,ready};
+  return {coordinator,handleMessage,updateScripts,connectBridge,bridgeStatus,bridgeSign,ready};
 }
 if (globalThis.chrome?.runtime?.id) createBridge(globalThis.chrome);

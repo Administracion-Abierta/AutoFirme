@@ -1,5 +1,5 @@
 /**
- * Stored identities and outputs (issue #29). The vault runs over the in-memory backend — its crypto
+ * Stored identities (issue #29). The vault runs over the in-memory backend — its crypto
  * and error mapping are the same code the IndexedDB backend uses, which jsdom cannot provide.
  */
 
@@ -162,43 +162,5 @@ describe('stored identities', () => {
 		};
 
 		expect(await codeOf(() => stored(createVault(full)))).toBe('quota');
-	});
-});
-
-describe('stored outputs', () => {
-	const signed = new TextEncoder().encode('firma de contrato') as Uint8Array<ArrayBuffer>;
-
-	it('stores the signed bytes with their digest and gives them back unchanged', async () => {
-		const { vault } = vaultOn();
-		const meta = await vault.saveOutput({
-			name: 'contrato.pdf.csig',
-			format: 'cades',
-			mime: 'application/octet-stream',
-			commonName: LEAF_COMMON_NAME,
-			bytes: signed
-		});
-
-		expect(await vault.listOutputs()).toEqual([meta]);
-		expect(meta.name).toBe('contrato.pdf.csig');
-		expect(meta.format).toBe('cades');
-		expect(meta.commonName).toBe(LEAF_COMMON_NAME);
-		expect(meta.sha256).toMatch(/^[0-9a-f]{64}$/);
-		expect(await vault.readOutput(meta.id)).toEqual(signed);
-	});
-
-	it('deletes an output', async () => {
-		const { vault } = vaultOn();
-		const meta = await vault.saveOutput({
-			name: 'contrato.pdf.csig',
-			format: 'cades',
-			mime: 'application/octet-stream',
-			commonName: LEAF_COMMON_NAME,
-			bytes: signed
-		});
-
-		await vault.removeOutput(meta.id);
-
-		expect(await vault.listOutputs()).toEqual([]);
-		expect(await vault.readOutput(meta.id)).toBeNull();
 	});
 });

@@ -6,11 +6,15 @@ with the ordinary web build.
 
 See [CHROME-EXTENSION-DESIGN.md](CHROME-EXTENSION-DESIGN.md) for the implementation
 and request protocol, and [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md)
-for the recorded checks and remaining manual tests.
+for the recorded checks and remaining manual tests. En español: las funciones de la
+extensión están en [LEEME.md](LEEME.md) (sección «Extensión Chrome»).
 
 ## 1. Build and install
 
-Use Node 22+ (Node 24 verified), pnpm 11.24.0, and Chrome/Chromium 116+:
+Use Node 22+ (Node 24 verified), pnpm 11.24.0, and Chrome/Chromium 116+. The
+extension is **Chrome-only for now**; Firefox support is deferred to
+[issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18)
+(`userScripts` API study, tagged `fleet:hold`).
 
 ```sh
 pnpm install --frozen-lockfile
@@ -43,21 +47,35 @@ webapp and extension are different origins: existing webapp storage does not
 migrate automatically. Import certificates into the extension. The extension does
 not provide operating-system certificate-store access or a native helper.
 
+### MCP bridge
+
+Settings → Servidor MCP (extension builds only) can connect the extension to a deployed
+`autofirma-mcp` HTTP entry. The operator enters the server's `/mcp` address and its
+`AUTOFIRME_MCP_TOKEN`, enables the bridge, and the extension signs only with the identity the
+agent requested. If that identity has a PIN remembered from the picker's per-identity checkbox,
+the service worker signs without a window; otherwise Chrome opens one consent window for the
+signature. The private key, PIN and vault never leave Chrome.
+The socket is outbound to `WS(S) /bridge` (same token), so no inbound port is opened on
+the browser side and stdio MCP servers cannot use it. See `docs/MCP-DESIGN.md`.
+
 ## 3. Signing requests from websites
 
-A fresh install grants no website access and injects nothing. Authorize one site
-in Site access: enter its origin and select Authorize site. Chrome asks for access
-to that website only; reload the site and its AutoScript calls open the chooser.
-Signing then works on the first request.
+The extension intercepts every HTTP and HTTPS website from installation: the manifest
+declares `http://*/*` and `https://*/*` as install-time host permissions, so a site's
+AutoScript calls open the chooser on the first request with no prior setup.
 
-The panel also lists authorized sites, lets you remove their access and, under
-Intercept all websites, offers an explicit opt-in to `http://*/*` and
-`https://*/*` for trusted environments only. Turning that off returns to per-site
-authorization. Origins you disable in AutoFirme stay bypassed even with the
-all-sites grant. Chrome's own site-access settings can still withhold host
-access; AutoFirme respects those restrictions. Restricted browser pages such as
-chrome:// pages cannot be intercepted. Timestamping needs its own grant for the
-configured TSA origin.
+For a `CAdEStri` call (Aragon's portafirmas), the page's signing server performs the
+pre-sign and post-sign phases: the extension sends the selected certificate and the
+request data, signs the returned attributes locally with the RSA key, and returns
+the PKCS#1 signature to that server. The private key never leaves the browser. The
+chooser marks the request as server-backed.
+
+In Site access, enter an origin and select Disable site to exclude it: reload the site
+and its calls run the original AutoFirma integration again. Chrome's own site-access
+settings can still withhold host access; if Chrome revoked the wildcard grant (or a
+specific origin), the panel can request a per-origin grant again. Restricted browser
+pages such as chrome:// pages cannot be intercepted. Timestamping needs its own grant
+for the configured TSA origin.
 
 A supported AutoScript request opens a compact certificate chooser inspired by
 Bitwarden's passkey-selection interaction. It uses AutoFirme's real certificate
@@ -84,20 +102,28 @@ AutoScript.selectCertificate(null, success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', null, success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', 'mode=implicit', success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', 'mode=explicit', success, error);
+AutoScript.sign(base64, 'SHA256withRSA', 'PAdES', null, success, error);
+AutoScript.sign(base64, 'SHA256withRSA', 'AUTO', null, success, error);
+AutoScript.sign(base64, 'SHA1withRSA', 'XAdES', null, success, error);
 ```
 
 Input must be canonical Base64, at most 4 MiB. Certificate selection does not
 honor unsupported filters. Supported signing uses currently valid RSA certificates
-with at least 2048-bit keys and appropriate document-signing usage. Unsupported
-methods, formats, algorithms, parameters, sticky identities and custom stores
-continue through the original implementation unchanged. This website contract is
-narrower than the full app's interactive feature set.
+with at least 2048-bit keys and appropriate document-signing usage. `AUTO` sniffs
+the payload the way AutoFirma does: a `%PDF-` header signs as PAdES, XML signs as
+enveloped XAdES when the mode is implicit, and everything else signs as CAdES.
+Legacy portals that still request `SHA1withRSA` are honored only for enveloped
+XAdES; CAdES and PAdES stay SHA-256-only.
+Explicit XAdES needs a detached signature and continues through the original
+implementation. Unsupported methods, formats, algorithms, parameters, sticky
+identities and custom stores also continue through it unchanged. This website
+contract is narrower than the full app's interactive feature set.
 
 ## 4. Security boundaries and limits
 
-Only HTTP/HTTPS websites the user authorized (or, explicitly, all of them through
-the opt-in) get MAIN/isolated-world bridge scripts, and origins disabled in
-AutoFirme never do. Chrome supplies the requesting tab, frame
+Every HTTP/HTTPS website gets MAIN/isolated-world bridge scripts unless its origin is
+disabled in AutoFirme, and Chrome still withholds host access where its own settings
+say so. Chrome supplies the requesting tab, frame
 and document identity. The bridge does not accept an origin
 supplied by the website. An opaque ID is bound to the actual chooser
 tab. Other app tabs cannot confirm or retrieve that chooser's payload. Private
@@ -129,6 +155,7 @@ pnpm test:extension:artifacts
 pnpm test:extension:browser
 pnpm package:extension
 bash test/fixtures/verify-fixtures.sh
+pnpm demo:registradores          # live website run, see demo/README.md
 ```
 
 `pnpm check` runs two TypeScript projects: the app (`tsconfig.json` over
@@ -151,12 +178,16 @@ cache: `npx playwright install --with-deps chromium` leaves the binary in
 `~/.cache/ms-playwright/chromium-<build>/chrome-linux64/chrome`). Branded Google Chrome builds 137
 and newer ignore `--load-extension`; use Chromium or Chrome for Testing, and the script rejects a
 branded `CHROME_PATH` before launching. `pnpm package:extension` additionally requires `python3`.
-The browser test loads the production manifest with no install-time host
-permissions: it checks that a fresh profile injects nothing, then authorizes the
-fixture origin through the Site access panel and signs on the
-first request after a reload. Chrome's actual installation prompts and desktop
-AutoFirma launch need separate manual checks.
+The browser test loads the production manifest with its install-time wildcard
+host permissions: it checks that a fresh profile captures the fixture origin's first
+call, disables that origin through the Site access panel, verifies the disabled site
+falls back to native AutoFirma across a browser restart and signs once the site is
+re-enabled. Chrome's actual installation prompts and desktop AutoFirma launch need
+separate manual checks.
 
 See the [verification record](CHROME-EXTENSION-VERIFICATION.md) for executed checks
-and remaining manual/environment-specific checks. `pnpm package:extension` packages
-the existing verified build; rebuild first after making source changes.
+and remaining manual/environment-specific checks, including the full target and
+format matrix run against the Colegio de Registradores' own test page
+(<https://www.registradores.org/test-autofirma>) in §4.1.
+`pnpm package:extension` packages the existing verified build; rebuild first after
+making source changes.

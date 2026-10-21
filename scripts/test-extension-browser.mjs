@@ -19,8 +19,8 @@ try {
   const manifest = JSON.parse(await readFile(join(extension, 'manifest.json'), 'utf8'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.action.default_popup, undefined, 'app must survive focus changes');
-  assert.equal(manifest.host_permissions, undefined, 'clean install grants no website access');
-  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*','https://*/*'], 'all-sites interception stays opt-in');
+  assert.deepEqual(manifest.host_permissions, ['http://*/*','https://*/*'], 'all-sites interception is the install-time default');
+  assert.equal(manifest.optional_host_permissions, undefined, 'all-sites access is no longer an opt-in');
   let executable = process.env.CHROME_PATH;
   if (!executable) {
     const cache = join(homedir(), '.cache/ms-playwright');
@@ -65,7 +65,7 @@ try {
   main = await open(appURL); mainSession=main.session;
   await cdp.wait(main.session, `document.querySelector('h1')?.textContent.includes('AutoFirma')`);
   assert.equal(await cdp.evaluate(main.session, 'location.protocol'), 'chrome-extension:');
-  assert.ok(await cdp.evaluate(main.session, "document.body.textContent.includes('CAdES')"));
+  assert.ok(await cdp.evaluate(main.session, "document.body.textContent.includes('Configura la firma')"));
   const click = (session, selector) => cdp.evaluate(session, `document.querySelector(${JSON.stringify(selector)}).click()`);
   const set = (session, selector, value) => cdp.evaluate(session, `(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.value=${JSON.stringify(value)};el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const enter = (session, selector) => cdp.evaluate(session, `document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
@@ -92,6 +92,11 @@ try {
     assert.ok(node.nodeId, `missing file input ${selector}`);
     await cdp.send('DOM.setFileInputFiles',{nodeId:node.nodeId,files},session);
   }
+  // Two steps now: certificate on step 1, then the documents card that holds the format chooser.
+  // The Next button carries no aria-describedby once a certificate is picked; match its text.
+  await cdp.wait(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Siguiente')?.disabled===false`);
+  await cdp.evaluate(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Siguiente').click()`);
+  await cdp.wait(main.session, "Boolean(document.querySelector('#panel-sign fieldset button[aria-haspopup=dialog]'))");
   await cdp.evaluate(main.session, `[...document.querySelectorAll('button[aria-haspopup=dialog]')].find(b=>b.textContent.includes('CAdES-BES')).click()`);
   await cdp.wait(main.session, 'Boolean(document.querySelector("input[name=format][value=pades]"))');
   await click(main.session,'input[name=format][value=pades]');
@@ -101,14 +106,23 @@ try {
   const source=resolve('test/fixtures/pades-source.pdf'), second=join(directory,'second.pdf');
   await cp(source,second);
   await upload(main.session,'#panel-sign input[type=file][multiple]',[source,second]);
-  await cdp.wait(main.session, 'document.querySelector("button[aria-describedby=sign-hint]")?.disabled===false');
-  await click(main.session,'button[aria-describedby=sign-hint]');
-  const outputQuery=`new Promise((resolve,reject)=>{const open=indexedDB.open('autofirme-web',2);open.onerror=()=>reject(Error('test output DB unavailable'));open.onsuccess=()=>{const db=open.result;const tx=db.transaction('outputs');const q=tx.objectStore('outputs').getAll();q.onsuccess=()=>{const rows=q.result;db.close();resolve(rows.map(r=>({name:r.value.name,bytes:Array.from(r.value.bytes)})));};q.onerror=()=>reject(Error('test outputs unavailable'));};})`;
-  await cdp.wait(main.session, `(${outputQuery}).then(rows=>rows.length===2)`);
-  const outputs=await cdp.evaluate(main.session,outputQuery);
+  await cdp.wait(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Firmar')?.disabled===false`);
+  await cdp.evaluate(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Firmar').click()`);
+  await cdp.wait(main.session, `document.querySelector('[aria-live=polite]')?.textContent.includes('2/2')`);
+  // The signed bytes live only in the queue now: pull them from the ZIP the app downloads.
+  await cdp.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:directory});
+  await cdp.evaluate(main.session, `[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Descargar ZIP')).click()`);
+  let archive;
+  for(let i=0;i<100;i++){archive=(await readdir(directory)).find(name=>name.endsWith('.zip'));if(archive)break;await new Promise(r=>setTimeout(r,100));}
+  assert.ok(archive,'batch ZIP download');
+  const zipCheck=spawnSync('unzip',['-t',join(directory,archive)]);assert.equal(zipCheck.status,0,zipCheck.stdout.toString()+zipCheck.stderr.toString());
+  const names=spawnSync('unzip',['-Z1',join(directory,archive)]).stdout.toString().split('\n').filter(Boolean);
+  assert.equal(names.length,3,'ZIP carries both signed documents plus the manifest');
   let producedPDF;
-  for(const record of outputs) {
-    const pdf=Buffer.from(record.bytes), text=pdf.toString('latin1');
+  for(const name of names) {
+    if(name==='manifest.json') continue;
+    const pdf=Buffer.from(spawnSync('unzip',['-p',join(directory,archive),name]).stdout);
+    const text=pdf.toString('latin1');
     const ranges=[...text.matchAll(/\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g)].at(-1);
     assert.ok(ranges,'actual app must generate a PDF signature');
     const [a,b,c,d]=ranges.slice(1).map(Number);
@@ -121,55 +135,59 @@ try {
     openssl(['cms','-verify','-cades','-binary','-inform','DER','-in',sigPath,'-content',contentPath,'-CAfile',fixtureCert,'-purpose','any','-out',join(directory,'pdf-verified')]);
     producedPDF=join(directory,'signed.pdf');await writeFile(producedPDF,pdf);
   }
-  await cdp.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:directory});
-  await cdp.evaluate(main.session, `[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Descargar ZIP')).click()`);
-  let archive;
-  for(let i=0;i<100;i++){archive=(await readdir(directory)).find(name=>name.endsWith('.zip'));if(archive)break;await new Promise(r=>setTimeout(r,100));}
-  assert.ok(archive,'batch ZIP download');
-  const zipCheck=spawnSync('unzip',['-t',join(directory,archive)]);assert.equal(zipCheck.status,0,zipCheck.stdout.toString()+zipCheck.stderr.toString());
   await click(main.session,'[role=tab][aria-controls=panel-verify]');
   await cdp.wait(main.session,'Boolean(document.querySelector("#panel-verify input[type=file]"))');
   await upload(main.session,'#panel-verify input[type=file]',[producedPDF]);
   await cdp.wait(main.session, 'document.querySelector("[data-check=signature]")?.dataset.status==="pass"');
   assert.equal(await cdp.evaluate(main.session,'document.querySelector("[data-check=structure]").dataset.status'),'pass');
-  process.stdout.write('PASS: full app PDF stamps, two-document batch signing, saved outputs, valid ZIP and PDF verification; OpenSSL checks both signatures.\n');
-  // Clean install: no host grants yet, so the fixture page must stay untouched.
+  process.stdout.write('PASS: full app PDF stamps, two-document batch signing, valid ZIP and PDF verification; OpenSSL checks both signatures.\n');
+  // Clean install intercepts every HTTP(S) site: the fixture page gets the bridge
+  // immediately and the first sign call opens the chooser.
   const cold = await open(origin);
-  await cdp.wait(cold.session, 'Boolean(window.fixture)');
+  await cdp.wait(cold.session, "Boolean(window.AutoScript && Object.getOwnPropertyDescriptor(window,'AutoScript').set)");
   await click(cold.session, '#sign');
-  assert.equal(await cdp.evaluate(cold.session,'window.fixture.fallbackCalls'), 1, 'unauthorized site must keep the original AutoScript');
-  assert.equal(await cdp.evaluate(cold.session, "Object.getOwnPropertyDescriptor(window,'AutoScript')?.set"), undefined, 'no wrapper before any grant');
-  // The SiteAccess panel is wired: the authorize button enables for a typed origin.
-  await click(main.session, '#site-access-open');
+  let coldChooser;
+  for (let i=0;i<100;i++) {
+    const {targetInfos}=await cdp.send('Target.getTargets');
+    coldChooser=targetInfos.find(t=>t.type==='page'&&t.url.startsWith(appURL+'?request='));
+    if (coldChooser) break;
+    await new Promise(r=>setTimeout(r,100));
+  }
+  assert.ok(coldChooser,'a clean install must capture the first website call');
+  await cdp.send('Target.closeTarget',{targetId:coldChooser.targetId});
+  await cdp.wait(cold.session, 'window.fixture.fallbackCalls===0');
+  // The SiteAccess panel lives inside the app's settings dialog now: open it by its label.
+  await click(main.session, "[aria-label='Ajustes y ayuda']");
   await cdp.wait(main.session, 'Boolean(document.querySelector("#site-access-panel"))');
   await set(main.session, '#site-origin', origin);
-  await cdp.wait(main.session, "document.querySelector('#authorize-site')?.disabled===false");
+  await cdp.wait(main.session, "document.querySelector('#disable-site')?.disabled===false");
+  await click(main.session, '#disable-site');
+  await cdp.wait(main.session, "chrome.runtime.sendMessage({type:'sites:list'}).then(r=>r.value.disabledOrigins.length===1)");
   await cdp.evaluate(main.session, "document.querySelector('[role=dialog] [data-dialog-close]')?.click()");
   await cdp.send('Target.closeTarget', {targetId: cold.targetId});
-  process.stdout.write('PASS: a clean install injects nothing until the site is authorized.\n');
-  // Headless Chrome cannot render the native grant bubble, so record the user's
-  // answer (origin in explicit_host), restart, and verify the post-grant flow;
-  // the prompt itself stays a documented manual check.
+  process.stdout.write('PASS: a clean install intercepts websites and the panel disables an origin.\n');
+  // Restart: the wildcard grant and the disabled exception survive the browser restart.
   cdp.close();
   await new Promise(resolve => {
     const timer = setTimeout(() => {processHandle.kill('SIGKILL'); resolve(undefined);}, 5000);
     processHandle.once('exit', () => {clearTimeout(timer); resolve(undefined);});
     processHandle.kill('SIGTERM');
   });
-  const preferences = JSON.parse(await readFile(join(profileDir, 'Default', 'Preferences'), 'utf8'));
-  preferences.extensions.settings[id].active_permissions.explicit_host = [`${origin}/*`];
-  await writeFile(join(profileDir, 'Default', 'Preferences'), JSON.stringify(preferences));
+  // The dead port file would make the next launch read the previous session's endpoint.
   await rm(join(profileDir, 'DevToolsActivePort'), {force: true});
   ({processHandle, cdp} = await launch());
   main = await open(appURL); mainSession = main.session;
-  await cdp.wait(main.session, `chrome.runtime.sendMessage({type:'sites:list'}).then(r=>r.value.grantedOrigins.length===1)`);
   const granted = await cdp.evaluate(main.session, `chrome.runtime.sendMessage({type:'sites:list'}).then(r=>r.value)`);
-  assert.deepEqual(granted.grantedOrigins, [origin], 'only the authorized site holds host access after restart');
-  assert.equal(granted.allSites, false, 'all-sites interception stays off');
-  process.stdout.write('PASS: the grant and the sealed identity survive the restart; only the authorized origin has access.\n');
+  assert.equal(granted.allSites, true, 'the all-sites wildcard survives the restart');
+  assert.deepEqual(granted.disabledOrigins, [origin], 'the disabled-site exception survives the restart');
+  process.stdout.write('PASS: the wildcard grant and the disabled exception survive the restart.\n');
   const page = await open(origin);
   await cdp.wait(page.session, 'Boolean(window.fixture)');
-  // document_start scripts register from the stored grant; signing works first try.
+  // The disabled exception survived the restart, so this load keeps the original AutoFirma.
+  await click(page.session, '#sign');
+  await cdp.wait(page.session, 'window.fixture.fallbackCalls===1');
+  await cdp.evaluate(main.session, `chrome.runtime.sendMessage({type:'sites:set',origin:${JSON.stringify(origin)},enabled:true})`);
+  await cdp.send('Page.navigate',{url:origin},page.session);
   await cdp.wait(page.session, "Boolean(window.AutoScript && Object.getOwnPropertyDescriptor(window,'AutoScript').set)");
   async function picker(selector) {
     await click(page.session, selector);
@@ -296,6 +314,8 @@ try {
   assert.equal(await cdp.evaluate(page.session,'window.fixture.results.length'),0,'navigation cannot deliver old results');
   assert.equal(await cdp.evaluate(page.session,'window.fixture.fallbackCalls'),0,'navigation cannot replay');
   const disabled=await cdp.evaluate(main.session,`chrome.runtime.sendMessage({type:'sites:set',origin:${JSON.stringify(origin)},enabled:false})`);assert.equal(disabled.ok,true);
+  await cdp.send('Page.navigate',{url:origin+'?disabled=1'},page.session);
+  await cdp.wait(page.session, "Boolean(window.fixture) && !Object.getOwnPropertyDescriptor(window,'AutoScript')?.set");
   await click(page.session,'#sign');
   await cdp.wait(page.session,'window.fixture.fallbackCalls===1');
   assert.equal((await chooserTargets()).length,0,'disabled existing page must bypass chooser');

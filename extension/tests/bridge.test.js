@@ -10,11 +10,105 @@ const root = 'chrome-extension://extension/';
 const ui = id => ({id:'extension',url:`${root}index.html?request=${id}`,tab:{id:15,url:`${root}index.html?request=${id}`},frameId:0});
 const flush = () => new Promise(resolve=>setImmediate(resolve));
 
-test('contract limits interception to supported RSA CAdES calls and canonical base64', () => {
-  assert.deepEqual(parseCall('sign',['YQ==','SHA256withRSA','CAdES',null,()=>{},()=>{}]),sign);
-  for(const [data,algorithm,format,params] of [['YR==','SHA256withRSA','CAdES',''],['YQ==','SHA256withRSA','PAdES',''],['YQ==','SHA1withRSA','CAdES',''],['YQ==','SHA256withRSA','CAdES','mode=implicit\nother=x']]) assert.equal(parseCall('sign',[data,algorithm,format,params,()=>{},()=>{}]),null);
+test('contract accepts supported RSA formats and resolves AUTO from the content', () => {
+  const call=(data,algorithm,format,params)=>parseCall('sign',[data,algorithm,format,params,()=>{},()=>{}]);
+  assert.deepEqual(call('YQ==','SHA256withRSA','CAdES'),sign);
+  const pdf='JVBERi0xLjM=';
+  assert.deepEqual(call(pdf,'SHA256withRSA','PAdES','mode=explicit'),{...sign,data:pdf,format:'PAdES',mode:'explicit'});
+  assert.deepEqual(call(pdf,'SHA256withRSA','AUTO','mode=explicit'),{...sign,data:pdf,format:'PAdES',mode:'explicit'});
+  assert.deepEqual(call('YQ==','SHA256withRSA','AUTO'),sign);
+  const xml='PHgvPg==';
+  assert.deepEqual(call(xml,'SHA256withRSA','XAdES'),{...sign,data:xml,format:'XAdES'});
+  const legacy=call(xml,'SHA1withRSA','XAdES');
+  assert.deepEqual(legacy,{...sign,data:xml,algorithm:'SHA1withRSA',format:'XAdES'});
+  assert.deepEqual(validateRequest(legacy),legacy);
+  assert.deepEqual(call(xml,'SHA256withRSA','AUTO'),{...sign,data:xml,format:'XAdES'});
+  for(const [data,algorithm,format,params] of [['YR==','SHA256withRSA','CAdES',''],['YQ==','SHA256withRSA','PAdES',''],['YQ==','SHA1withRSA','CAdES',''],['YQ==','SHA1withRSA','PAdES',''],['PHgvPg==','SHA1withRSA','XAdES','mode=explicit'],['YQ==','SHA256withRSA','CAdES','mode=implicit\nother=x'],['PHgvPg==','SHA256withRSA','XAdES','mode=explicit'],['PHgvPg==','SHA256withRSA','AUTO','mode=explicit'],['YQ==','SHA256withRSA','ASiC',''],['YQ==','SHA256withRSA','constructor','']]) assert.equal(call(data,algorithm,format,params),null);
   assert.throws(()=>validateRequest({...sign,origin:'https://spoof.test'}));
   assert.deepEqual(publicResult({certificate:'YQ==',signature:'Yg==',privateKey:'secret'},'sign'),{kind:'result',certificate:'YQ==',signature:'Yg=='});
+});
+
+test('accepts AutoFirma visible-signature parameters for PDF only', () => {
+  const call=(data,algorithm,format,params)=>parseCall('sign',[data,algorithm,format,params,()=>{},()=>{}]);
+  const pdf='JVBERi0xLjM=';
+  const png='iVBORw0KGgo=';
+  const stamp=[
+    'visibleSignature=want',
+    'signaturePositionOnPageLowerLeftX=45',
+    'signaturePositionOnPageLowerLeftY=80',
+    'signaturePositionOnPageUpperRightX=560',
+    'signaturePositionOnPageUpperRightY=140',
+    'signaturePage=-1',
+    'layer2Text=Firmado por $$SUBJECTCN$$ el $$SIGNDATE=dd/MM/yyyy (HH:mm:ss)$$',
+    'layer2FontFamily=1',
+    'layer2FontSize=8',
+    'layer2FontStyle=2',
+    'layer2FontColor=gray',
+    'signReason=Conforme',
+    'signatureProductionCity=Madrid',
+    'signerContact=signer@example.test'
+  ].join('\n');
+  const expected={...sign,data:pdf,format:'PAdES',params:{
+    visibleSignature:'want',
+    signaturePositionOnPageLowerLeftX:'45',
+    signaturePositionOnPageLowerLeftY:'80',
+    signaturePositionOnPageUpperRightX:'560',
+    signaturePositionOnPageUpperRightY:'140',
+    signaturePage:'-1',
+    layer2Text:'Firmado por $$SUBJECTCN$$ el $$SIGNDATE=dd/MM/yyyy (HH:mm:ss)$$',
+    layer2FontFamily:'1',
+    layer2FontSize:'8',
+    layer2FontStyle:'2',
+    layer2FontColor:'gray',
+    signReason:'Conforme',
+    signatureProductionCity:'Madrid',
+    signerContact:'signer@example.test'
+  }};
+  const parsed=call(pdf,'SHA256withRSA','PAdES',stamp);
+  assert.deepEqual(parsed,expected);
+  assert.deepEqual(validateRequest(parsed),expected);
+  assert.equal(/** @type {any} */ (call(pdf,'SHA256withRSA','PAdES',stamp+'\nsignatureRubricImage='+png))?.params?.signatureRubricImage,png);
+  const largeImage=Buffer.concat([Buffer.from(png,'base64'),Buffer.alloc(4096)]).toString('base64');
+  assert.equal(/** @type {any} */ (call(pdf,'SHA256withRSA','PAdES',stamp+'\nsignatureRubricImage='+largeImage))?.params?.signatureRubricImage,largeImage);
+  assert.equal(/** @type {any} */ (call(pdf,'SHA256withRSA','PAdES','signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4'))?.params?.signaturePage,'-1');
+  for(const params of [
+    'visibleSignature=want',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3',
+    'signaturePositionOnPageLowerLeftX=10\nsignaturePositionOnPageLowerLeftY=20\nsignaturePositionOnPageUpperRightX=5\nsignaturePositionOnPageUpperRightY=30',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nsignaturePage=0',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nsignaturePage=1\nsignaturePages=1',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nsignatureRotation=90',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nlayer2FontFamily=9',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nlayer2FontColor=blue',
+    'signaturePositionOnPageLowerLeftX=1\nsignaturePositionOnPageLowerLeftY=2\nsignaturePositionOnPageUpperRightX=3\nsignaturePositionOnPageUpperRightY=4\nsignatureRubricImage=not-base64',
+  ]) assert.equal(call(pdf,'SHA256withRSA','PAdES',params),null,params);
+  assert.equal(call(pdf,'SHA256withRSA','AUTO',stamp)?.format,'PAdES');
+  assert.equal(call('YQ==','SHA256withRSA','CAdES',stamp),null);
+  assert.equal(call(pdf,'SHA256withRSA','CAdES',stamp),null);
+});
+
+test('accepts CARM aliases and tri-phase calls without widening local formats', () => {
+  const call=(data,algorithm,format,params)=>parseCall('sign',[data,algorithm,format,params,()=>{},()=>{}]);
+  const pdf='JVBERi0xLjM=';
+  const carm=call(pdf,'SHA256withRSA','CMS/PKCS#7','mode=implicit\nfilters=nonexpired:\nmimeType=text/xml');
+  assert.deepEqual(carm,{operation:'sign',data:pdf,algorithm:'SHA256withRSA',format:'CAdES',mode:'implicit',params:{filters:'nonexpired:',mimeType:'text/xml'}});
+  assert.deepEqual(validateRequest(carm),carm);
+  const tri=call('YQ==','SHA512withRSA','CAdEStri','serverUrl=https://sign.test/api?x=1\nprecalculatedHashAlgorithm=SHA-512');
+  if(!tri) throw new Error('tri-phase call was rejected');
+  assert.deepEqual(tri,{operation:'sign',data:'YQ==',algorithm:'SHA512withRSA',format:'CAdES',mode:'implicit',serverUrl:'https://sign.test/api?x=1',params:{precalculatedHashAlgorithm:'SHA-512'}});
+  assert.deepEqual(validateRequest(tri),tri);
+  for(const [algorithm,format,params] of [
+    ['SHA512withRSA','CAdEStri','precalculatedHashAlgorithm=SHA-512'],
+    ['SHA1withRSA','CAdEStri','serverUrl=https://sign.test'],
+    ['SHA512withRSA','CAdEStri','serverUrl=https://sign.test\nprecalculatedHashAlgorithm=SHA-256'],
+    ['SHA512withRSA','CAdEStri','serverUrl=javascript:alert(1)'],
+    ['SHA512withRSA','CAdEStri','serverUrl=https://user:pass@sign.test'],
+    ['SHA512withRSA','CAdEStri','serverUrl=https://sign.test\nfoo=bar'],
+    ['SHA512withRSA','CAdEStri','serverUrl=https://sign.test\nserverUrl=https://evil.test'],
+    ['SHA256withRSA','CAdES','serverUrl=https://sign.test'],
+  ]) assert.equal(call('YQ==',algorithm,format,params),null,`${format} ${params}`);
+  assert.throws(()=>validateRequest({...tri,format:'PAdES'}),/Unsupported/);
+  assert.throws(()=>validateRequest({...tri,serverUrl:'javascript:alert(1)'}),/Unsupported/);
 });
 
 test('adapter preserves original receiver and callbacks and replays fallback exactly once', async () => {

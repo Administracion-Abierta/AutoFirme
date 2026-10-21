@@ -20,13 +20,6 @@ afterEach(cleanup);
 
 const t = copy.es;
 
-function addDocument(container: HTMLElement, name = 'contrato.pdf') {
-	const input = container.querySelector<HTMLInputElement>('input[type="file"]');
-	if (!input) throw new Error('drop zone input not rendered');
-	return fireEvent.change(input, {
-		target: { files: [new File(['%PDF-1.4'], name, { type: 'application/pdf' })] }
-	});
-}
 
 describe('shadcn primitives in use', () => {
 	it('renders a document as one row whose download arms only when signed', async () => {
@@ -36,6 +29,7 @@ describe('shadcn primitives in use', () => {
 			id: 'd1',
 			file,
 			status: 'pending',
+			format: 'cades',
 			result: 'NOT_STARTED',
 			description: '',
 			sha256: '',
@@ -69,48 +63,36 @@ describe('shadcn primitives in use', () => {
 		return fireEvent.click(trigger).then(() => {
 			expect(container.querySelector('input[type="file"]')).not.toBeNull();
 			expect(onselect).not.toHaveBeenCalled();
-			expect(card.outerHTML).toMatchInlineSnapshot(`"<div data-slot="card" data-size="default" class="ring-foreground/10 text-card-foreground gap-(--card-spacing) overflow-hidden rounded-xl py-(--card-spacing) text-sm [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl group/card flex flex-col min-h-44 w-full shrink-0 cursor-pointer border-2 border-dashed bg-card/50 shadow-none ring-0 transition-colors border-border hover:border-primary/60" aria-label="Arrastra aquí los ficheros que quieres firmar" role="button" tabindex="0"><div data-slot="card-content" class="flex flex-col items-center gap-3 overflow-hidden px-6 py-12 text-center"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-12 transition-colors text-muted-foreground"><path d="M14 3v4a1 1 0 0 0 1 1h4" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5 8V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2h-3" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9 21H5a2 2 0 0 1-2-2v-4m6 0h.01M12 15h.01M9 18h.01M12 18h.01" stroke-linecap="round"></path><path d="M12 15v-3m0 0-1.5 1.5M12 12l1.5 1.5" stroke-linecap="round" stroke-linejoin="round"></path><!----></svg> <p class="text-lg font-medium">Arrastra aquí los ficheros que quieres firmar <span class="text-primary underline decoration-primary/40 underline-offset-4">Seleccionar ficheros</span><!----></p> <p class="text-muted-foreground text-sm">o selecciónalos desde tu equipo</p> <input class="sr-only" type="file" tabindex="-1" aria-hidden="true" multiple=""><!----></div><!----></div>"`);
 		});
 	});
 
-	it('lays the sign flow out as a 2/3 documents column beside the config card, queue full width', async () => {
+	it('lays the sign flow out as one column of step cards under a step indicator', async () => {
 		const { container } = render(App);
-		await addDocument(container);
 		await tick();
 
-		const grid = container.querySelector('#panel-sign');
-		expect(grid?.className).toContain('lg:grid-cols-3');
-		// Desktop: the panels share one fr row; the queue sits under them at its own height.
-		expect(grid?.className).toContain('lg:grid-rows-[minmax(0,1fr)_auto]');
-
-		const [documents, config, queue] = Array.from(grid!.children) as HTMLElement[];
-		// All three panels are shadcn Cards; documents first (left), config right, queue bottom.
-		expect(documents?.getAttribute('data-slot')).toBe('card');
-		expect(config?.getAttribute('data-slot')).toBe('card');
-		// Documents take two of the three columns; the config card keeps the remaining third.
-		expect(documents?.className).toContain('lg:col-span-2');
-		expect(config?.className).not.toContain('lg:col-span');
-		// The queue spans all three columns at the bottom.
-		expect(queue?.className).toContain('lg:col-span-3');
-
-		// The format chooser is a button opening the selection modal.
-		const formatTrigger = screen.getByRole('button', { name: /CAdES-BES/ });
-		expect(formatTrigger.getAttribute('aria-haspopup')).toBe('dialog');
+		const panel = container.querySelector('#panel-sign');
+		expect(panel?.className).toContain('flex-col');
+		// Step 1 first: the certificate card with the Next button.
+		expect(panel?.textContent).toContain(t.step1Title);
+		expect(screen.getByRole('button', { name: t.next })).toBeTruthy();
+		// Step 1 has no drop zone yet — the file input here belongs to the keystore picker.
+		const input = container.querySelector<HTMLInputElement>('#pkcs12-file');
+		expect(input?.getAttribute('aria-label')).toBe(t.addSign);
+		expect(container.querySelector('#panel-sign p.text-lg')).toBeNull();
 	});
 
-	it('explains a blocked sign button with a tooltip and opens the privacy dialog from the help menu', async () => {
+	it('explains the blocked Next button with a hint and opens the privacy dialog from settings', async () => {
 		const { container } = render(App);
-		await addDocument(container);
 		await tick();
 
-		// No certificate loaded yet: the disabled button carries the reason on hover.
-		expect(container.querySelector('[data-slot="tooltip-trigger"]')).not.toBeNull();
+		// No certificate loaded yet: the hint states the reason inline and Next stays disabled.
+		expect(container.querySelector('#sign-hint')?.textContent).toContain('certificado');
+		expect(screen.getByRole('button', { name: t.next }).hasAttribute('disabled')).toBe(true);
 
-		await fireEvent.click(screen.getByRole('button', { name: t.helpMenu }));
-		const privacy = await screen.findByRole('menuitem', { name: t.privacyTitle });
-		await fireEvent.click(privacy);
-
+		// The privacy note lives in the Help tab.
+		await fireEvent.click(screen.getByRole('button', { name: t.settingsLabel }));
 		const dialog = await screen.findByRole('dialog');
+		await fireEvent.click(within(dialog).getByRole('tab', { name: t.helpMenu }));
 		expect(within(dialog).getByText(t.privacyTitle)).toBeTruthy();
 		expect(within(dialog).getByText(t.privacyNote)).toBeTruthy();
 	});

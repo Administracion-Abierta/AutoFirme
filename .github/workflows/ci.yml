@@ -53,6 +53,8 @@ jobs:
       # the batch archive, openssl/python3 for every fixture (positive and negative).
       - run: pnpm verify:zip
       - run: bash test/fixtures/verify-fixtures.sh
+      # 50 MB PDF, 500-file batch and cold start; absolute ceilings calibrated on a dev box.
+      - run: pnpm perf
       - run: pnpm package:extension
       - uses: actions/upload-artifact@v4
         with:
@@ -61,3 +63,63 @@ jobs:
             dist/autofirme-extension-*.zip
             dist/SHA256SUMS
           if-no-files-found: error
+
+  mcp:
+    name: mcp check, test, e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Same OpenSSL floor as `checks`: `mcp/test/helpers.ts` builds the shared CAdES fixtures,
+    # whose expired leaf needs `-not_before`/`-not_after` (OpenSSL >= 3.4) — absent on the runner.
+    container:
+      image: debian:trixie
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      # The image is minimal and checkout needs git, so the toolchain comes first.
+      # This step must run from the workspace root: the job-wide `working-directory: mcp`
+      # only exists after checkout, and the runner `docker exec`s with that cwd (no mkdir).
+      - name: Toolchain
+        working-directory: .
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends git openssl ca-certificates
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          openssl version
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: mcp/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - run: pnpm test
+      # Builds both entry points and verifies a stdio signature with openssl cms -verify.
+      - run: pnpm e2e
+
+  deploy:
+    name: deploy worker to production
+    needs: checks
+    # Production worker autofirme.eduard3v.workers.dev tracks main; develop ships
+    # the dev pre-release instead (release-develop.yml). PRs never deploy.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Deploy to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy

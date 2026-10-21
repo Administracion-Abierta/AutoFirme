@@ -1,13 +1,11 @@
 /**
- * Client-side store for signing identities and produced signatures (issue #29).
+ * Client-side store for signing identities (issue #29).
  *
  * Two layers over one IndexedDB database:
  * - **identities** — the PKCS#12 container bytes, sealed with PBKDF2(SHA-256) → AES-GCM under the
  *   container's own PIN, the one the user types to load it. That PIN is never persisted: it only
  *   derives the key, losing it means the blob is unreadable, and unlocking asks for it once. Each
  *   saved signature carries its own PIN, so saving several of them never trips over a shared one.
- * - **outputs** — produced `.csig`/`.xsig`/`.pdf` bytes plus metadata. Those files hold public
- *   data only (signature + certificate), so they are stored as they are and need no unlock.
  *
  * The backend is a four-method interface: IndexedDB in the browser, a map in tests — jsdom has no
  * IndexedDB and the project takes no dependency for it.
@@ -15,7 +13,7 @@
 
 import type { Bytes } from './asn1';
 import { loadSignerSession } from './keystore';
-import type { SignerSession, SignFormat } from './sign';
+import type { SignerSession } from './sign';
 
 export type StoreErrorCode = 'unavailable' | 'wrong-pin' | 'tampered' | 'quota' | 'missing';
 
@@ -122,22 +120,6 @@ interface IdentityRecord extends IdentityMeta {
 	sealed: SealedBlob;
 }
 
-export interface OutputMeta {
-	id: string;
-	/** File name the output was produced with (`contrato.pdf.csig`). */
-	name: string;
-	format: SignFormat;
-	mime: string;
-	/** Hex SHA-256 of the stored bytes. */
-	sha256: string;
-	commonName: string;
-	createdAt: string;
-	size: number;
-}
-
-interface OutputRecord extends OutputMeta {
-	bytes: Bytes;
-}
 
 export interface SaveIdentityInput {
 	label: string;
@@ -147,14 +129,6 @@ export interface SaveIdentityInput {
 	container: Bytes;
 	/** The container's own PIN: the blob is sealed under it and unlocked with it. Never stored. */
 	pin: string;
-}
-
-export interface SaveOutputInput {
-	name: string;
-	format: SignFormat;
-	mime: string;
-	commonName: string;
-	bytes: Bytes;
 }
 
 export interface Vault {
@@ -170,10 +144,6 @@ export interface Vault {
 	removeIdentity(id: string): Promise<void>;
 	/** Deletes every saved record and reloads the page: the way out of a broken store. */
 	reset(): Promise<void>;
-	listOutputs(): Promise<OutputMeta[]>;
-	saveOutput(input: SaveOutputInput): Promise<OutputMeta>;
-	readOutput(id: string): Promise<Bytes | null>;
-	removeOutput(id: string): Promise<void>;
 }
 
 /* ------------------------------------------------------------------ helpers */
@@ -188,11 +158,6 @@ export function toStoreError(reason: unknown): StoreError {
 		return new StoreError('quota', 'the browser store is full');
 	}
 	return new StoreError('unavailable', failure?.message ?? String(reason));
-}
-
-async function sha256Hex(bytes: Bytes): Promise<string> {
-	const digest = await crypto.subtle.digest('SHA-256', bytes);
-	return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /* ------------------------------------------------------------------ vault */
@@ -269,47 +234,6 @@ export function createVault(raw: StoreBackend, persistent: boolean | (() => bool
 		async removeIdentity(id) {
 			await backend.remove('identities', id);
 			log(`removed identity ${id}`);
-		},
-
-		async listOutputs() {
-			const records = (await backend.list('outputs')) as { value: OutputRecord }[];
-			return records
-				.map(({ value }) => ({
-					id: value.id,
-					name: value.name,
-					format: value.format,
-					mime: value.mime,
-					sha256: value.sha256,
-					commonName: value.commonName,
-					createdAt: value.createdAt,
-					size: value.size
-				}))
-				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-		},
-
-		async saveOutput(input) {
-			const id = crypto.randomUUID();
-			const meta: OutputMeta = {
-				id,
-				name: input.name,
-				format: input.format,
-				mime: input.mime,
-				sha256: await sha256Hex(input.bytes),
-				commonName: input.commonName,
-				createdAt: new Date().toISOString(),
-				size: input.bytes.length
-			};
-			await backend.put('outputs', { id, value: { ...meta, bytes: input.bytes } });
-			return meta;
-		},
-
-		async readOutput(id) {
-			const record = await backend.get('outputs', id);
-			return record ? (record.value as OutputRecord).bytes : null;
-		},
-
-		async removeOutput(id) {
-			await backend.remove('outputs', id);
 		}
 	};
 }
@@ -394,8 +318,8 @@ function request<T>(source: IDBRequest<T>): Promise<T> {
 }
 
 const DB_NAME = 'autofirme-web';
-/** v2: identities carry their own PIN (v1 had one store-wide PIN, whose records cannot be read). */
-const DB_VERSION = 2;
+/** v3: the outputs store (produced signatures) went with the downloads feature; upgrade deletes it. */
+const DB_VERSION = 3;
 /** An open that answers nothing this long is wedged: report it rather than wait forever. */
 const OPEN_TIMEOUT_MS = 2_500;
 
@@ -429,7 +353,11 @@ export function indexedDbBackend(): StoreBackend {
 				for (const name of STORES) {
 					if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
 				}
-				if (event.oldVersion > 0 && event.oldVersion < DB_VERSION) {
+				if (db.objectStoreNames.contains('outputs')) {
+					// v3: produced signatures were only ever read by the downloads dialog, which is gone.
+					db.deleteObjectStore('outputs');
+				}
+				if (event.oldVersion > 0 && event.oldVersion < 2) {
 					// v1 sealed every identity under one store-wide PIN; those records cannot be read
 					// under the per-signature scheme, so they go rather than linger as junk.
 					const versionChange = request.transaction;

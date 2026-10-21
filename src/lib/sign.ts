@@ -31,7 +31,7 @@ export interface SelectedFile {
 /** WebCrypto parameters used for both importing and signing with a certificate's private key. */
 export interface SigningAlgorithm {
 	name: 'RSASSA-PKCS1-v1_5' | 'ECDSA';
-	hash: 'SHA-256' | 'SHA-384' | 'SHA-512';
+	hash: 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512';
 	/** ECDSA only. */
 	namedCurve?: 'P-256' | 'P-384' | 'P-521';
 }
@@ -52,6 +52,10 @@ export interface SignerCert {
 	der: Bytes;
 	/** Non-extractable signing key; null for the certificates of the chain that are not the signer. */
 	key: CryptoKey | null;
+	/** RSA view imported with SHA-512, for the PK1 step of a three-phase signature. */
+	sha512Key?: CryptoKey | null;
+	/** Legacy portals still request SHA-1; WebCrypto binds the hash to the key. */
+	sha1Key?: CryptoKey | null;
 	algorithm: SigningAlgorithm | null;
 }
 
@@ -73,12 +77,30 @@ export function signingAlgorithmName(cert: SignerCert): string {
 	return `${hash.replace('-', '')}with${name === 'ECDSA' ? 'ECDSA' : 'RSA'}`;
 }
 
+/** The non-extractable key view bound to `hash`, or null when the certificate has none. */
+export function signingKey(cert: SignerCert, hash: SigningAlgorithm['hash']): CryptoKey | null {
+	if (!cert.algorithm) return null;
+	if (hash === cert.algorithm.hash) return cert.key;
+	if (hash === 'SHA-1') return cert.sha1Key ?? null;
+	if (hash === 'SHA-512') return cert.sha512Key ?? null;
+	return null;
+}
+
 /** Sign raw bytes with the selected certificate's key. Format wrapping happens in #6–#11. */
-export async function signBytes(cert: SignerCert, data: Bytes): Promise<Bytes> {
-	if (!cert.key || !cert.algorithm) {
+export async function signBytes(
+	cert: SignerCert,
+	data: Bytes,
+	hash: SigningAlgorithm['hash'] = cert.algorithm?.hash ?? 'SHA-256'
+): Promise<Bytes> {
+	const key = signingKey(cert, hash);
+	if (!key || !cert.algorithm) {
 		throw new Error(`certificate ${cert.commonName} has no private key`);
 	}
-	return new Uint8Array(await crypto.subtle.sign(cert.algorithm, cert.key, data));
+	const algorithm: AlgorithmIdentifier | EcdsaParams =
+		cert.algorithm.name === 'ECDSA'
+			? { name: 'ECDSA', hash }
+			: { name: 'RSASSA-PKCS1-v1_5' };
+	return new Uint8Array(await crypto.subtle.sign(algorithm, key, data));
 }
 
 export function toSelectedFile(file: File): SelectedFile {

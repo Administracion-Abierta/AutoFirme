@@ -11,3 +11,6 @@ paths = [
   '''test/fixtures/pades-signer\.key''',
   '''test/fixtures/pades-signer-ec\.key''',
 ]
+# RFC 6455 §1.3's sample Sec-WebSocket-Key ("the sample nonce"), used in
+# mcp/test/bridge.test.ts to exercise the bridge handshake. Not a credential.
+regexes = ['''dGhlIHNhbXBsZSBub25jZQ==''']

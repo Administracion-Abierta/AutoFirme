@@ -8,7 +8,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig(({ mode }) => mode === 'extension' ? {
 	root: 'extension',
 	base: './',
-	publicDir: '../static',
+	// Chrome rejects packaged files whose names start with "_" (e.g. static/_headers)
+	// and the extension needs only a few of the web app's public assets.
+	publicDir: false,
 	plugins: [tailwindcss(), svelte()],
 	resolve: { alias: { '#lib': fileURLToPath(new URL('./src/lib', import.meta.url)) } },
 	build: { outDir: '../dist/extension', emptyOutDir: true, target: 'chrome116' }

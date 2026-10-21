@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 
 const manifest = {
   manifest_version: 3, minimum_chrome_version: '116',
-  optional_host_permissions: ['http://*/*', 'https://*/*'],
+  host_permissions: ['http://*/*', 'https://*/*'],
   content_security_policy: { extension_pages: "script-src 'self'; object-src 'none'" },
   action: {}, options_page: 'index.html'
 };
@@ -20,9 +20,9 @@ const good = {
 };
 for (const entry of [
   ['accepts self-contained app', {}, null],
-  ['rejects install-time host permissions', { 'manifest.json': JSON.stringify({ ...manifest, host_permissions: ['http://*/*', 'https://*/*'] }) }, 'no host access at installation time'],
-  ['rejects missing optional all-sites grant', { 'manifest.json': JSON.stringify({ ...manifest, optional_host_permissions: undefined }) }, 'all-sites access stays an explicit opt-in'],
-  ['rejects wildcard hosts as API optional_permissions', { 'manifest.json': JSON.stringify({ ...manifest, optional_permissions: manifest.optional_host_permissions, optional_host_permissions: undefined }) }, 'site access is requested as host patterns, not API permissions'],
+  ['rejects a manifest without the all-sites host grant', { 'manifest.json': JSON.stringify({ ...manifest, host_permissions: undefined }) }, 'all-sites interception is the install-time default'],
+  ['rejects a narrowed all-sites host grant', { 'manifest.json': JSON.stringify({ ...manifest, host_permissions: ['https://*/*'] }) }, 'all-sites interception is the install-time default'],
+  ['rejects wildcard hosts as API optional_permissions', { 'manifest.json': JSON.stringify({ ...manifest, optional_permissions: manifest.host_permissions }) }, 'site access is requested as host patterns, not API permissions'],
   ['rejects removed app entry with orphan bundle retained', { 'index.html': '<link href="assets/app.css">' }, 'application module entry absent'],
   ['rejects classic script as app entry', { 'index.html': '<script src="assets/app.js"></script>' }, 'application module entry absent'],
   ['rejects orphan app features when entry is empty', { 'assets/entry.js': '', 'index.html': '<script type="module" src="assets/entry.js"></script>' }, 'full application feature absent'],
@@ -36,7 +36,8 @@ for (const entry of [
   ['rejects web PWA registration', { 'assets/app.js': 'navigator.serviceWorker.register("service-worker.js")' }, 'webapp worker registration'],
   ['rejects app subset', { 'assets/app.js': '/* CAdES */' }, 'full application feature absent'],
   ['rejects missing shared utility styles', { 'assets/app.css': 'body{}' }, 'shared app Tailwind utilities absent'],
-  ['rejects remote assets', { 'index.html': '<script src="https://host/app.js"></script>' }, 'remote bootstrap asset']
+  ['rejects remote assets', { 'index.html': '<script src="https://host/app.js"></script>' }, 'remote bootstrap asset'],
+  ['rejects Chrome-reserved underscore names', { '_headers': '/*\n  X-Frame-Options: DENY\n' }, 'Chrome reserves names starting with "_"']
 ]) {
   const [name, changes, message] = /** @type {[string, Record<string, string>, (string | null)]} */ (entry);
   test(name, async () => {

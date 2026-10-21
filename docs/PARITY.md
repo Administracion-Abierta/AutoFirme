@@ -38,16 +38,16 @@ table (constants `:13-30`); `getSigner(byte[])` `:36` content-sniffs in table or
 | AutoFirma capability | Original evidence (package/class:line) | Ours (file · issue) | Status | Verdict |
 |---|---|---|---|---|
 | CAdES (BES/EPES), explicit + implicit mode, detached or embedded | `signers/cades/AOCAdESSigner.java:31` sign, `:224` mode; `cades/CAdESExtraParams.java:8` | `src/lib/cms.ts:64 signCadesDetached` | **partial** — detached + explicit only, SHA-256 only, no implicit mode; `src/lib/cms.ts:72` rejects any other hash | needed |
-| CAdES-T (TSA `signature-timeStampToken`) | `signers/cades/AOCAdESSigner.java:40,234` `applyTimeStamp`; `signers/tsp/pkcs7/CMSTimestamper.java:108` | none — no TSA anywhere in `src/` (grep: zero `rfc3161`/`tsaURL` hits) | **missing** | needed (#43) |
+| CAdES-T (TSA `signature-timeStampToken`) | `signers/cades/AOCAdESSigner.java:40,234` `applyTimeStamp`; `signers/tsp/pkcs7/CMSTimestamper.java:108` | `src/lib/cms.ts:24,107` (`requestTimeStamp`, unsigned attribute) | **full** for TSA-present signing (#43) | needed |
 | CAdES-ASiC-S (ZIP container, `META-INF/signature.p7s`) | `signers/cades/asic/AOCAdESASiCSSigner.java:27-30`; `core/signers/asic/ASiCUtil.java:16,18` | none (our `src/lib/zip.ts` is a batch ZIP writer only) | **missing** | needed |
 | CMS / PKCS#7 generic, explicit + implicit, configurable content OID | `signers/cms/AOCMSSigner.java:35,45,48` | partial via CAdES (`src/lib/cms.ts`) — `id-data` only, no implicit/digest-signing mode | **partial** (`browser-moot` for the exotic content OIDs) | needed |
 | XAdES-EPES, Enveloped | `signers/xades/XAdESSigner.java:215`; wrapper `AOXAdESSigner.java:47` | `src/lib/xades.ts:167 signXades` | **full** for enveloped XML (SHA-256/384/512, exclusive C14N, policy optional; implied by default) | needed |
 | XAdES Detached / Enveloping / Externally Detached | `signers/xades/XAdESSigner.java:179,137,103` | none — file transform only | **missing** | needed |
 | XAdES-T (`SignatureTimeStamp`/`EncapsulatedTimeStamp`) | `signers/xades/XAdESTspUtil.java:53` | none | **missing** | needed (#43) |
 | XMLDSig (plain, 4 sub-modes, default Enveloping, SHA-1 default) | `signers/xmldsig/AOXMLDSigSigner.java:124-126,145,189,214` | none standalone (XAdES wraps a `ds:Signature`) | **missing** | needed (low priority — XAdES covers the use case) |
-| PAdES B-B, incremental update, `adbe.pkcs7.detached` / `ETSI.CAdES.detached` | `signers/pades/AOPDFSigner.java:118,378`; `pades/PdfUtil.java:129` append mode | `src/lib/pades.ts:303 signPdf` | **partial** — engine exists and is openssl/pdfsig-checked (`test/fixtures/verify-fixtures.sh`), but it is **not wired into the UI**: `src/lib/sign.ts:20` marks PAdES `implemented: false` and `src/lib/App.svelte:429` shows a pending banner | needed |
-| PAdES visible signature (image/text, page, position) | `standalone/ui/preferences/PreferencesPanelPades.java:52`; `signers/pades/AOPDFSigner.java` appearance path | none | **missing** | needed (#45) |
-| PAdES-T / LTV (DSS, `ETSI.RFC3161`, DocTimeStamp) | `signers/pades/PdfTimestamper.java:31,60`; `signvalidation/SignatureFormatDetectorPadesCades.java:27` | none | **missing** | needed (#43) |
+| PAdES B-B, incremental update, `adbe.pkcs7.detached` / `ETSI.CAdES.detached` | `signers/pades/AOPDFSigner.java:118,378`; `pades/PdfUtil.java:129` append mode | `src/lib/pades.ts:293 signPdf`, wired into the picker (`src/lib/sign.ts:20`) | **full** — engine + UI, openssl/pdfsig-checked (#11) | needed |
+| PAdES visible signature (image/text, page, position) | `standalone/ui/preferences/PreferencesPanelPades.java:52`; `signers/pades/AOPDFSigner.java` appearance path | `src/lib/pades-visible.ts`, sign panel toggle off-by-default (#45) | **full** | needed |
+| PAdES-T / LTV (DSS, `ETSI.RFC3161`, DocTimeStamp) | `signers/pades/PdfTimestamper.java:31,60`; `signvalidation/SignatureFormatDetectorPadesCades.java:27` | `src/lib/pades.ts:19,510,516` (B-T via TSA); LTV DSS/DocTimeStamp still absent | **partial** (B-T full, no LTV) | needed (#43) |
 | OOXML (docx/xlsx/pptx) signature part + origin | `signers/ooxml/AOOOXMLSigner.java:188`; `ooxml/OOXMLZipHelper.java:41,232` | `src/lib/ooxml.ts:255 signOoxmlPackage` | **partial** — library written and tested, **not called** from `src/lib/App.svelte`/`src/lib/batch.ts` (`README.md` "Status") | needed |
 | ODF (`.odt`/`.ods`) signature via manifest | `signers/odf/AOODFSigner.java:336,366` | none | **missing** | needed (low priority — office formats are rare in Spanish admin flows) |
 | FacturaE 3.0/3.1 (XAdES Enveloped forced, FacturaE policy, parameter + claimed-role whitelist) | `signers/xades/AOFacturaESigner.java:26-27` (`POLICY_FACTURAE_30/31`), `:29-49` (`ALLOWED_PARAMS`, `FORMAT=…ENVELOPED`), `:81,85` (`signerClaimedRoles`, default `emisor`), `:89,94` (policy whitelist), `:69` cosign throws | none | **missing** | needed (public-sector invoicing is AutoFirma's flagship use case) |
@@ -72,7 +72,7 @@ Original `AOSigner` is a composite of `AOSimpleSigner` + `AOCoSigner` + `AOCount
 | CAdES co-sign (detached + embedded) | `signers/cades/AOCAdESSigner.java:51,75` → `signers/multi/cades/CAdESCoSigner.java:127` | none — one signer per artifact | **missing** | needed |
 | CAdES counter-sign (tree + leaf) | `signers/cades/AOCAdESSigner.java:101` | none | **missing** | needed |
 | XAdES co-sign / counter-sign | `signers/xades/AOXAdESSigner.java:222,244` | none (`src/lib/xades.ts` writes a fresh `ds:Signature`) | **missing** | needed |
-| PAdES / ODF / OOXML co-sign = re-sign the same document | `signers/pades/AOPDFSigner.java:149`; `signers/odf/AOODFSigner.java:542`; `signers/ooxml/AOOOXMLSigner.java:202` | none wired; `src/lib/pades.ts:303` appends one revision, so co-sign would work at the byte level | **missing** (engine-ready, unreachable) | needed |
+| PAdES / ODF / OOXML co-sign = re-sign the same document | `signers/pades/AOPDFSigner.java:149`; `signers/odf/AOODFSigner.java:542`; `signers/ooxml/AOOOXMLSigner.java:202` | none wired; `src/lib/pades.ts:293 signPdf` appends one revision, so co-sign would work at the byte level | **missing** (engine-ready, unreachable) | needed |
 | Counter-sign of PAdES/ODF/OOXML/FacturaE (throws in the original) | `signers/pades/AOPDFSigner.java:159`; `signers/odf/AOODFSigner.java:552`; `signers/facturae` `AOFacturaESigner.java:74` | n/a | **missing** | browser-moot by construction — the original refuses too |
 
 ## C. Verification and validation
@@ -83,9 +83,9 @@ package): base `signvalidation/SignValider.java:10`, factory by magic bytes
 
 | Capability | Original evidence | Ours | Status | Verdict |
 |---|---|---|---|---|
-| CAdES/CMS verification (structure, digest, signature, cert validity) | `signvalidation/ValidateBinarySignature.java:99,120,126`; `signers/cades/CAdESValidator.java:186` | `src/lib/verify/cms.ts:101 verifyCades` (structure, messageDigest vs content, CMS signature, signer cert, validity window, chain) | **full** for the checks it names | needed |
+| CAdES/CMS verification (structure, digest, signature, cert validity) | `signvalidation/ValidateBinarySignature.java:99,120,126`; `signers/cades/CAdESValidator.java:186` | `src/lib/verify/cms.ts` `verifyCades` (structure, messageDigest vs content, CMS signature, signer cert, validity window, chain) | **full** for the checks it names | needed |
 | XAdES verification (references, transforms, signature value) | `signvalidation/ValidateXMLSignature.java:51,126`; `standalone/configurator/common/XAdESValidator.java:35` | `src/lib/verify/xades.ts` (references + transforms, C14N, signature, signer cert) | **full** | needed |
-| PAdES verification (incl. form-modification, shadow/PSA attack) | `signvalidation/ValidatePdfSignature.java:64,71,164` | none — `src/lib/verify/index.ts:29-37` returns an "unsupported" info check for PDF | **missing** | needed |
+| PAdES verification (byte range, signature, trust) | `signvalidation/ValidatePdfSignature.java:64,71,164` | `src/lib/verify/pades.ts` via the PDF dispatch in `verifyArtifact` (byte-range, digest, chain; no form-modification/shadow-attack depth) | **partial** (no PSA/modification depth) | needed |
 | OOXML/ODF verification | original has **no** validator either (`SignValiderFactory.java:31,35` warn and return `null`) | n/a | **missing** | browser-moot — feature parity means *also* not validating them; ours says so explicitly |
 | External-reference policy (`CANT_VALIDATE_EXTERNALLY_DETACHED`, relaxed mode) | `ValidateXMLSignature.java:128`; `SignValider.java:20` | none — unresolved references fail the check | **partial** | needed (low priority) |
 | Trust chain to anchors | **absent in the original too**: the validators check `x509Certificate.checkValidity()` only (`ValidateBinarySignature.java:126`); modern validation is delegated to VALIDe (`:143` `SIGN_PROFILE_NOT_CHECKED`) | `src/lib/verify/roots.ts:7` + `buildChain` — chain building against committed anchors, currently **FNMT RACM only** | **partial** | needed (our side is *ahead*; the gap is anchor coverage, not the mechanism) |
@@ -111,7 +111,7 @@ Original: `keystores/AOKeyStore.java:13-31` (18 store types), dispatch
 | JMulticard pure-Java card stack (APDU over PC/SC) | `keystores/AOKeyStoreManagerHelperFullJava.java:27`; `jmulticard/**` | n/a — not browser-reachable | **missing** | browser-moot |
 | Generic PKCS#11 module picker (`.dll/.so/.dylib`) | `AOKeyStoreManagerHelperPkcs11.java:28`; `AOKeyStoreManagerFactory.java:266` | none | **missing** | browser-moot (WebCrypto cannot load a native module) |
 | Several certificates per container, picker, expiry shown | `ui/preferences/PreferencesPanelKeystores.java:57` | `src/lib/components/CertPicker.svelte`, `src/lib/keystore.ts` (`expired`/`notYetValid` per cert) | **full** | needed |
-| Storing identities for reuse (new in the web app, no original equivalent) | — (the original re-reads the OS store each run) | `src/lib/certstore.ts` (IndexedDB, identities sealed with PBKDF2→AES-GCM, outputs stored plain; #29) | **full** | needed — this is the web replacement for the OS keystore |
+| Storing identities for reuse (new in the web app, no original equivalent) | — (the original re-reads the OS store each run) | `src/lib/certstore.ts` (IndexedDB, identities sealed with PBKDF2→AES-GCM; #29) | **full** | needed — this is the web replacement for the OS keystore |
 
 ## E. Batch / massive signing
 
@@ -129,17 +129,17 @@ The original has two unrelated things called "batch":
 
 | Capability | Original evidence | Ours | Status | Verdict |
 |---|---|---|---|---|
-| `afirma://` protocol for web portals: `sign`/`cosign`/`countersign`, `selectcert`, `load`, `save`, `signandsave`, `batch` | `standalone/protocol/ProtocolInvocationLauncher.java:372,203,437,251,306,151`; params `core/misc/protocol/UrlParameters.java:17` | none | **missing** | browser-moot — a page cannot register an OS URI scheme; replacement: the SPA *is* the portal-side flow (file in, signature out, no native hand-off), and for agents the MCP server (`mcp/src/server.ts:60` `autofirma_list_certs`, `:71` `autofirma_sign`, `:100` `autofirma_verify`; remote transport #46) |
+| `afirma://` protocol for web portals: `sign`/`cosign`/`countersign`, `selectcert`, `load`, `save`, `signandsave`, `batch` | `standalone/protocol/ProtocolInvocationLauncher.java:372,203,437,251,306,151`; params `core/misc/protocol/UrlParameters.java:17` | none | **missing** | browser-moot — a page cannot register an OS URI scheme; replacement: the SPA *is* the portal-side flow (file in, signature out, no native hand-off), and for agents the MCP server (`mcp/src/surface.ts:55,66,95` `autofirma_list_certs`, `autofirma_sign`, `autofirma_verify`; remote transport #46) |
 | Local WebSocket/raw-socket server on port 63117 for portal callbacks | `ProtocolInvocationLauncher.java:47,109,132`; `AfirmaWebSocketServerV4.java` | none | **missing** | browser-moot — replaced by direct browser APIs and, where a portal must be scripted, the MCP/HTTP endpoint (#46) |
-| CLI (`listaliases`, `sign`, `cosign`, `countersign`, `verify`, `batchsign`; `-store -alias -format -algorithm -config …`) | `standalone/CommandLineCommand.java:5-11`; `standalone/CommandLineLauncher.java:264`; `standalone/CommandLineParameters.java:10-51` | `mcp/` stdio server (sign cades + verify; `mcp/src/tools.ts:19-24` refuses xades/pades with a reason) | **partial** | needed (#46) — a scriptable surface is what replaces the CLI |
-| Main window: open, sign (Ctrl+F), verify (Ctrl+V), bulk results | `standalone/SimpleAfirma.java:607`; `standalone/ui/MainMenu.java:54-167` | `src/routes/+page.svelte` + `src/lib/App.svelte` (drop zone, sign panel, verify panel, downloads dialog) | **full** for the core flow | needed |
+| CLI (`listaliases`, `sign`, `cosign`, `countersign`, `verify`, `batchsign`; `-store -alias -format -algorithm -config …`) | `standalone/CommandLineCommand.java:5-11`; `standalone/CommandLineLauncher.java:264`; `standalone/CommandLineParameters.java:10-51` | `mcp/` stdio server (sign cades + verify; `mcp/src/tools.ts:19` refuses xades/pades with a reason) | **partial** | needed (#46) — a scriptable surface is what replaces the CLI |
+| Main window: open, sign (Ctrl+F), verify (Ctrl+V), bulk results | `standalone/SimpleAfirma.java:607`; `standalone/ui/MainMenu.java:54-167` | `src/routes/+page.svelte` + `src/lib/App.svelte` (drop zone, sign panel, verify panel) | **full** for the core flow | needed |
 | Preferences (per-format: visible signature, shadow-attack check, co/counter-sign defaults, policy, hash, proxy, card management) | `standalone/ui/preferences/PreferencesPanel.java:41-66` and its per-format panels | partial: theme switcher (`src/lib/theme.ts`), format picker; no per-format preference tabs | **partial** | needed (low priority — most originals are desktop-only knobs; a web app can hard-code the safe default) |
 | Signature viewer window (`VisorFirma`) | `standalone/VisorFirma.java:24`; `standalone/ui/VisorPanel.java:63` | `src/lib/verify/` report rendered by the verify panel in `src/lib/App.svelte` | **full** | needed |
 | i18n ES/EN | Java `.properties` bundles | `src/lib/i18n.ts` | **full** | needed |
 | OS installers, localhost SSL cert, root-cert injection into OS/browser stores | `decompiled-configurador/sources/es/gob/afirma/standalone/configurator/ConfiguratorLinux.java:27`; `…/ConfiguratorMacOSX.java:244`; `…/ui/restoreconfig/RestoreConfigFirefox*.java` | none — `Containerfile` (caddy) + static build (#12); deploy docs | **missing** | browser-moot — HTTPS comes from the host; no local CA to install; replacement: the own-domain deploy |
 | Auto-updater (`updateSite`, per-OS versions) | `standalone/updater/Updater.java:22,126`; `SimpleAfirma.java:662` | none; PWA service worker #47 (open) | **missing** | browser-moot — the browser refreshes the app; replacement: cache-busting via the static host, offline shell via #47 |
 | Plugin jars from a `plugins` dir | `standalone/SimpleAfirma.java:92`; `plugins/manager/PluginInfoLoader.java` | none | **missing** | browser-moot — no dynamic native code in a page; replacement: MCP tool servers (#46) |
-| File-system dialogs / "reveal output folder" | `AOUIFactory.getLoadFiles`; `MassiveResultProcessPanel.java:93` `Desktop.getDesktop().open` | native file picker + `src/lib/components/DownloadsDialog.svelte` (browser downloads) | **full** | browser-moot — the browser sandbox owns file I/O; the web-native equivalent is in place |
+| File-system dialogs / "reveal output folder" | `AOUIFactory.getLoadFiles`; `MassiveResultProcessPanel.java:93` `Desktop.getDesktop().open` | native file picker + browser downloads (per-row `Descargar` and the batch ZIP) | **full** | browser-moot — the browser sandbox owns file I/O; the web-native equivalent is in place |
 | Proxy configuration with encrypted password | `ui/preferences/ProxyPanel.java:23,183` | n/a — the browser owns the proxy | **missing** | browser-moot |
 | Look-and-feel / high-contrast / font scaling | `LookAndFeelManager.java`; `MassiveResultProcessPanel.java:74` | Tailwind v4 themes (`src/app.css`, `src/lib/theme.ts`), semantic markup | **partial** | browser-moot — replaced by the browser's own zoom/high-contrast; accessibility is a repo requirement (AGENTS.md), not a parity row |
 | Desktop-app packaging, per-OS JRE handling | `Configurator*.java`; `standalone/updater/**` | static SPA + `Containerfile`; desktop install #47 (open) | **partial** | browser-moot |
@@ -151,47 +151,46 @@ Each line is issue-sized. `P0` breaks the "drop-in replacement" promise for a no
 
 **P0**
 
-1. PAdES is a library, not a feature: wire `src/lib/pades.ts` into the sign panel and the format
-   picker (`src/lib/sign.ts:20` `implemented:false`, `src/lib/App.svelte:429` banner).
-2. PAdES verification: `src/lib/verify/index.ts:29-37` answers "not verified yet" for every PDF;
-   the original verifies signatures, form modification and PSA/shadow attacks
-   (`signvalidation/ValidatePdfSignature.java:64,71,164`). *(New — not covered by an open issue.)*
-3. OOXML signing is written and tested but unreachable from the UI (`src/lib/ooxml.ts`,
+1. PAdES verification depth: form modification and PSA/shadow-attack checks still absent
+   (`signvalidation/ValidatePdfSignature.java:64,71,164`); byte-range, digest and chain already
+   ship (`src/lib/verify/pades.ts`). *(New — not covered by an open issue.)*
+2. OOXML signing is written and tested but unreachable from the UI (`src/lib/ooxml.ts`,
    `README.md` "Status"); wire it, with verify-side honesty about the missing validator.
-4. DNIe / CERES smartcard users have no path: `browser-moot` as a *native* driver, but the
-   replacement (a local bridge app or an eID/`dnie-remote` flow) is a product decision that
-   currently has no issue. *(New.)*
+3. DNIe / CERES smartcard users have no path: `browser-moot` as a *native* driver; the replacement
+   (a local bridge app or an eID/`dnie-remote` flow) needs a product decision. Decision recorded
+   2026-10-16: tracked as a possible improvement (`README.md` "Possible improvements"); the
+   desktop-app route is discarded for now (`docs/PIVOT-STUDY.md` §5), so a no-key-export PKCS#11
+   helper stays out of scope until card support is taken up. *(New.)*
 
 **P1**
 
-5. CAdES-T / XAdES-T RFC 3161 timestamp (#43, open) — `signers/tsp/pkcs7/CMSTimestamper.java:108`.
-6. FacturaE 3.0/3.1 signing (`signers/xades/AOFacturaESigner.java:26-27,29-49,81,89`).
-7. Co-sign and counter-sign for CAdES/XAdES/PAdES (`signers/multi/cades/CAdESCoSigner.java:127`;
+4. XAdES-T RFC 3161 timestamp (#43, open) — `signers/tsp/pkcs7/CMSTimestamper.java:108` (CAdES-T and PAdES B-T already ship).
+5. FacturaE 3.0/3.1 signing (`signers/xades/AOFacturaESigner.java:26-27,29-49,81,89`).
+6. Co-sign and counter-sign for CAdES/XAdES/PAdES (`signers/multi/cades/CAdESCoSigner.java:127`;
    `signers/xades/AOXAdESSigner.java:222,244`). *(New.)*
-8. ASiC-S containers, binary and XML (`core/signers/asic/ASiCUtil.java:16-19`). *(New.)*
-9. Revocation checking (OCSP/CRL) and timestamp-token validation — the original delegates this to
+7. ASiC-S containers, binary and XML (`core/signers/asic/ASiCUtil.java:16-19`). *(New.)*
+8. Revocation checking (OCSP/CRL) and timestamp-token validation — the original delegates this to
    VALIDe (`ValidateBinarySignature.java:143` `SIGN_PROFILE_NOT_CHECKED`); we do strictly less.
    *(New.)*
-10. Trust-anchor coverage: `src/lib/verify/roots.ts:7` holds FNMT RACM only; a signature from any
-    other Spanish CA reports "chain untrusted". *(New.)*
-11. PAdES visible signature (#45, open) — `PreferencesPanelPades.java:52` equivalent.
-12. XAdES Detached/Enveloping/Externally Detached (`signers/xades/XAdESSigner.java:103,137,179`).
-    *(New, low volume.)*
+9. Trust-anchor coverage: `src/lib/verify/roots.ts:7` holds FNMT RACM only; a signature from any
+   other Spanish CA reports "chain untrusted". *(New.)*
+10. XAdES Detached/Enveloping/Externally Detached (`signers/xades/XAdESSigner.java:103,137,179`).
+   *(New, low volume.)*
 
 **P2**
 
-13. Signature-level detection and the AutoFirma validity taxonomy
-    (`signvalidation/ISignatureFormatDetector.java:5-51`; `SignValidity.java:11-48`) — needed to
-    answer "is this an LTA signature?" (`[INFERENCE]` low demand for a citizen UI).
-14. ODF signing (`signers/odf/AOODFSigner.java:336,366`). *(New.)*
-15. JKS/JCEKS containers and single-cert/PKCS#7 inputs (`keystores/JavaKeyStoreManager.java:12`;
-    `AOKeyStoreManagerHelperSingle.java:20`). *(New.)*
-16. Massive directory signing with `COSIGN`/`COUNTERSIGN_*` (`massive/MassiveType.java:4`;
-    `massive/DirectorySignatureHelper.java:96`) — the whole-directory half of #42, depends on 7.
-    *(New.)*
-17. MCP server parity with the CLI: XAdES/PAdES refused at runtime (`mcp/src/tools.ts:19-24`),
-    remote transport still open (#46).
-18. Plain XMLDSig signing (`signers/xmldsig/AOXMLDSigSigner.java:124`). *(New.)*
+11. Signature-level detection and the AutoFirma validity taxonomy
+   (`signvalidation/ISignatureFormatDetector.java:5-51`; `SignValidity.java:11-48`) — needed to
+   answer "is this an LTA signature?" (`[INFERENCE]` low demand for a citizen UI).
+12. ODF signing (`signers/odf/AOODFSigner.java:336,366`). *(New.)*
+13. JKS/JCEKS containers and single-cert/PKCS#7 inputs (`keystores/JavaKeyStoreManager.java:12`;
+   `AOKeyStoreManagerHelperSingle.java:20`). *(New.)*
+14. Massive directory signing with `COSIGN`/`COUNTERSIGN_*` (`massive/MassiveType.java:4`;
+   `massive/DirectorySignatureHelper.java:96`) — the whole-directory half of #42, depends on 7.
+   *(New.)*
+15. MCP server parity with the CLI: XAdES/PAdES refused at runtime (`mcp/src/tools.ts:19`),
+   remote transport still open (#46).
+16. Plain XMLDSig signing (`signers/xmldsig/AOXMLDSigSigner.java:124`). *(New.)*
 
 **Deliberately not gaps** (browser-moot with the replacement named): smartcard and OS-keystore
 access, the `afirma://` URI scheme and its local socket server, OS/browser trust-store
@@ -200,11 +199,13 @@ signature algorithms. See the *Verdict* column — the replacement is stated per
 
 ## H. Bottom line
 
-The web app replaces AutoFirma for: **CAdES-BES** and **XAdES-EPES** signing, **CAdES and XAdES
-verification**, certificate loading from **PKCS#12**, **batch** signing with a manifest, ES/EN UI,
-and self-hosting. The gap between that and "drop-in replacement" is concentrated in four places:
-**PAdES end-to-end** (sign wiring + verification), **office formats** (OOXML unwired, ODF absent,
-FacturaE absent), **long-term validity** (no TSA, no OCSP/CRL, anchors = FNMT only), and
-**multi-signature** (no co-sign/counter-sign). The desktop-specific half of AutoFirma — smartcards,
-OS keystores, the `afirma://` hand-off, installers — has no browser equivalent by construction and
-needs a product decision (local bridge app vs. eID vs. nothing), not a code port.
+The web app replaces AutoFirma for: **CAdES-BES + CAdES-T** and **XAdES-EPES** signing, **CAdES, XAdES
+and PAdES verification** (PAdES without form-modification/shadow-attack depth), **PAdES B-B and B-T
+signing with visible signatures**, certificate loading from **PKCS#12**, **batch** signing with a
+manifest, ES/EN UI, and self-hosting. The gap between that and "drop-in replacement" is
+concentrated in four places: **PAdES depth** (LTV, PSA/shadow checks), **office formats** (OOXML
+unwired, ODF absent, FacturaE absent), **long-term validity** (XAdES-T, OCSP/CRL, anchors = FNMT
+only), and **multi-signature** (no co-sign/counter-sign). The desktop-specific half of AutoFirma —
+smartcards, OS keystores, the `afirma://` hand-off, installers — has no browser equivalent by
+construction; recorded product decision: PWA stays the primary surface, desktop discarded for now
+(`docs/PIVOT-STUDY.md` §5).

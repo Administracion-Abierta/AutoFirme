@@ -15,18 +15,27 @@ export interface Copy {
 	themeDark: string;
 	themeSystem: string;
 	brand: string;
-	tagline: string;
 	privacyNote: string;
+	/** Title of the privacy section of the settings modal. */
+	privacyTitle: string;
+	/** Link to the project's source repository, in the Ayuda section. */
+	sourceCode: string;
 	/** Label of the header help menu. */
 	helpMenu: string;
-	/** Title of the privacy dialog opened from that menu. */
-	privacyTitle: string;
-	/** Menu entry linking to the project's source repository. */
-	sourceCode: string;
+	/** Header settings button and modal title. */
+	settingsLabel: string;
+	settingsTitle: string;
+	/** Settings modal tabs. */
+	settingsTab: string;
+	mcpTab: string;
 	/** Header button that opens the browser's install prompt (#47). */
 	installApp: string;
 	/** Header button that activates a downloaded update of the installed app (#47). */
 	updateApp: string;
+	/** Settings: optional PIN memory for the signing picker. */
+	pinMemoryTitle: string;
+	pinMemoryHint: string;
+	pinMemoryMinutes: string;
 	/** Selected-files table headers. */
 	colFile: string;
 	colActions: string;
@@ -35,6 +44,7 @@ export interface Copy {
 	dropHint: string;
 	browse: string;
 	dragging: string;
+	dropOverlay: string;
 	remove: string;
 	step2Title: string;
 	/** Trigger of the signature picker modal. */
@@ -52,6 +62,8 @@ export interface Copy {
 	certErrors: Record<Pkcs12ErrorCode | 'unknown', string>;
 	formatTitle: string;
 	formatHint: string;
+	/** Label shown next to the chosen format: it applies to the whole batch. */
+	formatAll: string;
 	/** Optional RFC 3161 timestamp: the TSA address field of the sign panel. */
 	timeStampTitle: string;
 	timeStampPlaceholder: string;
@@ -82,26 +94,14 @@ export interface Copy {
 	queueDownload: string;
 	queueArchive: string;
 	downloadOne: string;
-	modesLabel: string;
 	modeSign: string;
-	modeVerify: string;
-	verifyStepTitle: string;
-	/** Closes the loaded signature and its report, back to the verify drop zone. */
-	verifyClose: string;
-	verifyDropTitle: string;
-	verifyDropHint: string;
-	verifyRunning: string;
-	verifyReportTitle: string;
-	verifyOk: string;
-	/** Valid signature whose signer certificate is outside its validity window (#40). */
-	verifyExpired: string;
-	verifyFail: string;
-	verifySigner: string;
-	verifySigningTime: string;
-	verifyNoSigner: string;
-	verifyAddDocument: string;
-	verifyAddDocumentHint: string;
-	verifyDocumentLabel: string;
+	entryShared: string;
+	entryPortal: string;
+	entryError: string;
+	entryReturn: string;
+	entryReturnWait: string;
+	entryReturnReady: string;
+	entryReturnButton: string;
 	checkLabels: Record<CheckId, string>;
 	storeTitle: string;
 	storeHint: string;
@@ -115,17 +115,20 @@ export interface Copy {
 	/** Badge on the modal cell that mirrors the sign currently loaded in memory. */
 	storeCurrent: string;
 	storePin: string;
+	/** Checkbox under the PIN prompt; `{minutes}` is replaced by the configured duration. */
+	rememberPin: string;
 	storeSave: string;
 	storeUnlock: string;
 	storeOpen: string;
 	storeExpiry: string;
 	storeErrors: Record<StoreErrorCode, string>;
-	downloadsLabel: string;
-	downloadsTitle: string;
-	downloadsEmpty: string;
-	downloadsDownload: string;
-	downloadsClose: string;
-	/** MCP endpoint settings dialog, opened from the help menu. */
+	stepConfigure: string;
+	stepFiles: string;
+	stepDownload: string;
+	next: string;
+	back: string;
+	newBatch: string;
+	/** MCP server section, inline in the settings modal. */
 	mcpMenu: string;
 	mcpTitle: string;
 	mcpHint: string;
@@ -136,6 +139,18 @@ export interface Copy {
 	mcpCopy: string;
 	mcpCopied: string;
 	mcpCopiedNote: string;
+	/** Extension-only: bridge to the local MCP server. */
+	mcpBridgeTitle: string;
+	mcpBridgeEnable: string;
+	mcpBridgeHint: string;
+	mcpBridgeConnect: string;
+	mcpBridgeOnline: string;
+	mcpBridgeOffline: string;
+	mcpBridgeNeedsToken: string;
+	mcpBridgeBadEndpoint: string;
+	mcpBridgeUnreachable: string;
+	/** Extension chooser label when the request comes from an MCP agent. */
+	mcpOrigin: string;
 }
 
 export const copy: Record<Lang, Copy> = {
@@ -146,22 +161,30 @@ export const copy: Record<Lang, Copy> = {
 		themeDark: 'Oscuro',
 		themeSystem: 'Sistema',
 		brand: 'AutoFirma Web',
-		tagline: 'Firma electrónica en tu navegador, sin instalar nada.',
 		privacyNote: 'Las claves privadas nunca salen de tu equipo: todo se firma en el navegador.',
 		helpMenu: 'Ayuda',
 		privacyTitle: 'Privacidad',
 		sourceCode: 'Código fuente',
 		installApp: 'Instalar app',
 		updateApp: 'Actualizar versión',
+		pinMemoryTitle: 'PIN en memoria',
+		pinMemoryHint:
+			'La casilla junto al PIN lo recuerda solo en memoria (nunca en disco) durante el tiempo indicado. Cerrar el navegador lo borra. Si no la marcas, se pide cada vez.',
+		pinMemoryMinutes: 'Minutos que se recuerda',
+		settingsLabel: 'Ajustes y ayuda',
+		settingsTitle: 'Ajustes y ayuda',
+		settingsTab: 'Ajustes',
+		mcpTab: 'MCP',
 		colFile: 'Fichero',
 		colActions: 'Acciones',
-		step1Title: '1. Elige los documentos',
+		step1Title: 'Configura la firma',
 		dropTitle: 'Arrastra aquí los ficheros que quieres firmar',
 		dropHint: 'o selecciónalos desde tu equipo',
 		browse: 'Seleccionar ficheros',
 		dragging: 'Suelta el fichero para cargarlo',
+		dropOverlay: 'Suelta los ficheros aquí para añadirlos',
 		remove: 'Quitar',
-		step2Title: '2. Configura la firma',
+		step2Title: 'Elige los documentos',
 		selectSign: 'Seleccionar firma',
 		addSign: 'Agregar firma',
 		certLoading: 'Descifrando el fichero…',
@@ -184,6 +207,7 @@ export const copy: Record<Lang, Copy> = {
 		},
 		formatTitle: 'Formato de firma',
 		formatHint: 'Elige el tipo de firma digital que quieres generar',
+		formatAll: 'para todo el lote — se puede cambiar por archivo',
 		timeStampTitle: 'Sello de tiempo (TSA)',
 		timeStampPlaceholder: 'https://tu-servidor-tsa/ruta',
 		timeStampHint:
@@ -222,24 +246,14 @@ export const copy: Record<Lang, Copy> = {
 		queueDownload: 'Descargar ZIP',
 		queueArchive: 'firmas-lote.zip',
 		downloadOne: 'Descargar',
-		modesLabel: 'Modo',
+		entryShared: 'Ficheros recibidos para firmar: revisa, elige certificado y confirma.',
+		entryPortal: 'Solicitud de firma recibida',
+		entryError: 'Solicitud de firma no válida',
+		entryReturn: 'Devolver a',
+		entryReturnWait: 'Tras firmar, podrás devolver el resultado al portal.',
+		entryReturnReady: 'Firma lista. Revísala y devuélvela al portal con el botón.',
+		entryReturnButton: 'Devolver al portal',
 		modeSign: 'Firmar',
-		modeVerify: 'Verificar',
-		verifyStepTitle: 'Comprueba una firma',
-		verifyClose: 'Cerrar',
-		verifyDropTitle: 'Arrastra aquí el fichero firmado (.csig, .xsig o PDF)',
-		verifyDropHint: 'se analiza en tu equipo, sin subir nada',
-		verifyRunning: 'Comprobando la firma…',
-		verifyReportTitle: 'Informe de validación',
-		verifyOk: 'Firma verificada: todas las comprobaciones han pasado.',
-		verifyExpired: 'Firma válida, pero el certificado del firmante ha caducado.',
-		verifyFail: 'La firma no supera todas las comprobaciones.',
-		verifySigner: 'Firmante',
-		verifySigningTime: 'Fecha de firma',
-		verifyNoSigner: 'No se ha encontrado el certificado del firmante.',
-		verifyAddDocument: 'Añade el documento original',
-		verifyAddDocumentHint: 'la firma es separada (detached): sin el documento no se puede comprobar el contenido',
-		verifyDocumentLabel: 'Documento original',
 		checkLabels: {
 			structure: 'Estructura de la firma',
 			contentDigest: 'Integridad del contenido',
@@ -248,16 +262,18 @@ export const copy: Record<Lang, Copy> = {
 			signerCert: 'Certificado del firmante',
 			certValidity: 'Vigencia del certificado',
 			certChain: 'Cadena de confianza',
-			signingTime: 'Fecha de firma'
+			signingTime: 'Fecha de firma',
+			unsupported: 'Formato no comprobable en este entorno'
 		},
 		storeTitle: 'Firmas guardadas',
 		storeHint:
-			'Guarda tu fichero PKCS#12 cifrado en este navegador para no volver a subirlo. El PIN no se guarda: solo tú puedes abrirlo.',
+			'Guarda tu fichero PKCS#12 cifrado en este navegador para no volver a subirlo. El PIN no se escribe en disco; puedes recordarlo en memoria durante unos minutos si lo marcas al abrirlo.',
 		storeEmpty: 'No hay ninguna firma guardada.',
 		storeEphemeral:
 			'Este navegador no puede guardar datos ahora mismo: las firmas se quedan solo en esta sesión. Cierra las otras pestañas de la app y recarga.',
 		storeCurrent: 'En uso',
 		storePin: 'PIN de la firma',
+		rememberPin: 'Recordar el PIN {minutes} min (solo en memoria)',
 		storeReset: 'Reiniciar el almacén',
 		storeBack: 'Volver',
 		storeSave: 'Guardar',
@@ -271,11 +287,12 @@ export const copy: Record<Lang, Copy> = {
 			unavailable: 'El almacén del navegador no está disponible.',
 			missing: 'Esa firma ya no está guardada.'
 		},
-		downloadsLabel: 'Descargas',
-		downloadsTitle: 'Firmas generadas',
-		downloadsEmpty: 'Todavía no has firmado ningún documento.',
-		downloadsDownload: 'Descargar',
-		downloadsClose: 'Cerrar',
+		stepConfigure: 'Configurar',
+		stepFiles: 'Documentos',
+		stepDownload: 'Descargar firmados',
+		next: 'Siguiente',
+		back: 'Atrás',
+		newBatch: 'Nuevo lote',
 		mcpMenu: 'Servidor MCP',
 		mcpTitle: 'Servidor MCP remoto',
 		mcpHint:
@@ -284,10 +301,21 @@ export const copy: Record<Lang, Copy> = {
 		mcpUrlHint: 'Se copia tal cual en la configuración del agente, normalmente `https://tu-dominio/mcp`.',
 		mcpTokenLabel: 'Token de acceso',
 		mcpTokenHint:
-			'Es el valor de AUTOFIRME_MCP_TOKEN del servidor: el agente debe enviarlo como cabecera `Authorization: Bearer …`. Se guarda en este navegador; la aplicación no lo envía a ningún sitio.',
+			'Es el valor de AUTOFIRME_MCP_TOKEN del servidor: el agente lo envía como cabecera `Authorization: Bearer …`. Se guarda en este navegador y solo lo usa la extensión para conectar el puente MCP.',
 		mcpCopy: 'Copiar dirección',
 		mcpCopied: 'Copiado',
-		mcpCopiedNote: 'Dirección copiada al portapapeles.'
+		mcpCopiedNote: 'Dirección copiada al portapapeles.',
+		mcpBridgeTitle: 'Puente MCP (extensión)',
+		mcpBridgeEnable: 'Permitir que los agentes MCP pidan firmas',
+		mcpBridgeHint:
+			'La extensión usa la dirección y el token de arriba (los del servidor) y abre aquí una ventana de confirmación por cada firma.',
+		mcpBridgeConnect: 'Conectar',
+		mcpBridgeOnline: 'Conectado al servidor MCP.',
+		mcpBridgeOffline: 'Sin conexión con el servidor MCP.',
+		mcpBridgeNeedsToken: 'Falta el token de acceso.',
+		mcpBridgeBadEndpoint: 'La dirección debe ser http(s)://…/mcp, sin usuario ni contraseña.',
+		mcpBridgeUnreachable: 'No se pudo abrir el puente: ¿está el servidor MCP en marcha y publicado por TLS?',
+		mcpOrigin: 'Agente MCP'
 	},
 	en: {
 		langLabel: 'Language',
@@ -296,22 +324,30 @@ export const copy: Record<Lang, Copy> = {
 		themeDark: 'Dark',
 		themeSystem: 'System',
 		brand: 'AutoFirma Web',
-		tagline: 'Electronic signature in your browser, nothing to install.',
 		privacyNote: 'Private keys never leave your machine: signing happens in the browser.',
 		helpMenu: 'Help',
 		privacyTitle: 'Privacy',
 		sourceCode: 'Source code',
 		installApp: 'Install app',
 		updateApp: 'Update version',
+		pinMemoryTitle: 'PIN in memory',
+		pinMemoryHint:
+			'The box next to the PIN keeps it in memory only (never on disk) for the time shown. Closing the browser clears it. Leave it unticked to ask every time.',
+		pinMemoryMinutes: 'Minutes to remember it',
+		settingsLabel: 'Settings and help',
+		settingsTitle: 'Settings and help',
+		settingsTab: 'Settings',
+		mcpTab: 'MCP',
 		colFile: 'File',
+		remove: 'Remove',
 		colActions: 'Actions',
-		step1Title: '1. Choose the documents',
+		step1Title: 'Configure the signature',
 		dropTitle: 'Drag the files you want to sign here',
 		dropHint: 'or pick them from your machine',
 		browse: 'Choose files',
 		dragging: 'Drop the file to load it',
-		remove: 'Remove',
-		step2Title: '2. Configure the signature',
+		dropOverlay: 'Drop the files here to add them',
+		step2Title: 'Choose the documents',
 		selectSign: 'Select signature',
 		addSign: 'Add signature',
 		certLoading: 'Decrypting the file…',
@@ -334,6 +370,7 @@ export const copy: Record<Lang, Copy> = {
 		},
 		formatTitle: 'Signature format',
 		formatHint: 'Pick the type of digital signature to generate',
+		formatAll: 'for the whole batch — changeable per file',
 		timeStampTitle: 'Trusted timestamp (TSA)',
 		timeStampPlaceholder: 'https://your-tsa-server/path',
 		timeStampHint:
@@ -372,24 +409,14 @@ export const copy: Record<Lang, Copy> = {
 		queueDownload: 'Download ZIP',
 		queueArchive: 'signed-batch.zip',
 		downloadOne: 'Download',
-		modesLabel: 'Mode',
+		entryShared: 'Files received for signing: review, pick a certificate and confirm.',
+		entryPortal: 'Signature request received',
+		entryError: 'Invalid signature request',
+		entryReturn: 'Return to',
+		entryReturnWait: 'After signing, you can hand the result back to the portal.',
+		entryReturnReady: 'Signature ready. Review it and hand it back to the portal.',
+		entryReturnButton: 'Return to portal',
 		modeSign: 'Sign',
-		modeVerify: 'Verify',
-		verifyStepTitle: 'Check a signature',
-		verifyClose: 'Close',
-		verifyDropTitle: 'Drop the signed file here (.csig, .xsig or PDF)',
-		verifyDropHint: 'it is analysed on your machine, nothing is uploaded',
-		verifyRunning: 'Checking the signature…',
-		verifyReportTitle: 'Validity report',
-		verifyOk: 'Signature verified: every check passed.',
-		verifyExpired: 'Signature valid, but the signer certificate has expired.',
-		verifyFail: 'The signature does not pass every check.',
-		verifySigner: 'Signer',
-		verifySigningTime: 'Signing time',
-		verifyNoSigner: 'No signer certificate was found.',
-		verifyAddDocument: 'Add the original document',
-		verifyAddDocumentHint: 'this is a detached signature: without the document the content cannot be checked',
-		verifyDocumentLabel: 'Original document',
 		checkLabels: {
 			structure: 'Signature structure',
 			contentDigest: 'Content integrity',
@@ -398,16 +425,18 @@ export const copy: Record<Lang, Copy> = {
 			signerCert: 'Signer certificate',
 			certValidity: 'Certificate validity',
 			certChain: 'Trust chain',
-			signingTime: 'Signing time'
+			signingTime: 'Signing time',
+			unsupported: 'Format not checkable in this environment'
 		},
 		storeTitle: 'Saved signatures',
 		storeHint:
-			'Keep your PKCS#12 encrypted in this browser so you do not upload it again. Each signature uses its own PIN, which is never stored.',
+			'Keep your PKCS#12 encrypted in this browser so you do not upload it again. The PIN is never written to disk; you can keep it in memory for a few minutes by ticking the box when opening it.',
 		storeEmpty: 'No saved signature yet.',
 		storeEphemeral:
 			'This browser cannot store data right now: signatures stay in this session only. Close the other tabs of the app and reload.',
 		storeCurrent: 'In use',
 		storePin: 'PIN of the signature',
+		rememberPin: 'Remember the PIN for {minutes} min (memory only)',
 		storeReset: 'Reset the store',
 		storeBack: 'Back',
 		storeSave: 'Save',
@@ -421,11 +450,12 @@ export const copy: Record<Lang, Copy> = {
 			unavailable: 'The browser store is not available.',
 			missing: 'That signature is no longer saved.'
 		},
-		downloadsLabel: 'Downloads',
-		downloadsTitle: 'Produced signatures',
-		downloadsEmpty: 'You have not signed anything yet.',
-		downloadsDownload: 'Download',
-		downloadsClose: 'Close',
+		stepConfigure: 'Configure',
+		stepFiles: 'Documents',
+		stepDownload: 'Download signed',
+		next: 'Next',
+		back: 'Back',
+		newBatch: 'New batch',
 		mcpMenu: 'MCP server',
 		mcpTitle: 'Remote MCP server',
 		mcpHint:
@@ -434,9 +464,20 @@ export const copy: Record<Lang, Copy> = {
 		mcpUrlHint: 'Paste it as-is into the agent configuration, normally `https://your-domain/mcp`.',
 		mcpTokenLabel: 'Access token',
 		mcpTokenHint:
-			'The server\'s AUTOFIRME_MCP_TOKEN: the agent sends it as an `Authorization: Bearer …` header. It is kept in this browser; the app never sends it anywhere.',
+			'The server\'s AUTOFIRME_MCP_TOKEN: the agent sends it as an `Authorization: Bearer …` header. It is kept in this browser and only the extension uses it to connect the MCP bridge.',
 		mcpCopy: 'Copy address',
 		mcpCopied: 'Copied',
-		mcpCopiedNote: 'Address copied to the clipboard.'
+		mcpCopiedNote: 'Address copied to the clipboard.',
+		mcpBridgeTitle: 'MCP bridge (extension)',
+		mcpBridgeEnable: 'Let MCP agents request signatures',
+		mcpBridgeHint:
+			'The extension uses the address and token above (the server\'s) and opens a confirmation window here for every signature.',
+		mcpBridgeConnect: 'Connect',
+		mcpBridgeOnline: 'Connected to the MCP server.',
+		mcpBridgeOffline: 'Not connected to the MCP server.',
+		mcpBridgeNeedsToken: 'The access token is missing.',
+		mcpBridgeBadEndpoint: 'The address must be http(s)://…/mcp, without a user or password.',
+		mcpBridgeUnreachable: 'Could not open the bridge: is the MCP server running and published over TLS?',
+		mcpOrigin: 'MCP agent'
 	}
 };

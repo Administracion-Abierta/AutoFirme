@@ -1,39 +1,36 @@
 @import '@fontsource-variable/inter';
-/* Fraunces (SOFT/WONK axes) — the display voice: official-gazette serif for brand + steps. */
-@import '@fontsource-variable/fraunces';
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @theme {
 	--font-sans:
 		'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-	--font-display:
-		'Fraunces Variable', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+	--font-display: var(--font-sans);
 	--font-mono: ui-monospace, 'SFMono-Regular', 'Cascadia Mono', Menlo, Consolas, monospace;
 	/* Colors kept as raw hex so Tailwind sees plain values; oklch lives in the shadcn vars. */
 	--color-brand: #008d80;
 	--color-brand-strong: #006e64;
-	--color-brand-soft: #d9efec;
+	--color-brand-soft: #e6f4f2;
 }
 
 :root {
 	--radius: 0.75rem;
-	--background: oklch(0.985 0.004 95);
-	--foreground: oklch(0.216 0.014 158);
+	--background: oklch(1 0 0);
+	--foreground: oklch(0.25 0.03 200);
 	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.216 0.014 158);
+	--card-foreground: oklch(0.25 0.03 200);
 	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.216 0.014 158);
+	--popover-foreground: oklch(0.25 0.03 200);
 	--primary: oklch(0.552 0.104 186);
 	--primary-foreground: oklch(0.99 0.004 186);
-	--secondary: oklch(0.955 0.008 95);
-	--secondary-foreground: oklch(0.3 0.016 158);
-	--muted: oklch(0.955 0.008 95);
-	--muted-foreground: oklch(0.51 0.016 158);
-	--accent: oklch(0.955 0.008 95);
+	--secondary: oklch(0.97 0.012 186);
+	--secondary-foreground: oklch(0.3 0.03 200);
+	--muted: oklch(0.97 0.012 186);
+	--muted-foreground: oklch(0.5 0.025 200);
+	--accent: oklch(0.97 0.012 186);
 	--accent-foreground: oklch(0.3 0.016 158);
 	--destructive: oklch(0.55 0.19 28);
-	--border: oklch(0.9 0.011 110);
-	--input: oklch(0.88 0.012 110);
+	--border: oklch(0.91 0.018 186);
+	--input: oklch(0.89 0.02 186);
 	--ring: oklch(0.552 0.104 186);
 	color-scheme: light;
 }

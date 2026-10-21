@@ -3,6 +3,7 @@
 Status: implemented in extension 0.1.2. This document describes the current code.
 Installation and supported calls are in [CHROME-EXTENSION.md](CHROME-EXTENSION.md).
 Recorded checks are in [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md).
+En español: las funciones de la extensión están en [LEEME.md](LEEME.md).
 
 ## 1. Shared app, separate build target
 
@@ -34,7 +35,7 @@ and webapp service-worker registration.
 | `src/lib/extension/ExtensionShell.svelte` | Full-app window controls |
 | `src/lib/extension/RequestChooser.svelte` | Request review and confirmation |
 | `src/lib/extension/SiteAccess.svelte` | Disabled-site list and TSA permission controls |
-| `src/lib/extension/sign-request.ts` | Certificate eligibility and local CAdES signing |
+| `src/lib/extension/sign-request.ts` | Certificate eligibility and local CAdES/PAdES/XAdES signing |
 
 ## 2. App windows and certificate storage
 
@@ -63,12 +64,12 @@ uses imported PKCS#12 identities and does not access the operating-system store.
 
 ## 3. Website access
 
-The manifest declares no install-time host permissions. It offers `http://*/*` and
-`https://*/*` as `optional_host_permissions` (Chrome 116+), so a fresh install
-injects nothing. Users authorize one origin at a time from the site-access panel,
-which calls `chrome.permissions.request` on user activation; that key also allows
-narrower per-origin grants. Interception of every site stays an explicit opt-in.
-Users can additionally restrict access in Chrome or disable an exact origin.
+The manifest declares `http://*/*` and `https://*/*` as install-time
+`host_permissions` (Chrome 116+): a fresh install intercepts every HTTP(S) site with
+no prompt. The site-access panel is the exception list, not an allow list: users
+disable an exact origin there, and the panel can re-request a per-origin grant
+(`chrome.permissions.request` on user activation) when Chrome's own site-access
+settings withheld it.
 
 The worker stores exceptions in `disabledOrigins`. It registers MAIN and ISOLATED
 scripts at `document_start` in all matching frames, excluding disabled origins.
@@ -87,10 +88,21 @@ proxy.
 
 ## 4. Supported requests and app messages
 
-The bridge accepts certificate selection and RSA/SHA-256 CAdES signing with
-implicit or explicit content, up to 4 MiB of canonical Base64. Unsupported methods,
-formats, filters, sticky identities and custom stores use the original AutoFirma
-implementation. The full app retains its broader interactive format support.
+The bridge accepts certificate selection and RSA/SHA-256 signing as CAdES
+(implicit or explicit), PAdES and enveloped XAdES, plus `AUTO` content sniffing, up
+to 4 MiB of canonical Base64. Legacy `SHA1withRSA` calls are accepted only for
+enveloped XAdES (CORES' compatibility test, for one); the SHA-1 key view is still
+non-extractable and every other format remains SHA-256-only. It also accepts
+`CAdEStri` from Aragon's portafirmas: the page supplies `serverUrl`, so the
+extension performs the pre-sign and post-sign calls while the private key stays
+local; RSA/SHA-256 and RSA/SHA-512 are supported.
+Explicit XAdES stays outside the contract because the engine only emits enveloped
+signatures. Unsupported methods, filters, sticky identities, other `*Tri` formats
+and custom stores use the original AutoFirma implementation. PAdES requests may
+carry AutoFirma's visible-stamp bag (`signaturePage`, `signaturePositionOnPage*`,
+`signatureRubricImage`, `layer2*`, reason/city/contact); it is mapped to the local
+appearance, while a non-zero `signatureRotation` falls back to native. The full app
+retains its broader interactive format support.
 
 Page ports use the name `autofirme-page`. A request carries `{id, request}`; a
 reply carries `{id, response}`. The background uses Chrome's sender metadata to

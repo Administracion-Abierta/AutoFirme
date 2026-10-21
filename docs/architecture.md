@@ -5,7 +5,9 @@ AutoFirma Web rewrite. It was built from a jadx 1.5.6 decompilation of the 1.9 `
 that tree left the repo in #26 — recover it with
 `git checkout reference/decompile-1.9 -- decompiled`. Every row is anchored to a `file:line` of
 that tree or marked `[INFERENCE]`. Decompilation is lossy (names, generics, lambdas) — treat this
-as a map, not source. Upstream source, for cross-reading:
+as a map, not source. Resumen en español de lo que la app ya tiene: [LEEME.md](LEEME.md).
+
+Upstream source, for cross-reading:
 https://github.com/ctt-gob-es/clienteafirma (`afirma-core/src/main/java/es/gob/afirma/core/...`).
 Provenance, packaging, and the full shaded-dependency inventory are in
 [REVERSING-NOTES.md](REVERSING-NOTES.md); this file does not repeat them.

@@ -21,6 +21,19 @@ const workflow = readFileSync(
 	join(dirname(fileURLToPath(import.meta.url)), '..', '.github', 'workflows', 'release.yml'),
 	'utf8'
 );
+const devWorkflow = readFileSync(
+	join(dirname(fileURLToPath(import.meta.url)), '..', '.github', 'workflows', 'release-develop.yml'),
+	'utf8'
+);
+
+/** Body of one top-level job in release-develop.yml. */
+function devJob(name) {
+	const start = devWorkflow.indexOf(`\n  ${name}:\n`);
+	assert.ok(start >= 0, `job ${name} missing from release-develop.yml`);
+	const rest = devWorkflow.slice(start + 1);
+	const next = rest.slice(1).search(/^ {2}\S/m);
+	return next < 0 ? rest : rest.slice(0, next + 1);
+}
 
 /** Body of one top-level job, from `  <name>:` to the next two-space key. */
 function job(name) {
@@ -71,4 +84,51 @@ test('the image job publishes the Containerfile to ghcr.io after the gate (findi
 test('out-of-scope chrome-webstore and attestation stay out (findings 5, 6)', () => {
 	assert.doesNotMatch(workflow, /chrome/i, 'Chrome Web Store is deferred to its own issue');
 	assert.doesNotMatch(workflow, /attest-build-provenance|id-token/, 'not requested in #3');
+});
+
+// The develop pre-release channel: every push to develop ships code + extension zip
+// as a marked-unstable dev-<sha> pre-release and the site as a ghcr dev image.
+
+test('develop release triggers only on develop pushes and manual dispatch', () => {
+	const onEnd = devWorkflow.indexOf('\npermissions:');
+	assert.ok(onEnd > 0, 'permissions must follow on:');
+	assert.equal(
+		devWorkflow.slice(0, onEnd),
+		`name: Develop release\n\n# Every push to develop ships a pre-release tagged dev-<short-sha>: the rolling\n# test channel for the extension zip, the static site and the container image.\n# Production releases keep coming from release-please on main (release.yml).\non:\n  push:\n    branches: [develop]\n  workflow_dispatch:\n`
+	);
+});
+
+test('develop artifacts job publishes the pre-release with code, extension zip and checksums', () => {
+	const artifacts = devJob('artifacts');
+	assert.match(artifacts, /pnpm build\n/);
+	assert.match(artifacts, /pnpm package:extension/);
+	assert.match(artifacts, /tar -czf dist\/autofirme-web-dev\.tar\.gz -C build \./);
+	// The tag is commit-pinned so a release always maps to exactly one tree.
+	assert.match(artifacts, /TAG="dev-\$\{GITHUB_SHA::7\}"/);
+	assert.match(artifacts, /--target "\$GITHUB_SHA"/);
+	assert.match(artifacts, /--prerelease/);
+	assert.match(artifacts, /--title "\[Development build\] \$TAG/);
+	assert.match(artifacts, /--notes "\$NOTES"/);
+	assert.match(artifacts, /dist\/autofirme-extension-\*\.zip dist\/SHA256SUMS dist\/autofirme-web-dev\.tar\.gz/);
+});
+
+test('develop releases are labelled as development builds', () => {
+	const artifacts = devJob('artifacts');
+	assert.match(artifacts, /NOTES: \|-/);
+	assert.match(artifacts, /not for production use/);
+	// The label is a user-facing promise; the notes must also state the channel.
+	assert.match(artifacts, /Rolling pre-release/);
+});
+
+test('develop image job pushes the site image to ghcr after the release exists', () => {
+	const image = devJob('image');
+	assert.match(image, /needs: artifacts/);
+	assert.match(image, /packages: write/);
+	// The org name has uppercase; the tag expression must come from the lowercased output.
+	assert.match(image, /lower=\$\{GITHUB_REPOSITORY,,\}/);
+	assert.match(image, /tags: ghcr\.io\/\$\{\{ steps\.repo\.outputs\.lower \}\}:dev,ghcr\.io\/\$\{\{ steps\.repo\.outputs\.lower \}\}:dev-\$\{\{ github\.sha \}\}/);
+	assert.ok(
+		!devWorkflow.includes('${{ github.repository }}:'),
+		'raw repository interpolation produces uppercase ghcr paths and fails'
+	);
 });

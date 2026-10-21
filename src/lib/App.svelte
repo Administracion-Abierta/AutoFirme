@@ -1,7 +1,14 @@
 <script lang="ts">
 	import { copy, type Copy, type Lang } from '#lib/i18n';
-	import { EMPTY_BATCH_STATE, createBatchQueue, type BatchSigner, type BatchState } from '#lib/batch';
-	import { browserVault, StoreError } from '#lib/certstore';
+	import { extensionCopy } from '#lib/extension/copy';
+	import {
+		EMPTY_BATCH_STATE,
+		buildZip,
+		createBatchQueue,
+		type BatchSigner,
+		type BatchState
+	} from '#lib/batch';
+	import { browserVault } from '#lib/certstore';
 	import { signCadesDetached } from '#lib/cms';
 	import { signPdf } from '#lib/pades';
 	import {
@@ -19,14 +26,11 @@
 		type SignerCert
 	} from '#lib/sign';
 	import { signXades } from '#lib/xades';
-	import { verifyArtifact, type Bytes, type VerificationReport } from '#lib/verify';
 	import BatchQueue from '#lib/components/BatchQueue.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
-	import DownloadsDialog from '#lib/components/DownloadsDialog.svelte';
 	import FileCard from '#lib/components/FileCard.svelte';
 	import FileDrop from '#lib/components/FileDrop.svelte';
 	import PwaControls from '#lib/components/PwaControls.svelte';
-	import VerifyReport from '#lib/components/VerifyReport.svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.js';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -41,12 +45,6 @@
 		DialogTitle
 	} from '#lib/components/ui/dialog/index.js';
 	import {
-		DropdownMenu,
-		DropdownMenuContent,
-		DropdownMenuItem,
-		DropdownMenuTrigger
-	} from '#lib/components/ui/dropdown-menu/index.js';
-	import {
 		Table,
 		TableBody,
 		TableCell,
@@ -55,44 +53,94 @@
 		TableRow
 	} from '#lib/components/ui/table/index.js';
 	import { TooltipProvider } from '#lib/components/ui/tooltip/index.js';
-	import { readMcp, saveMcp, type McpSettings } from '#lib/mcp';
+	import { readMcp, saveMcp, configureMcpBridge, listenMcpBridge, mcpBridgeStatus, type BridgeStatus, type McpSettings } from '#lib/mcp';
+	import { isExtension } from '#lib/extension/runtime';
+	import { readPinMemorySettings, savePinMemorySettings, DEFAULT_MINUTES } from '#lib/pin-memory';
 	import { applyTheme, readTheme, type Theme } from '#lib/theme';
 	import MonitorIcon from '@lucide/svelte/icons/monitor';
 	import MoonIcon from '@lucide/svelte/icons/moon';
 	import SunIcon from '@lucide/svelte/icons/sun';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import LanguagesIcon from '@lucide/svelte/icons/languages';
+	import CodeIcon from '@lucide/svelte/icons/code';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import PlugIcon from '@lucide/svelte/icons/plug';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
+	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PenLineIcon from '@lucide/svelte/icons/pen-line';
+	import DownloadIcon from '@lucide/svelte/icons/download';
+	import UploadIcon from '@lucide/svelte/icons/upload';
 	import { onMount, type Snippet } from 'svelte';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import {
+		buildDeepLinkReturn,
+		encodeBase64,
+		parseDeepLink,
+		takeShare,
+		type DeepLinkRequest,
+		type DeepLinkResult
+	} from '#lib/pwa-entry';
 
-	let { extensionControls }: { extensionControls?: Snippet<[Lang]> } = $props();
+	let { extensionSettings }: { extensionSettings?: Snippet<[Lang]> } = $props();
 	let lang = $state<Lang>('es');
 	const t = $derived<Copy>(copy[lang]);
 	// http away from localhost: the browser withholds WebCrypto from insecure contexts, so no
 	// signature can be produced or verified here until the page is served over https.
 	const secure = $derived(globalThis.crypto?.subtle !== undefined);
-	/** `?tab=` deep link (ES and EN spellings both accepted); also mirrored back into the URL. */
-	function tabFromSearch(search: string): 'sign' | 'verify' {
-		const tab = new URLSearchParams(search).get('tab');
-		return tab === 'verificar' || tab === 'verify' ? 'verify' : 'sign';
+	let settingsOpen = $state(false);
+	const SETTINGS_TABS = ['general', 'mcp', 'help'] as const;
+	let settingsTab = $state<(typeof SETTINGS_TABS)[number]>('general');
+	function moveSettingsTab(event: KeyboardEvent): void {
+		if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+		event.preventDefault();
+		const focused = SETTINGS_TABS.findIndex(
+			(tab) => event.target instanceof HTMLElement && event.target.id === `settings-tab-${tab}`
+		);
+		const current = focused >= 0 ? focused : SETTINGS_TABS.indexOf(settingsTab);
+		const next =
+			event.key === 'Home'
+				? 0
+				: event.key === 'End'
+					? SETTINGS_TABS.length - 1
+					: (current + (event.key === 'ArrowRight' ? 1 : -1) + SETTINGS_TABS.length) %
+						SETTINGS_TABS.length;
+		settingsTab = SETTINGS_TABS[next]!;
+		document.getElementById(`settings-tab-${settingsTab}`)?.focus();
 	}
-
-	// `location` exists only where a DOM exists — prerender runs without one.
-	const onClient = typeof location === 'object';
-	let mode = $state<'sign' | 'verify'>(onClient ? tabFromSearch(location.search) : 'sign');
-
-	/** Switch tab and keep the address bar honest, so the current view is linkable. */
-	function setMode(next: 'sign' | 'verify') {
-		mode = next;
-		if (!onClient) return;
-		const url = new URL(location.href);
-		url.searchParams.set('tab', next === 'verify' ? 'verificar' : 'firmar');
-		history.replaceState(history.state, '', url);
-	}
-	let helpOpen = $state(false);
-	let mcpOpen = $state(false);
 	// Empty until mount, so the prerendered HTML and the hydrated one agree.
-	let mcp = $state<McpSettings>({ url: '', token: '' });
+	let mcp = $state<McpSettings>({ url: '', token: '', enabled: false });
 	let mcpCopied = $state(false);
+	let bridge = $state<BridgeStatus>({ enabled: false, online: false, error: '' });
+	const bridgeError = $derived(
+		bridge.error === 'token required'
+			? t.mcpBridgeNeedsToken
+			: bridge.error === 'Invalid MCP endpoint'
+				? t.mcpBridgeBadEndpoint
+				: bridge.error
+					? t.mcpBridgeUnreachable
+					: ''
+	);
+	let pinMinutes = $state(DEFAULT_MINUTES);
+
+	function updatePinMinutes(value: string): void {
+		const minutes = Number(value);
+		pinMinutes = Number.isInteger(minutes) && minutes >= 1 && minutes <= 120 ? minutes : DEFAULT_MINUTES;
+		savePinMemorySettings({ ...readPinMemorySettings(), minutes: pinMinutes });
+	}
+
+	/** Applies the address/token the operator just typed and reports the socket state. */
+	async function connectBridge(): Promise<void> {
+		if (!isExtension()) return;
+		bridge = await configureMcpBridge(mcp).catch((): BridgeStatus => ({
+			enabled: mcp.enabled,
+			online: false,
+			error: 'connect-failed'
+		}));
+	}
 
 	function updateMcp(patch: Partial<McpSettings>): void {
 		mcp = { ...mcp, ...patch };
@@ -118,7 +166,74 @@
 	onMount(() => {
 		theme = readTheme();
 		mcp = readMcp();
+		pinMinutes = readPinMemorySettings().minutes;
+		void consumeEntry();
+		if (!isExtension()) return;
+		const detach = listenMcpBridge((status) => (bridge = status));
+		void mcpBridgeStatus().then((status) => (bridge = status)).catch(() => {});
+		if (mcp.enabled) void connectBridge();
+		return detach;
 	});
+
+	/** PWA sign entry (#47): share_target, file_handlers, shortcut, portal deep-link. */
+	let deepLink = $state<DeepLinkRequest | null>(null);
+	let deepLinkError = $state('');
+	let entryNotice = $state('');
+	let returned = $state<DeepLinkResult | null>(null);
+
+	/** One-shot intake: preload files/data, never sign without explicit user confirm. */
+	async function consumeEntry(): Promise<void> {
+		if (typeof location === 'undefined') return;
+		const params = new URLSearchParams(location.search);
+		const nonce = params.get('share');
+		const parsed = parseDeepLink(location.search);
+		if (parsed && 'error' in parsed) deepLinkError = parsed.error;
+		if (parsed && 'request' in parsed) {
+			deepLink = parsed.request;
+			format = parsed.request.format;
+			files = [new File([parsed.request.bytes.slice()], parsed.request.name)];
+		}
+		if (nonce) {
+			try {
+				const shared = await takeShare(nonce);
+				const textFile =
+					shared.text.length > 0 ? [new File([shared.text], 'compartido.txt', { type: 'text/plain' })] : [];
+				const picked = [...shared.files, ...textFile];
+				if (picked.length > 0) {
+					files = [...files, ...picked];
+					const pdf = picked.find((file) => file.type === 'application/pdf' || file.name.endsWith('.pdf'));
+					if (pdf) format = 'pades';
+					entryNotice = 'shared';
+				}
+			} catch {
+				// Stash unreadable (private mode, cleared storage): fall through to manual pick.
+			}
+		}
+	// `launchQueue` (file_handlers): the OS opens a file with the installed app.
+	const launcher = (
+		window as Window & { launchQueue?: { setConsumer: (fn: (p: { files: File[] }) => void) => void } }
+	).launchQueue;
+	launcher?.setConsumer((launch) => {
+		if (launch.files.length > 0) {
+			files = [...files, ...launch.files];
+			step = 2;
+		}
+	});
+		// Entry links land on step 2 with files preloaded; plain visits stay on step 1.
+		if (files.length > 0) step = 2;
+		if (params.has('entry') || params.has('shared') || (parsed && 'request' in parsed)) {
+			history.replaceState(null, '', location.pathname);
+		}
+	}
+
+	/**
+	 * Hand the signed result back to the portal. Fires only on explicit click, shows the
+	 * destination first, and navigates in the same tab so the user sees where they go.
+	 */
+	function returnToPortal(): void {
+		if (!deepLink?.returnUrl || !returned) return;
+		location.href = buildDeepLinkReturn(deepLink.returnUrl, returned);
+	}
 	$effect(() => applyTheme(theme));
 	const THEMES = $derived([
 		{ id: 'light' as const, label: t.themeLight, icon: SunIcon },
@@ -127,6 +242,23 @@
 	]);
 
 	let files = $state<File[]>([]);
+	let fileListEl = $state<HTMLDivElement | null>(null);
+	/** Horizontal scroll room left/right of the visible area, for the edge fades. */
+	let scrollLeft = $state(0);
+	let scrollRight = $state(0);
+	function measureFileList() {
+		if (!fileListEl) return;
+		scrollLeft = fileListEl.scrollLeft;
+		scrollRight = fileListEl.scrollWidth - fileListEl.clientWidth - fileListEl.scrollLeft;
+	}
+	$effect(() => {
+		if (files.length >= 0) queueMicrotask(measureFileList);
+	});
+	/** Depth counter: dragenter/dragleave fire per child element, so a bool would flicker. */
+	let dragDepth = $state(0);
+	function hasFiles(event: DragEvent): boolean {
+		return event.dataTransfer?.types.includes('Files') ?? false;
+	}
 	let format = $state<SignFormat>('cades');
 	let formatOpen = $state(false);
 	// Visible signature block (#45), PAdES only and off by default: an uploaded image plus the
@@ -147,99 +279,93 @@
 	const queue = createBatchQueue();
 	$effect(() => queue.set(files, format));
 
-
-	// The picker stays mounted in the new layout (the config card does not unmount with the last
-	// document): configuring the signature before adding documents is a normal order, and nothing
-	// drops a sign for want of documents — signing simply stays disabled until one exists.
-	// Storage of saved identities and produced signatures (#29). IndexedDB in the browser, memory
-	// when it is unavailable (prerender), so nothing here can fail at import time.
+	// Storage of saved identities (#29). IndexedDB in the browser, memory when it is unavailable
+	// (prerender), so nothing here can fail at import time.
 	const vault = browserVault();
-	let saveError = $state('');
-	/** Content type of a produced signature, from the extension the format declares. */
-	const MIME_BY_EXTENSION: Record<string, string> = {
-		'.csig': 'application/octet-stream',
-		'.xsig': 'application/xml',
-		'.pdf': 'application/pdf'
-	};
-
-	/** Keep every signature of a finished run in the browser store, for the downloads list. */
-	async function keepSignatures(state: BatchState) {
-		const extension = SIGN_FORMATS.find((entry) => entry.id === state.format)?.extension ?? '';
-		for (const document of state.documents) {
-			if (document.status !== 'signed' || !document.bytes) continue;
-			try {
-				await vault.saveOutput({
-					name: document.output,
-					format: state.format,
-					mime: MIME_BY_EXTENSION[extension] ?? 'application/octet-stream',
-					commonName: cert?.commonName ?? '',
-					bytes: document.bytes
-				});
-				saveError = '';
-			} catch (reason) {
-				saveError =
-					reason instanceof StoreError ? t.storeErrors[reason.code] : t.storeErrors.unavailable;
-				console.error('[autofirme:app] keeping the produced signature failed', reason, saveError);
-			}
-		}
-	}
 
 	// The selected-files table repeats the queue's per-document status; the queue itself keeps
 	// rendering the detailed result rows.
 	let batch = $state<BatchState>(EMPTY_BATCH_STATE);
 	$effect(() => queue.subscribe((value) => (batch = value)));
 
-	/** Format engines (#6 CAdES, #7 XAdES, #11 PAdES) plug in here; the queue never looks inside. */
-	function makeSigner(certificate: SignerCert | null, kind: SignFormat): BatchSigner | null {
+	/** The 3-step flow: 1 configure, 2 files, 3 progress + download. Not persisted. */
+	let step = $state<1 | 2 | 3>(1);
+	const dragging = $derived(dragDepth > 0 && step === 2);
+	const signedCount = $derived(batch.documents.filter((entry) => entry.status === 'signed').length);
+
+	/** Step 2 fires the run: the queue throws only when it is already running, which cannot happen
+	 *  here because the button that reaches this is disabled while `phase === 'running'`. */
+	function startBatch() {
+		if (!signer || files.length === 0) return;
+		step = 3;
+		void queue.run(signer);
+	}
+
+	/** Batch ZIP: the queue holds the signed bytes, the archive is built on demand. */
+	function downloadZip() {
+		saveFile(t.queueArchive, buildZip(batch), 'application/zip');
+	}
+
+	function saveFile(name: string, bytes: Uint8Array<ArrayBuffer>, type: string) {
+		const url = URL.createObjectURL(new Blob([bytes], { type }));
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = name;
+		link.click();
+		URL.revokeObjectURL(url);
+	}
+
+
+	/** Format engines (#6 CAdES, #7 XAdES, #11 PAdES) plug in here; the queue never looks inside.
+	 *  One dispatcher: the format arrives per document (global choice unless overridden per file),
+	 *  so a mixed batch signs each file with the engine its format names. */
+	function makeSigner(certificate: SignerCert | null): BatchSigner | null {
 		if (!certificate?.key || !certificate.algorithm) return null;
 		const algorithm = signingAlgorithmName(certificate);
 		const { key, der, commonName } = certificate;
-		if (kind === 'cades') {
-			const timeStamp = tsaUrl.trim() || undefined;
-			return async (_file, bytes) => ({
-				bytes: await signCadesDetached(certificate, bytes, { timeStamp }),
-				algorithm
-			});
-		}
-		if (kind === 'xades') {
-			return async (file, bytes) => ({
-				bytes: new TextEncoder().encode(
-					await signXades({
-						xml: bytes,
-						certificates: chain,
-						signer: certificate,
-						dataObject: { mimeType: file.type || 'application/xml' }
-					})
-				),
-				algorithm
-			});
-		}
-		if (kind === 'pades') {
-			return async (file, bytes) => {
-				const signingTime = new Date();
+		return async (file, bytes, kind) => {
+			if (kind === 'cades') {
+				const timeStamp = tsaUrl.trim() || undefined;
 				return {
-					// The block is drawn inside the incremental update, so its bytes are part of what
-					// the CMS signs — nothing is stamped on afterwards.
-					bytes: await signPdf(bytes, {
-						certificate: der,
-						chain: chain.filter((entry) => entry !== certificate).map((entry) => entry.der),
-						privateKey: key,
-						signingTime,
-						name: commonName,
-						visible: visibleOn
-							? {
-									page: Math.max(0, visiblePage - 1),
-									corner: visibleCorner,
-									image: visibleImage?.bytes,
-									lines: [commonName, `${t.signedOn} ${signedOnLabel(signingTime)}`]
-								}
-							: undefined
-					}),
+					bytes: await signCadesDetached(certificate, bytes, { timeStamp }),
 					algorithm
 				};
+			}
+			if (kind === 'xades') {
+				return {
+					bytes: new TextEncoder().encode(
+						await signXades({
+							xml: bytes,
+							certificates: chain,
+							signer: certificate,
+							dataObject: { mimeType: file.type || 'application/xml' }
+						})
+					),
+					algorithm
+				};
+			}
+			const signingTime = new Date();
+			return {
+				// The block is drawn inside the incremental update, so its bytes are part of what
+				// the CMS signs — nothing is stamped on afterwards.
+				bytes: await signPdf(bytes, {
+					certificate: der,
+					chain: chain.filter((entry) => entry !== certificate).map((entry) => entry.der),
+					privateKey: key,
+					signingTime,
+					name: commonName,
+					visible: visibleOn
+						? {
+								page: Math.max(0, visiblePage - 1),
+								corner: visibleCorner,
+								image: visibleImage?.bytes,
+								lines: [commonName, `${t.signedOn} ${signedOnLabel(signingTime)}`]
+							}
+						: undefined
+				}),
+				algorithm
 			};
-		}
-		return null;
+		};
 	}
 
 	/** `dd/mm/aa, hh:mm` in the interface's language — the block's date line (#45). */
@@ -267,70 +393,10 @@
 	// The format chooser shows the picked format; the modal lists every one with its state.
 	const currentFormat = $derived(SIGN_FORMATS.find((option) => option.id === format)!);
 
-	const signer = $derived(makeSigner(cert, format));
-	const signHint = $derived(
-		files.length === 0
-			? t.signNeedsFile
-			: cert === null
-				? t.signNeedsCert
-				: signer === null
-					? t.signPendingFormat
-					: ''
-	);
+	const signer = $derived(makeSigner(cert));
+	// Step 1 gates on the certificate alone now: the format lives on step 2, next to the files.
+	const signHint = $derived(cert === null ? t.signNeedsCert : '');
 
-	let verifyFile = $state<SelectedFile | null>(null);
-	let verifyBytes = $state<Bytes | null>(null);
-	let detachedFile = $state<SelectedFile | null>(null);
-	let detachedBytes = $state<Bytes | null>(null);
-	let report = $state<VerificationReport | null>(null);
-	let running = $state(false);
-	const needsDocument = $derived(
-		(report?.checks.some((entry) => entry.id === 'contentDigest' && entry.status === 'info') ?? false) &&
-			detachedFile === null
-	);
-
-	async function runVerify() {
-		if (verifyBytes === null) return;
-		running = true;
-		try {
-			report = await verifyArtifact(verifyBytes, { detached: detachedBytes });
-		} finally {
-			running = false;
-		}
-	}
-
-	async function pickSignature(picked: File[]) {
-		const file = picked[0];
-		if (!file) return;
-		verifyBytes = new Uint8Array(await file.arrayBuffer());
-		verifyFile = toSelectedFile(file);
-		detachedFile = null;
-		detachedBytes = null;
-		report = null;
-		await runVerify();
-	}
-
-	async function pickDocument(picked: File[]) {
-		const file = picked[0];
-		if (!file) return;
-		detachedBytes = new Uint8Array(await file.arrayBuffer());
-		detachedFile = toSelectedFile(file);
-		await runVerify();
-	}
-
-	function clearVerification() {
-		verifyFile = null;
-		verifyBytes = null;
-		detachedFile = null;
-		detachedBytes = null;
-		report = null;
-	}
-
-	function clearDocument() {
-		detachedFile = null;
-		detachedBytes = null;
-		void runVerify();
-	}
 </script>
 
 <!--
@@ -364,112 +430,45 @@
 	</svg>
 {/snippet}
 
+	<svelte:window
+		ondragenter={(event) => {
+			if (step === 2 && hasFiles(event)) dragDepth++;
+		}}
+		ondragleave={(event) => {
+			if (step === 2 && hasFiles(event)) dragDepth = Math.max(0, dragDepth - 1);
+		}}
+		ondragover={(event) => {
+			if (step === 2 && hasFiles(event)) event.preventDefault();
+		}}
+		ondrop={(event) => {
+			dragDepth = 0;
+			if (step !== 2) return;
+			event.preventDefault();
+			const dropped = Array.from(event.dataTransfer?.files ?? []);
+			if (dropped.length > 0) files = [...files, ...dropped];
+		}}
+	/>
+
 <TooltipProvider>
 	<div
 		class="mx-auto flex h-dvh max-w-7xl flex-col gap-6 px-3 py-4 sm:px-5 sm:py-6 [--panel-offset:7.5rem] max-lg:h-auto max-lg:min-h-dvh"
 	>
-		<header class="flex flex-wrap items-start justify-between gap-4">
+		<header class="flex items-center justify-between gap-4">
 			<div class="flex min-w-0 items-center gap-3 sm:gap-4">
-				{@render seal(44)}
-				<div>
-					<h1 class="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-balance">
-						{t.brand}
-					</h1>
-					<p class="text-muted-foreground mt-1">{t.tagline}</p>
-				</div>
+				{@render seal(28)}
+				<h1 class="font-display text-lg font-semibold tracking-tight">{t.brand}</h1>
 			</div>
-			<div class="flex min-w-0 max-w-full flex-col items-end gap-2 text-sm">
-				<div class="flex flex-wrap items-center justify-end gap-2">
-					{@render extensionControls?.(lang)}
-					<PwaControls copy={t} />
-					<DownloadsDialog copy={t} {vault} />
-					<div
-						class="bg-muted inline-flex items-center gap-1 rounded-lg p-1"
-						role="group"
-						aria-label={t.themeLabel}
-					>
-						{#each THEMES as option (option.id)}
-							{@const Icon = option.icon}
-							<Button
-								variant={theme === option.id ? 'default' : 'ghost'}
-								size="icon"
-								class="size-8"
-								aria-pressed={theme === option.id}
-								aria-label={option.label}
-								onclick={() => (theme = option.id)}
-							>
-								<Icon class="size-4" />
-							</Button>
-						{/each}
-					</div>
-					<div
-						class="bg-muted inline-flex items-center gap-1 rounded-lg p-1"
-						role="group"
-						aria-label={t.langLabel}
-					>
-						<Button
-							variant={lang === 'es' ? 'default' : 'ghost'}
-							size="sm"
-							class="h-8 px-3"
-							aria-pressed={lang === 'es'}
-							onclick={() => (lang = 'es')}>ES</Button
-						>
-						<Button
-							variant={lang === 'en' ? 'default' : 'ghost'}
-							size="sm"
-							class="h-8 px-3"
-							aria-pressed={lang === 'en'}
-							onclick={() => (lang = 'en')}>EN</Button
-						>
-					</div>
-					<DropdownMenu>
-						<DropdownMenuTrigger>
-							{#snippet child({ props })}
-								<Button {...props} variant="ghost" size="sm" class="h-8 px-3">
-									{t.helpMenu}
-								</Button>
-							{/snippet}
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end">
-							<DropdownMenuItem onSelect={() => (helpOpen = true)}>{t.privacyTitle}</DropdownMenuItem>
-							<DropdownMenuItem onSelect={() => (mcpOpen = true)}>{t.mcpMenu}</DropdownMenuItem>
-							<DropdownMenuItem>
-								{#snippet child({ props })}
-									<a
-										{...props}
-										href="https://git.eduard3v.com/EduarD3V/AutoFirme"
-										target="_blank"
-										rel="noreferrer">{t.sourceCode}</a
-									>
-								{/snippet}
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
-				</div>
-				<div
-					class="bg-muted inline-flex items-center gap-1 rounded-lg p-1"
-					role="tablist"
-					aria-label={t.modesLabel}
+			<div class="flex shrink-0 items-center gap-2">
+				<PwaControls copy={t} />
+				<Button
+					variant="ghost"
+					size="icon"
+					aria-label={t.settingsLabel}
+					aria-haspopup="dialog"
+					onclick={() => (settingsOpen = true)}
 				>
-					<Button
-						role="tab"
-						aria-selected={mode === 'sign'}
-						aria-controls="panel-sign"
-						variant={mode === 'sign' ? 'default' : 'ghost'}
-						size="sm"
-						class="h-8 px-4"
-						onclick={() => setMode('sign')}>{t.modeSign}</Button
-					>
-					<Button
-						role="tab"
-						aria-selected={mode === 'verify'}
-						aria-controls="panel-verify"
-						variant={mode === 'verify' ? 'default' : 'ghost'}
-						size="sm"
-						class="h-8 px-4"
-						onclick={() => setMode('verify')}>{t.modeVerify}</Button
-					>
-				</div>
+					<SettingsIcon class="size-5" aria-hidden="true" />
+				</Button>
 			</div>
 		</header>
 
@@ -481,50 +480,59 @@
 					<AlertDescription>{t.insecureContext}</AlertDescription>
 				</Alert>
 			{/if}
-			{#if mode === 'sign'}
-				<div
-					id="panel-sign"
-					role="tabpanel"
-					aria-label={t.modeSign}
-					class="grid min-h-0 flex-1 gap-6 lg:grid-cols-3 lg:grid-rows-[minmax(0,1fr)_auto]"
-				>
-					<!-- Left (2/3): drop zone and the documents waiting in the batch. -->
-					<Card class="flex min-h-0 flex-col overflow-hidden lg:col-span-2">
-						<CardHeader>
-							<h2 class="font-display text-xl font-semibold">{t.step1Title}</h2>
-						</CardHeader>
-						<CardContent class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-							<FileDrop copy={t} onselect={(picked) => (files = [...files, ...picked])} />
-							{#if files.length > 0}
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>{t.colFile}</TableHead>
-											<TableHead class="text-right">{t.colActions}</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{#each files as file, index (index)}
-											<FileCard
-												copy={t}
-												file={toSelectedFile(file)}
-												document={batch.documents[index] ?? null}
-												onremove={() => {
-													files = files.filter((_, position) => position !== index);
-												}}
-											/>
-										{/each}
-									</TableBody>
-								</Table>
+			<div
+				id="panel-sign"
+				role="tabpanel"
+				aria-label={t.modeSign}
+				class="mx-auto flex w-full max-w-3xl flex-col gap-6"
+			>
+				<!-- Step indicator: where the flow stands; back-navigation allowed when idle. -->
+				<ol class="flex items-center gap-2" aria-label={t.modeSign}>
+					{#each [1, 2, 3] as entry, index (entry)}
+						{@const labels = [t.stepConfigure, t.stepFiles, t.stepDownload]}
+						{@const reached = step >= entry}
+						{@const canJump = entry < step && batch.phase !== 'running'}
+						<li class="flex min-w-0 items-center gap-2" aria-current={step === entry ? 'step' : undefined}>
+							{#if canJump}
+								<button
+									type="button"
+									class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm font-medium"
+									onclick={() => (step = entry as 1 | 2 | 3)}
+								>
+									<CheckIcon class="size-4" aria-hidden="true" />
+									{labels[index]}
+								</button>
+							{:else}
+								<span
+									class="flex items-center gap-1.5 text-sm font-medium {reached
+										? 'text-foreground'
+										: 'text-muted-foreground'}"
+								>
+									{#if step > entry}
+										<CheckIcon class="size-4" aria-hidden="true" />
+									{:else}
+										<span
+											class="bg-muted text-foreground inline-flex size-5 items-center justify-center rounded-full text-xs"
+											aria-hidden="true">{entry}</span
+										>
+									{/if}
+									{labels[index]}
+								</span>
 							{/if}
-						</CardContent>
-					</Card>
-					<!-- Upper right: signature config (certificate + format chooser). -->
-					<Card class="min-h-0 overflow-hidden">
+							{#if index < 2}
+								<span class="bg-border h-px w-6 shrink-0" aria-hidden="true"></span>
+							{/if}
+						</li>
+					{/each}
+				</ol>
+
+				{#if step === 1}
+					<!-- Step 1: configure the signature — certificate and format. -->
+					<Card>
 						<CardHeader>
-							<h2 class="font-display text-xl font-semibold">{t.step2Title}</h2>
+						<h2 class="font-display text-xl font-semibold">{t.step1Title}</h2>
 						</CardHeader>
-						<CardContent class="flex min-h-0 flex-col gap-4 overflow-y-auto">
+						<CardContent class="flex flex-col gap-4">
 							<CertPicker
 								copy={t}
 								{cert}
@@ -538,28 +546,118 @@
 								}}
 							/>
 
-							<fieldset class="flex flex-col gap-2">
+							<div class="flex items-center justify-between gap-3 border-t pt-4">
+								{#if signHint}
+									<p id="sign-hint" class="text-muted-foreground text-sm">{signHint}</p>
+								{:else}
+									<span class="text-sm" aria-hidden="true"></span>
+								{/if}
+								<Button
+									disabled={signer === null}
+									aria-describedby={signHint ? 'sign-hint' : undefined}
+									onclick={() => (step = 2)}
+								>
+									{t.next}
+									<ArrowRightIcon class="size-4" aria-hidden="true" />
+								</Button>
+							</div>
+						</CardContent>
+					</Card>
+				{:else if step === 2}
+					<!-- Step 2: documents and format — global for the batch, overridable per file;
+					     Firmar starts the run and lands on step 3. -->
+					<Card>
+						<CardHeader>
+						<h2 class="font-display text-xl font-semibold">{t.step2Title}</h2>
+						</CardHeader>
+						<CardContent class="flex flex-col gap-4">
+							{#if deepLinkError || entryNotice === 'shared' || deepLink}
+								<!-- PWA entry: what preloaded this batch and where it returns. -->
+								<div class="rounded-lg border p-3 text-sm" role="status">
+									{#if deepLinkError}
+										<p class="text-destructive">{t.entryError}: {deepLinkError}</p>
+									{:else if deepLink}
+										<p>{t.entryPortal}: <span class="font-medium">{deepLink.name}</span> · {deepLink.format}</p>
+										{#if deepLink.returnUrl}
+											<p class="text-muted-foreground mt-1 text-xs">{t.entryReturn}: {deepLink.returnUrl}</p>
+										{/if}
+									{:else}
+										<p>{t.entryShared}</p>
+									{/if}
+								</div>
+							{/if}
+							<fieldset class="flex w-full min-w-0 flex-col gap-2">
 								<legend class="text-sm font-medium">{t.formatTitle}</legend>
 								<Button
 									variant="outline"
-									class="justify-between px-4 py-3 text-left h-auto"
+									class="w-full min-w-0 justify-between px-4 py-3 text-left h-auto whitespace-normal"
 									aria-haspopup="dialog"
 									onclick={() => (formatOpen = true)}
 								>
-									<span class="flex min-w-0 items-center gap-3">
-										<span class="font-medium">{currentFormat.label}</span>
+									<span class="flex min-w-0 flex-1 items-center gap-3">
+										<span class="font-medium truncate">{currentFormat.label}</span>
 										<span class="text-muted-foreground tnum text-sm"
 											>{currentFormat.extension}</span
 										>
-										{#if !currentFormat.implemented}
-											<Badge variant="secondary">
-												{t.pendingIssue} #{currentFormat.issue}
-											</Badge>
-										{/if}
+										<span class="text-muted-foreground min-w-0 truncate text-sm">{t.formatAll}</span>
 									</span>
-									<span aria-hidden="true" class="text-muted-foreground text-sm">▾</span>
+									<ChevronDownIcon class="text-muted-foreground size-4" aria-hidden="true" />
 								</Button>
 							</fieldset>
+
+							{#if files.length === 0}
+								<FileDrop copy={t} onselect={(picked) => (files = [...files, ...picked])} />
+							{/if}
+							{#if files.length > 0}
+								<div class="relative min-w-0">
+								{#if scrollLeft > 0}<div aria-hidden="true" class="from-background pointer-events-none absolute inset-y-0 start-0 z-10 w-6 bg-gradient-to-r to-transparent"></div>{/if}
+								{#if scrollRight > 0}<div aria-hidden="true" class="from-background pointer-events-none absolute inset-y-0 end-0 z-10 w-6 bg-gradient-to-l to-transparent"></div>{/if}
+								<div class="max-h-80 overflow-x-hidden overflow-y-auto" onscroll={measureFileList} bind:this={fileListEl}>
+								<div class="overflow-visible">
+								<Table>
+									<TableBody>
+										<TableRow class="border-border/50 hover:bg-transparent">
+											<TableCell class="p-0">
+												<FileDrop copy={t} compact onselect={(picked) => (files = [...files, ...picked])} />
+											</TableCell>
+										</TableRow>
+										{#each files as file, index (index)}
+											{@const entry = batch.documents[index] ?? null}
+											{@const docFormat = entry?.format ?? format}
+											<FileCard
+												copy={t}
+												file={toSelectedFile(file)}
+												document={entry}
+												removable={true}
+												downloadable={false}
+												onremove={() => {
+													files = files.filter((_, position) => position !== index);
+												}}
+											>
+																											{#snippet actions()}
+																												<select
+																													class="border-input bg-background h-8 shrink-0 rounded-md border px-2 text-sm"
+																													aria-label="{t.formatTitle}: {file.name}"
+																													value={docFormat}
+																													onchange={(event) => {
+																													if (entry) queue.setFormat(entry.id, event.currentTarget.value as SignFormat);
+																													}}
+																													>
+																													{#each SIGN_FORMATS as option (option.id)}
+																														<option value={option.id} disabled={!option.implemented}>
+																															{option.label}
+																														</option>
+																													{/each}
+																												</select>
+																											{/snippet}
+	</FileCard>
+										{/each}
+									</TableBody>
+								</Table>
+								</div>
+								</div>
+								</div>
+							{/if}
 
 							{#if format === 'pades'}
 								<!-- Visible signature block (#45), off by default. -->
@@ -588,6 +686,7 @@
 												size="sm"
 												onclick={() => visibleImageInput?.click()}
 											>
+												<UploadIcon class="size-4" aria-hidden="true" />
 												{t.visibleImageChoose}
 											</Button>
 											{#if visibleImage}
@@ -634,9 +733,9 @@
 												</div>
 											</div>
 										</div>
-										{/if}
-										</fieldset>
 									{/if}
+								</fieldset>
+							{/if}
 
 							{#if format === 'cades'}
 								<!-- Trusted timestamp (#43): collapsed until asked for — one click opens it. -->
@@ -661,153 +760,353 @@
 									</div>
 								</details>
 							{/if}
-						</CardContent>
-					</Card>
 
-					<!-- Bottom: the signing queue — its own height, never stretched by the row above. -->
-					<Card class="lg:col-span-3">
-						<CardContent class="flex flex-col">
-							<BatchQueue
-								copy={t}
-								{queue}
-								{signer}
-								hint={signHint}
-								onsigned={keepSignatures}
-							/>
-							{#if saveError}
-								<p class="text-sm text-amber-600 dark:text-amber-400" role="alert">
-									{saveError}
-								</p>
-							{/if}
+							<div class="flex items-center justify-between gap-3 border-t pt-4">
+								<Button variant="outline" onclick={() => (step = 1)}>
+									<ArrowLeftIcon class="size-4" aria-hidden="true" />
+									{t.back}
+								</Button>
+								<Button disabled={files.length === 0} onclick={startBatch}>
+									<PenLineIcon class="size-4" aria-hidden="true" />
+									{t.signButton}
+								</Button>
+							</div>
 						</CardContent>
 					</Card>
+				{:else}
+					<!-- Step 3: progress and downloads. The run started on the Firmar click. -->
+					<Card>
+						<CardHeader>
+							<h2 class="font-display text-xl font-semibold">{t.stepDownload}</h2>
+						</CardHeader>
+						<CardContent class="flex flex-col gap-4">
+							{#if deepLink?.returnUrl}
+								{@const doc = batch.documents.find((entry) => entry.status === 'signed' && entry.bytes)}
+								<!-- Portal hand-back: explicit click only, destination shown first. -->
+								<div class="rounded-lg border p-3 text-sm" role="status">
+									{#if doc?.bytes}
+										{@const result = {
+											format: doc.format,
+											signatureB64: encodeBase64(doc.bytes),
+											algorithm: doc.algorithm,
+											sha256: doc.sha256
+										}}
+										{@const href = buildDeepLinkReturn(deepLink.returnUrl, result)}
+										<p>{t.entryReturnReady}</p>
+										<p class="text-muted-foreground mt-1 break-all text-xs">{href}</p>
+										<div class="mt-2">
+											<Button
+												onclick={() => {
+													returned = result;
+													returnToPortal();
+												}}
+											>
+												{t.entryReturnButton}
+											</Button>
+										</div>
+									{:else}
+										<p class="text-muted-foreground">{t.entryReturnWait}</p>
+									{/if}
+								</div>
+							{/if}
+							<BatchQueue copy={t} {queue} />
+							{#if files.length > 0}
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>{t.colFile}</TableHead>
+											<TableHead class="text-right">{t.colActions}</TableHead>
+										</TableRow>
+									</TableHeader>
+									<TableBody>
+										{#each files as file, index (index)}
+											<FileCard
+												copy={t}
+												file={toSelectedFile(file)}
+												document={batch.documents[index] ?? null}
+												removable={false}
+												onremove={() => {}}
+											/>
+										{/each}
+									</TableBody>
+								</Table>
+							{/if}
+
+							<div class="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+								<Button
+									variant="outline"
+									disabled={batch.phase === 'running'}
+									onclick={() => (step = 2)}
+								>
+									<ArrowLeftIcon class="size-4" aria-hidden="true" />
+									{t.back}
+								</Button>
+								<div class="flex flex-wrap items-center gap-2">
+									<Button variant="outline" disabled={signedCount === 0} onclick={downloadZip}>
+										<DownloadIcon class="size-4" aria-hidden="true" />
+										{t.queueDownload}
+									</Button>
+									<Button
+										disabled={batch.phase === 'running'}
+										onclick={() => {
+											files = [];
+											step = 2;
+										}}
+									>
+										<PlusIcon class="size-4" aria-hidden="true" />
+										{t.newBatch}
+									</Button>
+								</div>
+							</div>
+						</CardContent>
+					</Card>
+				{/if}
+			</div>
+		</main>
+	</div>
+
+	{#if dragging}
+		<!-- Whole-screen target: the page takes any file dropped anywhere while step 2 is open. -->
+		<div
+			role="status"
+			aria-live="polite"
+			class="bg-background/60 border-primary fixed inset-0 z-50 flex items-center justify-center border-4 border-dashed backdrop-blur-sm"
+		>
+			<p class="text-primary font-display text-2xl font-semibold">{t.dropOverlay}</p>
+		</div>
+	{/if}
+
+	<Dialog bind:open={settingsOpen}>
+		<DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+			<DialogHeader>
+				<DialogTitle>{t.settingsTitle}</DialogTitle>
+			</DialogHeader>
+
+			<div
+				class="bg-muted grid grid-cols-3 gap-1 rounded-lg p-1"
+				role="tablist"
+				tabindex="-1"
+				aria-label={t.settingsTitle}
+				onkeydown={moveSettingsTab}
+			>
+				<Button
+					id="settings-tab-general"
+					role="tab"
+					variant={settingsTab === 'general' ? 'default' : 'ghost'}
+					size="sm"
+					class="h-8 min-w-0 px-2"
+					aria-selected={settingsTab === 'general'}
+					aria-controls="settings-panel-general"
+					tabindex={settingsTab === 'general' ? 0 : -1}
+					onclick={() => (settingsTab = 'general')}>{t.settingsTab}</Button
+				>
+				<Button
+					id="settings-tab-mcp"
+					role="tab"
+					variant={settingsTab === 'mcp' ? 'default' : 'ghost'}
+					size="sm"
+					class="h-8 min-w-0 px-2"
+					aria-selected={settingsTab === 'mcp'}
+					aria-controls="settings-panel-mcp"
+					tabindex={settingsTab === 'mcp' ? 0 : -1}
+					onclick={() => (settingsTab = 'mcp')}>{t.mcpTab}</Button
+				>
+				<Button
+					id="settings-tab-help"
+					role="tab"
+					variant={settingsTab === 'help' ? 'default' : 'ghost'}
+					size="sm"
+					class="h-8 min-w-0 px-2"
+					aria-selected={settingsTab === 'help'}
+					aria-controls="settings-panel-help"
+					tabindex={settingsTab === 'help' ? 0 : -1}
+					onclick={() => (settingsTab = 'help')}>{t.helpMenu}</Button
+				>
+			</div>
+
+			{#if settingsTab === 'general'}
+				<div
+					id="settings-panel-general"
+					role="tabpanel"
+					aria-labelledby="settings-tab-general"
+					tabindex="0"
+					class="flex flex-col gap-4"
+				>
+					<!-- Idioma -->
+					<section class="flex flex-col gap-2">
+						<h3 class="flex items-center gap-2 text-sm font-medium">
+							<LanguagesIcon class="size-4" aria-hidden="true" />
+							{t.langLabel}
+						</h3>
+						<div class="bg-muted inline-flex w-fit items-center gap-1 rounded-lg p-1" role="group" aria-label={t.langLabel}>
+							<Button
+								variant={lang === 'es' ? 'default' : 'ghost'}
+								size="sm"
+								class="h-8 px-3"
+								aria-pressed={lang === 'es'}
+								onclick={() => (lang = 'es')}>ES</Button
+							>
+							<Button
+								variant={lang === 'en' ? 'default' : 'ghost'}
+								size="sm"
+								class="h-8 px-3"
+								aria-pressed={lang === 'en'}
+								onclick={() => (lang = 'en')}>EN</Button
+							>
+						</div>
+					</section>
+
+					<!-- Tema -->
+					<section class="flex flex-col gap-2">
+						<h3 class="flex items-center gap-2 text-sm font-medium">{t.themeLabel}</h3>
+						<div class="bg-muted inline-flex w-fit items-center gap-1 rounded-lg p-1" role="group" aria-label={t.themeLabel}>
+							{#each THEMES as option (option.id)}
+								{@const Icon = option.icon}
+								<Button
+									variant={theme === option.id ? 'default' : 'ghost'}
+									size="icon"
+									class="size-8"
+									aria-pressed={theme === option.id}
+									aria-label={option.label}
+									onclick={() => (theme = option.id)}
+								>
+									<Icon class="size-4" />
+								</Button>
+							{/each}
+						</div>
+					</section>
+
+					<!-- PIN en memoria: optional, never written to disk. -->
+					<section class="flex flex-col gap-2">
+						<h3 class="flex items-center gap-2 text-sm font-medium">{t.pinMemoryTitle}</h3>
+						<div class="flex items-center gap-2">
+							<label class="text-sm" for="pin-memory-minutes">{t.pinMemoryMinutes}</label>
+							<Input
+								id="pin-memory-minutes"
+								type="number"
+								min="1"
+								max="120"
+								class="w-20"
+								value={pinMinutes}
+								oninput={(event) => updatePinMinutes(event.currentTarget.value)}
+							/>
+						</div>
+						<p class="text-muted-foreground text-xs">{t.pinMemoryHint}</p>
+					</section>
+
+					{#if extensionSettings}
+						<!-- Acceso a sitios: extension build only; the snippet renders the SiteAccess panel. -->
+						<section class="flex flex-col gap-2">
+							<h3 class="flex items-center gap-2 text-sm font-medium">
+								<GlobeIcon class="size-4" aria-hidden="true" />
+								{extensionCopy[lang].access}
+							</h3>
+							{@render extensionSettings(lang)}
+						</section>
+					{/if}
+				</div>
+			{:else if settingsTab === 'mcp'}
+				<div
+					id="settings-panel-mcp"
+					role="tabpanel"
+					aria-labelledby="settings-tab-mcp"
+					tabindex="0"
+					class="flex flex-col gap-3"
+				>
+					<h3 class="flex items-center gap-2 text-sm font-medium">
+						<PlugIcon class="size-4" aria-hidden="true" />
+						{t.mcpMenu}
+					</h3>
+					<p class="text-muted-foreground text-sm">{t.mcpHint}</p>
+					<div class="bg-muted/40 grid gap-4 rounded-lg p-3">
+						<div class="grid gap-2">
+							<label class="text-sm font-medium" for="mcp-url">{t.mcpUrlLabel}</label>
+							<div class="flex gap-2">
+								<Input
+									id="mcp-url"
+									class="font-mono text-sm"
+									placeholder="https://mcp.example.com/mcp"
+									value={mcp.url}
+									oninput={(event) => updateMcp({ url: event.currentTarget.value })}
+								/>
+								<Button type="button" variant="outline" onclick={copyEndpoint}>
+									{mcpCopied ? t.mcpCopied : t.mcpCopy}
+								</Button>
+							</div>
+							<p class="text-muted-foreground text-xs">{t.mcpUrlHint}</p>
+							{#if mcpCopied}
+								<p class="text-primary text-xs" role="status">{t.mcpCopiedNote}</p>
+							{/if}
+						</div>
+						<div class="grid gap-2">
+							<label class="text-sm font-medium" for="mcp-token">{t.mcpTokenLabel}</label>
+							<Input
+								id="mcp-token"
+								type="password"
+								class="font-mono text-sm"
+								value={mcp.token}
+								oninput={(event) => updateMcp({ token: event.currentTarget.value })}
+							/>
+							<p class="text-muted-foreground text-xs">{t.mcpTokenHint}</p>
+						</div>
+						{#if isExtension()}
+							<div class="grid gap-2 border-t pt-3">
+								<h4 class="text-sm font-medium">{t.mcpBridgeTitle}</h4>
+								<label class="flex items-center gap-2 text-sm">
+									<input
+										type="checkbox"
+										class="accent-primary size-4"
+										bind:checked={mcp.enabled}
+										onchange={() => {
+											updateMcp({ enabled: mcp.enabled });
+											void connectBridge();
+										}}
+									/>
+									{t.mcpBridgeEnable}
+								</label>
+								<p class="text-muted-foreground text-xs">{t.mcpBridgeHint}</p>
+								<div class="flex items-center gap-3">
+									<Button type="button" variant="outline" size="sm" onclick={connectBridge}>
+										{t.mcpBridgeConnect}
+									</Button>
+									<p class="text-muted-foreground text-xs" role="status">
+										{bridge.online ? t.mcpBridgeOnline : t.mcpBridgeOffline}
+									</p>
+								</div>
+								{#if bridgeError}
+									<p class="text-destructive text-xs" role="alert">{bridgeError}</p>
+								{/if}
+							</div>
+						{/if}
+					</div>
 				</div>
 			{:else}
 				<div
-					id="panel-verify"
+					id="settings-panel-help"
 					role="tabpanel"
-					aria-label={t.modeVerify}
-					class="mx-auto flex w-full max-w-3xl flex-col gap-8"
+					aria-labelledby="settings-tab-help"
+					tabindex="0"
+					class="flex flex-col gap-4"
 				>
-					{#if verifyFile === null}
-						<!-- One signature at a time: this card steps aside while one is loaded. -->
-						<Card>
-							<CardHeader>
-								<h2 class="text-lg font-medium">{t.verifyStepTitle}</h2>
-							</CardHeader>
-							<CardContent class="flex flex-col gap-4">
-								<FileDrop
-									copy={t}
-									onselect={pickSignature}
-									title={t.verifyDropTitle}
-									hint={t.verifyDropHint}
-									multiple={false}
-								/>
-							</CardContent>
-						</Card>
-					{/if}
-
-					{#if verifyFile !== null}
-						<Card>
-							<CardContent>
-								<VerifyReport copy={t} {report} {running} />
-							</CardContent>
-						</Card>
-
-						{#if needsDocument}
-							<Card>
-								<CardHeader>
-									<h2 class="text-lg font-medium">{t.verifyAddDocument}</h2>
-								</CardHeader>
-								<CardContent>
-									<FileDrop
-										copy={t}
-										onselect={pickDocument}
-										title={t.verifyAddDocument}
-										hint={t.verifyAddDocumentHint}
-										multiple={false}
-									/>
-								</CardContent>
-							</Card>
-						{:else if detachedFile !== null}
-							<Card>
-								<CardHeader>
-									<h2 class="text-lg font-medium">{t.verifyDocumentLabel}</h2>
-								</CardHeader>
-								<CardContent>
-									<Table>
-										<TableBody>
-											<FileCard copy={t} file={detachedFile} onremove={clearDocument} />
-										</TableBody>
-									</Table>
-								</CardContent>
-							</Card>
-						{/if}
-
-						<!-- Cerrar: the way back to the drop zone — it drops the signature and report. -->
-						<div class="flex justify-center">
-							<Button variant="outline" onclick={clearVerification}>{t.verifyClose}</Button>
+					<div class="flex items-start gap-2">
+						<ShieldCheckIcon class="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
+						<div>
+							<p class="text-sm font-medium">{t.privacyTitle}</p>
+							<p class="text-muted-foreground text-sm">{t.privacyNote}</p>
 						</div>
-					{/if}
+					</div>
+
+					<a
+						class="text-primary flex w-fit items-center gap-1.5 text-sm underline decoration-primary/40 underline-offset-4"
+						href="https://git.eduard3v.com/EduarD3V/AutoFirme"
+						target="_blank"
+						rel="noreferrer"
+					>
+						<CodeIcon class="size-4" aria-hidden="true" />
+						{t.sourceCode}
+					</a>
 				</div>
 			{/if}
-		</main>
-
-		<footer
-			class="text-muted-foreground flex items-center justify-between gap-4 border-t pt-3 text-sm"
-		>
-			<p class="truncate">{t.privacyNote}</p>
-			<div class="max-sm:hidden opacity-60">{@render seal(28)}</div>
-		</footer>
-	</div>
-
-	<Dialog bind:open={helpOpen}>
-		<DialogContent>
-			<DialogHeader>
-				<DialogTitle>{t.privacyTitle}</DialogTitle>
-				<DialogDescription>{t.privacyNote}</DialogDescription>
-			</DialogHeader>
-		</DialogContent>
-	</Dialog>
-
-	<Dialog bind:open={mcpOpen}>
-		<DialogContent class="sm:max-w-lg">
-			<DialogHeader>
-				<DialogTitle>{t.mcpTitle}</DialogTitle>
-				<DialogDescription>{t.mcpHint}</DialogDescription>
-			</DialogHeader>
-			<div class="grid gap-4">
-				<div class="grid gap-2">
-					<label class="text-sm font-medium" for="mcp-url">{t.mcpUrlLabel}</label>
-					<div class="flex gap-2">
-						<Input
-							id="mcp-url"
-							class="font-mono text-sm"
-							placeholder="https://mcp.example.com/mcp"
-							value={mcp.url}
-							oninput={(event) => updateMcp({ url: event.currentTarget.value })}
-						/>
-						<Button type="button" variant="outline" onclick={copyEndpoint}>
-							{mcpCopied ? t.mcpCopied : t.mcpCopy}
-						</Button>
-					</div>
-					<p class="text-muted-foreground text-xs">{t.mcpUrlHint}</p>
-					{#if mcpCopied}
-						<p class="text-primary text-xs" role="status">{t.mcpCopiedNote}</p>
-					{/if}
-				</div>
-				<div class="grid gap-2">
-					<label class="text-sm font-medium" for="mcp-token">{t.mcpTokenLabel}</label>
-					<Input
-						id="mcp-token"
-						type="password"
-						class="font-mono text-sm"
-						value={mcp.token}
-						oninput={(event) => updateMcp({ token: event.currentTarget.value })}
-					/>
-					<p class="text-muted-foreground text-xs">{t.mcpTokenHint}</p>
-				</div>
-			</div>
 		</DialogContent>
 	</Dialog>
 
