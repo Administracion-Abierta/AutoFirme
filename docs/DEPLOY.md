@@ -1,45 +1,45 @@
-# Deploy (Cloudflare Worker `autofirme`, static assets)
+# Deploy (static build, any host)
 
-Static build, zero backend. Signing runs in the browser; the Worker serves files
-only (assets-only Worker, no `main` entrypoint, no edge code).
+Static build, zero backend. Signing runs in the browser; the host serves files only.
+There is no Worker and no edge code in this repository: `pnpm build` emits `build/` and any
+nginx/Caddy/static host serves it. The only container here is `mcp/Containerfile`, for the
+optional MCP server.
 
-Live URL: https://autofirme.eduard3v.workers.dev
+## What the host must do
 
-## How it deploys
+- **SPA fallback.** The app has deep entries (`/?entry=sign`, `/?op=sign…`, `/?shared=1`)
+  and they boot from `build/404.html`, which is the app shell. Unknown paths must
+  resolve to it:
 
-- Pushes to `main` run CI (`checks` job) and then the `deploy` job:
-  `pnpm install --frozen-lockfile && pnpm build && pnpm exec wrangler deploy`.
-- PRs and `develop` never touch the production Worker (`develop` ships the dev
-  pre-release instead — see `release-develop.yml`).
-- `wrangler.jsonc` is the contract: `name: autofirme`, `assets.directory: ./build`,
-  `not_found_handling: 404-page` (deep entries `/?entry=sign`, `/?op=sign…`,
-  `/?shared=1` boot from `404.html`, which is the app shell).
+  ```nginx
+  root /srv/autofirme/build;
+  location / { try_files $uri $uri/ /404.html; }
+  ```
 
-## Setup (once, manual)
+- **HTTPS.** Required for the service worker and for the PWA install prompt.
+- **Caching.** `static/_headers` (shipped into `build/`) sets immutable caching for
+  `/_app/immutable/*` and icons. Do not cache `/`, `service-worker.js` or
+  `manifest.webmanifest` beyond revalidation — installs and updates depend on fresh copies.
+  Translate the file to the host's own syntax if it is not Cloudflare.
 
-1. Cloudflare dashboard → My Profile → API Tokens → create a token with
-   `Account:Read` + `Workers Scripts:Edit` (narrowest scope that deploys).
-2. GitHub repo → Settings → Secrets and variables → Actions → add:
-   - `CLOUDFLARE_API_TOKEN` (the token value)
-   - `CLOUDFLARE_ACCOUNT_ID` (`d56347ecdd18776f5fae3b468ce5134a`)
-3. No environment variables, no bindings, no Functions. The app needs none.
+## Releases
 
-## Conventions
+- `main` produces a versioned release through Release Please (`release.yml`); its
+  `artifacts` job uploads the extension zip, `SHA256SUMS` and the site tarball.
+- `develop` publishes a rolling pre-release tagged `dev-<short-sha>` with the extension zip
+  and `SHA256SUMS`, and uploads the built `build/` directory as a workflow artifact
+  (`release-develop.yml`).
+- The desktop shell (`src-tauri/`) is checked by CI but not packaged: the app ships as a
+  web app.
 
-- Do NOT let `wrangler deploy` re-scaffold the project: if it offers `sv add` /
-  adapter-cloudflare / a `main` entrypoint, decline — this repo stays on
-  `adapter-static` with an assets-only config. If scaffolding ever lands,
-  revert it (`git checkout -- package.json pnpm-lock.yaml tsconfig.json vite.config.ts`
-  and delete `src/app.d.ts`, `static/.assetsignore`).
-- `static/_headers` ships immutable caching for `/_app/immutable/*` and icons; do not
-  cache `/`, `service-worker.js` or the manifest beyond revalidation — installs and
-  updates depend on fresh copies.
-- After deploy: open the production URL on Chrome Android, confirm the install prompt,
-  share a PDF to the app, and check the sign flow opens with the file preloaded.
+## After a deploy
+
+Open the production URL on Chrome Android, confirm the install prompt, share a PDF to the
+app, and check the sign flow opens with the file preloaded.
 
 ## Limits
 
-- `share_target` POST bodies never reach the Worker runtime: the service worker
-  intercepts them and redirects into the sign flow (see `src/service-worker.ts`).
+- `share_target` POST bodies never reach the host: the service worker intercepts them and
+  redirects into the sign flow (see `src/service-worker.ts`).
 - Transparent AutoScript interception is extension-only; portals reach the PWA through
   share, file-open, or the deep-link contract (`docs/PWA-SIGNING.md`).

@@ -1,0 +1,3 @@
+# Desktop shell binary and generated IPC schemas: build output, never committed.
+/target/
+/gen/

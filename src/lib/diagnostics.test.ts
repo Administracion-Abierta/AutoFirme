@@ -1,11 +1,12 @@
+// @vitest-environment node
 /**
- * 50 MB PAdES sign+verify budget (Refs #94). Fails the shell CI job when the
- * engine exceeds the declared ceilings — same ceilings as `scripts/perf-budget.mjs`.
+ * 50 MB PAdES sign+verify budget (Refs #94) + WebCrypto probes (Refs #75).
+ * Both share `./diagnostics`; neither side reverted.
  */
 
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PDF_BUDGET, pdfWithContent, runBudget } from './diagnostics';
+import { PDF_BUDGET, pdfWithContent, runBudget, runWebCryptoProbes } from './diagnostics';
 import { runEngineSync, transferList, type EngineRequest, type EngineResult } from './engine';
 import { loadSignerSession } from './keystore';
 import {
@@ -77,4 +78,19 @@ describe('50 MB PAdES budget', () => {
 		expect(result.signMs).toBeLessThanOrEqual(PDF_BUDGET.signMs);
 		expect(result.verifyMs).toBeLessThanOrEqual(PDF_BUDGET.verifyMs);
 	}, 180_000);
+});
+
+describe('runWebCryptoProbes', () => {
+	it('runs every probe successfully on a WebCrypto host', async () => {
+		const results = await runWebCryptoProbes();
+		expect(results.map((result) => result.id)).toEqual([
+			'secure-context',
+			'crypto-subtle',
+			'sha256',
+			'pkcs8',
+			'aes-cbc',
+			'rsa-pss'
+		]);
+		expect(results.filter((result) => !result.ok)).toEqual([]);
+	});
 });

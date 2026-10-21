@@ -17,7 +17,7 @@ CAdES slice, which is what `mcp/` implements. Option (b), a Playwright harness, 
 
 The engine was audited module by module for its platform dependencies:
 
-| Module | Platform needs | Node 22+ |
+| Module | Platform needs | Node 24+ |
 |---|---|---|
 | `asn1.ts`, `der.ts`, `x509.ts` | DER + `Text{En,De}coder` | ✅ |
 | `pkcs12.ts` | `crypto.subtle` (PBKDF2, AES-CBC) | ✅ |
@@ -78,8 +78,8 @@ rather than pretending.
    src/lib --include=*.ts` matches only `xades.ts`, `ooxml.ts` and `verify/xades.ts`. A future
    edit that pulls a DOM into `cms.ts` or `verify/cms.ts` fails `pnpm test` (Node environment, no
    jsdom) immediately; in production the tool reports `dom_unavailable` rather than a false result.
-3. **Node version floor.** `crypto.subtle`, `atob`/`btoa` and the esbuild `--target=node22` set it;
-   Node 18–20 are untested and `mcp/package.json` declares no `engines`.
+3. **Node version floor.** `crypto.subtle`, `atob`/`btoa` and the esbuild `--target=node24` set it;
+   Node 18–22 are untested and `mcp/package.json` pins `engines.node: 24.x`.
 4. **A live signing key in a long-lived process** — the accepted residual risk of any local signer,
    and the reason stdio stays the transport a same-machine agent should use (see §5, "Server
    compromise" and the remote-mode rows added by #46).
@@ -172,8 +172,8 @@ Rejected for this slice, for three reasons that are costs rather than taste:
 2. **The audit trail needs to append.** `src/audit.ts` writes JSONL; Workers has no filesystem.
    Dropping the durable audit sink of a legally-weighted action to gain a free tier is a bad trade.
 3. **workerd bundling is a new build surface** for a process that must hold a live signing key
-   anyway, while the homelab already exposes services through the existing Cloudflare Tunnel
-   (`Containerfile`, `Caddyfile`), so deployment is one manifest (`mcp/deploy/k3s.yaml`).
+   anyway, while the homelab already exposes services through the existing Cloudflare Tunnel,
+   so deployment is one manifest (`mcp/deploy/k3s.yaml`).
 
 The port stays cheap: the handler is a Web-standard `(Request) => Response`, so a Worker entry would
 import `createHttpHandler` and add the cert/audit sources it lacks — see follow-up 4.

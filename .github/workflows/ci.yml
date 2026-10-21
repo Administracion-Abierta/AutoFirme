@@ -28,7 +28,7 @@ jobs:
       - name: Toolchain
         run: |
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends git openssl unzip python3 ca-certificates xmlsec1 libxml2-utils
+          apt-get install -y -qq --no-install-recommends git openssl unzip zip python3 ca-certificates xmlsec1 libxml2-utils
           # The workspace is mounted from the host; without this, git refuses to read it.
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           openssl version
@@ -38,11 +38,11 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
-      # package.json and extension/manifest.json must agree before anything is packaged.
+      # All five version files must agree before anything is packaged (see check-versions.mjs).
       - run: pnpm check:versions
       # Webapp plus extension suites; the extension tests need no build output.
       - run: pnpm test
@@ -64,6 +64,8 @@ jobs:
             dist/SHA256SUMS
           if-no-files-found: error
 
+  # The node sidecar used to run in no workflow at all; it is part of the pnpm
+  # workspace now, so the same install covers it.
   mcp:
     name: mcp check, test, e2e
     runs-on: ubuntu-latest
@@ -72,15 +74,9 @@ jobs:
     # whose expired leaf needs `-not_before`/`-not_after` (OpenSSL >= 3.4) — absent on the runner.
     container:
       image: debian:trixie
-    defaults:
-      run:
-        working-directory: mcp
     steps:
       # The image is minimal and checkout needs git, so the toolchain comes first.
-      # This step must run from the workspace root: the job-wide `working-directory: mcp`
-      # only exists after checkout, and the runner `docker exec`s with that cwd (no mkdir).
       - name: Toolchain
-        working-directory: .
         run: |
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends git openssl ca-certificates
@@ -90,36 +86,68 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
-          cache-dependency-path: mcp/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-      - run: pnpm test
+      - run: pnpm --filter autofirme-mcp check
+      - run: pnpm --filter autofirme-mcp build
+      - run: pnpm --filter autofirme-mcp test
       # Builds both entry points and verifies a stdio signature with openssl cms -verify.
-      - run: pnpm e2e
+      - run: pnpm --filter autofirme-mcp e2e
 
-  deploy:
-    name: deploy worker to production
-    needs: checks
-    # Production worker autofirme.eduard3v.workers.dev tracks main; develop ships
-    # the dev pre-release instead (release-develop.yml). PRs never deploy.
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
+  # P0 shell gate (#19): the job runs on the builder container. Rocky 9.8 ships only
+  # webkit2gtk 4.0, which wry cannot use, and the runner image ships OpenSSL 3.0 while
+  # the parity gate declares `openssl` >= 3.4; trixie has webkit2gtk-4.1 and OpenSSL 3.5.
+  shell:
+    name: tauri shell check and webview smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: debian:trixie
     steps:
-      - uses: actions/checkout@v4
+      # The image is minimal and checkout needs git, so the toolchain comes first.
+      - name: Toolchain and test oracles
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            build-essential curl git ca-certificates pkg-config libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
+            xvfb xauth \
+            openssl xmlsec1 libxml2-utils zip
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          openssl version
+          xmlsec1 --version
+          xmllint --version
+          zip -v | sed -n '2p'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - name: Deploy to Cloudflare Workers
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler deploy
+      - run: cargo check --locked --manifest-path src-tauri/Cargo.toml
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      # P0.6 headless smoke: the production build embeds `build/` and serves it over the
+      # `tauri://localhost` custom scheme. The marker proves the webview really booted and
+      # finished a page load; `timeout` fails the job when it never gets there.
+      - run: pnpm build:tauri
+      - name: Headless webview smoke
+        run: |
+          set -o pipefail
+          cargo build --release --locked --features tauri/custom-protocol \
+            --manifest-path src-tauri/Cargo.toml
+          export WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1
+          export LIBGL_ALWAYS_SOFTWARE=1 GDK_BACKEND=x11 AUTOFIRME_SMOKE=1
+          timeout 120 xvfb-run -a --server-args="-screen 0 1280x1024x24" \
+            ./src-tauri/target/release/autofirme-desktop | tee smoke.log
+          grep -q "SHELL_SMOKE Finished" smoke.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shell-smoke
+          path: smoke.log
+          if-no-files-found: error

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { isDesktop } from '#lib/desktop';
 	import type { Copy } from '#lib/i18n';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
@@ -20,7 +21,8 @@
 	let waiting = $state<ServiceWorker | null>(null);
 
 	onMount(() => {
-		if (location.protocol === 'chrome-extension:') return;
+		// No service worker and no install prompt under `tauri://localhost`.
+		if (isDesktop() || location.protocol === 'chrome-extension:') return;
 		// `beforeinstallprompt` is Chromium-only and missing from lib.dom, hence the bare EventTarget.
 		const events = window as EventTarget;
 		const onInstallable = (event: Event) => {

@@ -11,7 +11,7 @@ extensión están en [LEEME.md](LEEME.md) (sección «Extensión Chrome»).
 
 ## 1. Build and install
 
-Use Node 22+ (Node 24 verified), pnpm 11.24.0, and Chrome/Chromium 116+. The
+Use Node 24 (`.nvmrc`, `engines.node`), pnpm 11.24.0, and Chrome/Chromium 116+. The
 extension is **Chrome-only for now**; Firefox support is deferred to
 [issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18)
 (`userScripts` API study, tagged `fleet:hold`).
