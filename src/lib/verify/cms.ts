@@ -102,6 +102,7 @@ export function parseCms(der: Bytes): SignedData {
 			? wrap(TAG.SET, signedAttributesNode.content)
 			: new Uint8Array(),
 		unsignedAttributes: parseUnsigned(signerFields),
+		signature: octets(signerFields[attributesAt + 2]),
 		issuerDer: issuerAndSerial ? issuerAndSerial[0].raw : null,
 		serial: issuerAndSerial ? hex(issuerAndSerial[1].content) : null
 	};
