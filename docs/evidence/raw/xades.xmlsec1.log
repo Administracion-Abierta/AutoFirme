@@ -1,0 +1,5 @@
+$ xmlsec1 --verify --trusted-pem chain.pem xades.xml
+# xmlsec1 1.3.12 (openssl); trust anchor = fixture chain.pem (leaf.pem is a public key, not a cert -> rejected)
+
+Verification status: OK
+exit=0

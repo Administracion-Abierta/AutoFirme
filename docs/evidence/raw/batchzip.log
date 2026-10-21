@@ -1,0 +1,11 @@
+$ node scripts/verify-batch-zip.mjs
+Archive:  /tmp/autofirme-batch-WjHFoc/lote.zip
+    testing: contrato.txt.csig        OK
+    testing: factura.txt.csig         OK
+    testing: manifest.json            OK
+No errors detected in compressed data of /tmp/autofirme-batch-WjHFoc/lote.zip.
+contrato.txt.csig: sha256sum matches the manifest digest (78e4ac949ca1…)
+factura.txt.csig: sha256sum matches the manifest digest (bb6b552d7af0…)
+OK — 1171 bytes, 3 entries, verified by unzip + sha256sum
+archive kept at /tmp/autofirme-batch-WjHFoc/lote.zip
+exit=0

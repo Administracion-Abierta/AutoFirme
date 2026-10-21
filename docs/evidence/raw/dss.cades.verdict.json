@@ -1,0 +1,33 @@
+{
+  "source": "https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/services/rest/validation/validateSignature",
+  "request_date": "2026-10-21",
+  "method": "POST application/json {signedDocument:{bytes,name}[,originalDocuments]}",
+  "http_status": 200,
+  "document": "item-01.cades.p7s",
+  "validation_policy": "QES AES/QC AES TL based",
+  "signatures_count": 1,
+  "valid_signatures_count": 0,
+  "signature": {
+    "format": "CAdES-BASELINE-B",
+    "signed_by": "\u00d1and\u00fa Prueba",
+    "claimed_signing_time": "2026-10-21T16:59:50Z",
+    "digest_algorithm": "SHA256",
+    "encryption_algorithm": "RSA",
+    "key_length": "2048",
+    "signature_intact": true,
+    "signature_valid": true,
+    "signature_scope": [
+      {
+        "value": "Full document",
+        "Id": "D-06EC4BFB5D1A33702386093385D8D5755045D29C34CB834EB9FB8D6497E54B0F",
+        "name": "item-03.doc.bin",
+        "scope": "FULL"
+      }
+    ],
+    "indication": "INDETERMINATE",
+    "sub_indication": "NO_CERTIFICATE_CHAIN_FOUND",
+    "errors": [
+      "BBB_XCV_CCCBB_SIG_ANS"
+    ]
+  }
+}

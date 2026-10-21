@@ -1,46 +1,113 @@
 # P0 gate evidence — 12-item parity run (Refs #96)
 
-Run date: 2026-10-21. Host: Linux container in this worktree.
-Engine: `src/lib/cms.ts` + `src/lib/xades.ts` + `src/lib/pades.ts` + `src/lib/ooxml.ts`
-at commit `c0722af5` (plus this evidence-only diff — no `src/` changes).
-Keystore: self-signed RSA-2048 fixture generated on the fly by
-`src/test/fixtures.ts` (openssl); trust anchor = the fixture leaf passed as
-`trustedRoots`, so self-verify items check the chain mechanism, not a public root.
-Runner: throwaway script (not committed) driving the app's own sign/verify entry
-points; oracles: `openssl cms -verify`, `xmlsec1 verify`, `pdfsig` (poppler).
+Run date: 2026-10-21. Host: Linux container, worktree `issue-96`.
+Branch head for the engine under test: `aad68324` (this evidence commit adds docs only — no `src/`).
 
-**No canonical 12-item list exists in the tree** (roadmap, #19, CI, #75 branch
-all say "12-item" without enumerating). The mapping below is the reconstruction;
-each item is one row, one command-equivalent, one artifact.
+## The 12 items are the ones #19 defines
 
-| # | Gate item | Verdict | Artifact(s) |
+`src/routes/diagnostics/+page.svelte` (branch `issue/19-p0-tauri-shell-parity-gate-10-`) carries
+the canonical list — the `GATE` array, "The 12-item parity gate of #19, each item mapped to the
+suite that proves it". The list below is taken from it verbatim, not reconstructed. Issue #96's
+parent is #19, so that array is the contract.
+
+| # | Item (as #19 names it) | Proving suite (#19's `proof`) | Run here | Verdict |
+|---|---|---|---|---|
+| 1 | PKCS#12 import (PBES2 + legacy PBE) | `src/lib/pkcs12.test.ts` | 24 tests | PASS |
+| 2 | CAdES-BES | `src/lib/cms.test.ts` | 9 tests | PASS |
+| 3 | CAdES-T | `src/lib/timestamp.test.ts` | 6 tests | PASS |
+| 4 | XAdES-EPES + c14n | `src/lib/xades.test.ts`, `src/lib/c14n.test.ts` | 11 + 9 tests | PASS |
+| 5 | PAdES B-B | `src/lib/pades.test.ts` | 9 tests | PASS |
+| 6 | PAdES visible stamp | `src/lib/pades-visible.test.ts` | 6 tests | PASS |
+| 7 | PAdES B-T | `src/lib/timestamp.test.ts`, `src/lib/pades.test.ts` | 6 + 9 tests | PASS |
+| 8 | Batch + ZIP | `src/lib/batch.test.ts`, `scripts/verify-batch-zip.mjs` | 8 tests + zip verify | PASS |
+| 9 | Verify CAdES/XAdES/PAdES incl. byte-range | `src/lib/verify.test.ts` | 23 tests | PASS |
+| 10 | IndexedDB cert store | `src/lib/certstore.test.ts` | 9 tests | PASS |
+| 11 | i18n ES/EN | `src/lib/App.test.ts`, `src/lib/i18n.ts` | 19 tests | PASS |
+| 12 | Extension bridge handshake + portal interception | `extension/tests/*.test.js` | 54 tests | PASS |
+
+Suite totals: `npx vitest run` over the 11 named files → **11 files, 133 tests, 0 fail**;
+`node --test extension/tests/*.test.js` → **54 tests, 0 fail**; `scripts/verify-batch-zip.mjs`
+→ exit 0 (`unzip -t` + sha256 manifest recompute). Full run logs: `raw/gate-suites.json`,
+`raw/gate-suites.log`, `raw/extension-tests.log`, `raw/batchzip.log`.
+
+**Scope of "ran"**: these are the in-repo suites running on the merged tree, i.e. the same
+`pnpm test` #96 says "proves them already". What #96 adds is the *independent-validator* leg —
+nothing in #19's list is validated by a non-AutoFirme implementation, so the artifacts below are
+the cross-check. Two #19 items (3 CAdES-T, 7 PAdES B-T) are proven by `timestamp.test.ts`; that
+suite exercises the RFC 3161 request/parse path against a fixture TSA, not a live TSA — recorded
+as a limit, not a pass claim beyond what the suite asserts.
+
+## Independent-validator leg (the actual delta of #96)
+
+Signed artifacts produced from repo entry points with the fixture keystore, then re-validated by
+implementations that share no code with this repo:
+
+| Artifact | Independent validator | Verdict | Log |
 |---|---|---|---|
-| 01 | CAdES-BES sign (detached, SHA-256) | PASS (1520 bytes) | `raw/item-01.cades.p7s` |
-| 02 | CAdES self-verify (`verifyArtifact`, 7 checks) | PASS (0 fail) | `raw/item-02.cades-report.json` |
-| 03 | CAdES interop: `openssl cms -verify` | PASS (`Verification successful`) | `raw/item-03.openssl.log`, `raw/item-03.doc.bin` |
-| 04 | XAdES-EPES sign (enveloped) | PASS (5845 chars) | `raw/item-04.xades.xml` |
-| 05 | XAdES self-verify (`verifyArtifact`, 8 checks) | PASS (0 fail) | `raw/item-05.xades-report.json` |
-| 06 | XAdES interop: `xmlsec1 verify` | PASS (`OK`) | `raw/item-06.xmlsec1.log` |
-| 07 | PAdES B-B sign (incremental update over `test/fixtures/pades-source.pdf`) | PASS (6789 bytes) | `raw/item-07.pades.pdf` |
-| 08 | PAdES self-verify (`verifyArtifact`, 7 checks) | PASS (0 fail) | `raw/item-08.pades-report.json` |
-| 09 | PAdES interop: ByteRange CMS via `openssl cms -verify` + `pdfsig` signer read + prefix-preservation | PASS (openssl OK, prefix intact) | `raw/item-09.interop.log`, `raw/item-09.cms.der`, `raw/item-09.byrange-content.bin` |
-| 10 | OOXML sign (signature part added to a minimal docx) | PASS (4656 bytes) | `raw/item-10.ooxml.docx` |
-| 11 | Tamper negative: 1-byte flip inside signed data fails in all 3 families | PASS (invalid × 3) | `raw/item-11.negative.json` |
-| 12 | Batch smoke: 50 × CAdES sign | PASS (~1.5 ms/file, budget <2 s/file) | `raw/item-12.perf.log` |
+| `raw/cades.p7s` + `raw/cades.content.bin` | `openssl cms -verify` 4.0.3 | `CMS Verification successful` | `raw/cades.openssl.log` |
+| `raw/xades.xml` | `xmlsec1 --verify` 1.3.12 | `Verification status: OK` | `raw/xades.xmlsec1.log` |
+| `raw/pades.pdf` (ByteRange CMS) | `openssl cms -verify` | `CMS Verification successful` | `raw/pades.interop.log` |
+| `raw/pades.pdf` | `pdfsig` (poppler) | `Signature is Valid`, signer + algo + both ranges read | `raw/pades.interop.log` |
+| `raw/pades.pdf` | `qpdf --check` 12.4.2 | `No syntax or stream encoding errors found` (exit 0) | `raw/pades.interop.log` |
+| `raw/cades.p7s`, `raw/xades.xml`, `raw/pades.pdf` | **EU DSS demo REST** | `SignatureValid: true`, intact, per family | `raw/dss.*.verdict.json` |
 
-Machine-readable: `raw/results.json`. Trust inputs: `raw/leaf.pem`, `raw/chain.pem`.
+### EU DSS verdicts (HTTP 200, 2026-10-21)
+
+Posted each signed document to
+`https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/services/rest/validation/validateSignature`
+as `application/json` (`{"signedDocument":{"bytes":<b64>,"name":…},"originalDocuments":[…]}`).
+
+| Document | DSS format | SignatureIntact / SignatureValid | Indication | SubIndication | Scope DSS read |
+|---|---|---|---|---|---|
+| `cades.p7s` (+ detached `cades.content.bin`) | `CAdES-BASELINE-B` | true / **true** | INDETERMINATE | `NO_CERTIFICATE_CHAIN_FOUND` | Full document |
+| `xades.xml` | `XAdES-BASELINE-B` | true / **true** | INDETERMINATE | `NO_CERTIFICATE_CHAIN_FOUND` | Full XML file with transformations |
+| `pades.pdf` | `PAdES-BASELINE-B` | true / **true** | INDETERMINATE | `NO_CERTIFICATE_CHAIN_FOUND` | The document ByteRange : [0, 1590, 6120, 669] |
+
+**Does DSS agree with us? Yes on everything we claim.** For all three families DSS reports the
+signature value intact and valid, the digest over the right content, the right signer
+(`Ñandú Prueba`, RSA-2048/SHA-256), and — for PAdES — the exact ByteRange our verifier emits.
+`INDETERMINATE / NO_CERTIFICATE_CHAIN_FOUND` is **not a disagreement**: the fixture keystore is
+self-signed (`CN=Ñandú Prueba`, issuer itself) and DSS validates against the EU trusted lists, so
+it has no anchor for it. Our own `certChain` check passes only because the test passes the fixture
+leaf as `trustedRoots` — the mechanism is exercised, the anchor is deliberately the fixture. That
+is the same limitation #19's items carry ("self-verify items check the chain mechanism, not a
+public root"). Error key `BBB_XCV_CCCBB_SIG_ANS` = "certificate chain not trusted"; no
+cryptographic error, no `TOTAL_PASSED`-style failure in `ValidationReport`.
+
+Trust model note for a reader of the reports: if the fixture were replaced by a real FNMT/AC
+chain, the expected DSS indication moves from INDETERMINATE to PASSED for CAdES/XAdES once the
+anchors are published in the LOTL. Recorded, not fixed here (out of scope per #96).
 
 ## Disagreements / limits (recorded, not hidden)
 
-- Item 11, first run: a flip at the buffer midpoint (inside the PAdES `/Contents`
-  gap, outside both ByteRange spans) still verified `valid` — correct behavior
-  (unsigned gap), wrong test placement. Re-ran with the flip at offset 10
-  (inside span 1): all three families `invalid`. Lesson kept in the artifact log.
-- `qpdf --check` was tried as a PAdES oracle and rejected: it cannot parse the
-  incremental xref the engine appends (`unable to find page tree`), while
-  poppler (`pdfsig`) — the same parser family desktop readers use — reads the
-  signature, signer CN, hash algo and signed ranges correctly, and `openssl`
-  verifies the ByteRange CMS. Oracle mismatch recorded; engine output accepted
-  on the poppler+openssl majority.
-- Acrobat and EU DSS verdicts: see `external-validators.md` — unreachable
-  unattended; independent local oracles substituted, blocker recorded exactly.
+- **Acrobat: not obtained.** No Acrobat in this Linux container. Substituted oracle is `pdfsig`
+  (poppler) — same parser family desktop readers use — plus DSS, which is an EU reference
+  implementation. Human follow-up in `external-validators.md`.
+- **`qpdf --check` on the PAdES output: passes (exit 0), no rejection.** An earlier draft of this
+  doc claimed qpdf "cannot parse the incremental xref … `unable to find page tree`". That is not
+  reproducible: `qpdf --check raw/pades.pdf` (qpdf 12.4.2) exits 0 with "No syntax or stream
+  encoding errors found", and `qpdf --show-npages` returns 1. The qpdf leg is therefore a third
+  agreeing oracle, not a disagreement. See `raw/pades.interop.log`.
+- **#19's list, not a format-matrix list.** An earlier draft invented its own 12 items (3 formats ×
+  sign/verify/interop + OOXML + tamper + batch). Those artifacts are kept because they are the
+  independent-validator evidence this issue exists for, but they are **not** the gate's 12 items;
+  the gate's 12 are the table above. Nothing in the artifact set was dropped.
+- **Items 3 and 7 (CAdES-T / PAdES B-T) have no independent-validator artifact.** The timestamp
+  token path is only exercised against the fixture TSA in `timestamp.test.ts`; no public TSA was
+  used. Difference from a live-TSA run is not observable in this environment; recorded as a limit.
+- **Fixture trust anchor.** Loaded from `raw/chain.pem`; `raw/leaf.pem` is a bare public key, not a
+  certificate — `xmlsec1 --trusted-pem leaf.pem` fails with `failed to load trusted cert`. Kept as
+  a warning for whoever re-runs the command.
+
+## Artifacts
+
+`raw/` — `cades.p7s`, `cades.content.bin`, `cades.selfverify.json`, `cades.openssl.log`,
+`xades.xml`, `xades.selfverify.json`, `xades.xmlsec1.log`, `pades.pdf`, `pades.selfverify.json`,
+`pades.byrange.cms.der`, `pades.byrange-content.bin`, `pades.interop.log`, `ooxml.docx`,
+`tamper.negative.json`, `batch.perf.log`, `dss.{cades,xades,pades}.verdict.json`,
+`dss.{cades,xades,pades}.validation-report.xml`, `chain.pem`, `leaf.pem`, `results.json` (the
+format-level run, kept for provenance), `gate-suites.json`, `gate-suites.log`,
+`extension-tests.log`, `batchzip.log`.
+
+These are the artifacts a human needs to drive Acrobat / DSS by hand — `cades.p7s` +
+`cades.content.bin`, `xades.xml`, `pades.pdf`.

@@ -1,0 +1,13 @@
+$ node --test extension/tests/*.test.js
+✔ restored cached documents reconnect for new calls and never replay old pending calls (0.920917ms)
+✔ adapter polling resumes after each cached-document restoration (0.776724ms)
+✔ the ninth concurrent page call falls back in the content script and never posts to the port (1.62319ms)
+✔ the page terminal timer is exactly the shared contract limit and resolves error once (5.172527ms)
+ℹ tests 54
+ℹ suites 0
+ℹ pass 54
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 385.492773
