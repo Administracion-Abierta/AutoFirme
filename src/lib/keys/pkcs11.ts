@@ -32,7 +32,8 @@ export interface Pkcs11Object {
 /** Minimal cryptoki surface the provider needs. The native bridge implements this. */
 export interface CryptokiModule {
 	listSlots(): Promise<Pkcs11Slot[]>;
-	listCertificates(slotId: number, pin?: string): Promise<Pkcs11Object[]>;
+	/** `C_FindObjects` for `CKO_CERTIFICATE`. Runs after `login`, which is what unlocks them. */
+	listCertificates(slotId: number): Promise<Pkcs11Object[]>;
 	/**
 	 * Sign with the private key paired to `keyId`. `login` already ran: the bridge holds the
 	 * authenticated session so the PIN never crosses this boundary twice.
@@ -141,7 +142,7 @@ export class Pkcs11Provider {
 		if (!slot.token) throw new Pkcs11Error('no-token', `slot ${slotId} has no token inserted`);
 		const resolvedPin = pin ?? (await this.loginCallback?.(slot));
 		if (resolvedPin !== undefined) await this.bridge.login(slotId, resolvedPin);
-		const objects = await this.bridge.listCertificates(slotId, resolvedPin);
+		const objects = await this.bridge.listCertificates(slotId);
 		return signOnly(objectsToSignerCerts(objects, this.sourceLabel, slotId));
 	}
 
