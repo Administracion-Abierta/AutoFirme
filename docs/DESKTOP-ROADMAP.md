@@ -206,32 +206,50 @@ for exactly that user.
 Resolved 2026-10-20 — see decisions 6–9. Nothing hosted, Firefox after Windows, macOS committed,
 GitHub Releases only.
 
-## 9. Issue map (created 2026-10-20)
+## 9. Issue map (created 2026-10-20, split 2026-10-21)
 
-Epic: **#37**. Every issue carries `fleet:hold`; removing that label is the act of approving it for
-execution.
+Epic: **#37**.
 
-| Phase | Issue | Milestone |
-|---|---|---|
-| P0 shell + parity gate + audit fixes | #19 | v0.1 |
-| P1 native key layer | #20 | v0.1 |
-| P2 portal interop + native messaging | #21 | v0.1 |
-| P3 format parity | #22 | v0.2 |
-| P4 validation depth | #23 | v0.3 |
-| P5 MCP inside the app | #24 | v0.2 |
-| P6 P2P slice 1 | #25 | v0.4 |
-| P7 distribution | #26 | v0.3 |
-| P8 docs rewrite | #27 | v0.1 |
-| E0 extension v1 hardening | #28 | Extension v1 |
-| E1 portal coverage | #29 | Extension v1 |
-| E2 Firefox `userScripts` (was #18) | #30 | Extension v1 |
-| E3 extension MCP bridge | #31 | Extension v1 |
-| E4 optional native-messaging client | #32 | Extension v1 |
-| X1 i18n parity | #33 | v0.1 |
-| X2 security model doc | #34 | v0.1 |
-| X3 test strategy | #35 | v0.1 |
-| X4 user/enterprise/migration docs | #36 | v0.3 |
+**Split rule.** A phase estimated over 5 days is not a unit of work: bullet runs one agent per
+issue per role, so the only way to parallelise is more issues. Every phase >5 d was split into
+slices of <=5 d, cut by **shared files** — two siblings never write the same file unless
+`depends-on` serialises them. A parent that was split is now **tracking only**: it carries no
+work and must not be handed to a coder.
 
+Children depend on **siblings, never on the parked parent**: `depends-on` is satisfied only when
+the blocker is CLOSED, and a parked parent never closes.
+
+X1 (#33), X2 (#34), X4 (#36) and E2 (#30) never had a recorded day estimate — the original issue
+bodies carry none. Rather than invent one, each was cut into two slices small enough for a single
+sitting; merging a slice back is a one-line edit if it turns out trivial. **P5 (#24, 5–8 d)** sits on
+the boundary and was split because its upper estimate crosses the rule.
+
+| Phase | Parent (tracking) | Slices | Children | Days |
+|---|---|---|---|---|
+| P0 shell + parity gate | #19 (mid-review, delta only) | 3 | #40–#42 | 7 |
+| P1 native key layer | #20 | 6 | #43–#48 | 21 |
+| P2 portal interop + NM host | #21 | 4 | #49–#52 | 17 |
+| P3 format parity | #22 | 10 | #71–#80 | 34 |
+| P4 validation depth | #23 | 8 | #81–#88 | 32 |
+| P5 MCP inside the app | #24 | 2 | #53–#54 | 9 |
+| P6 P2P slice 1 | #25 | 4 | #55–#58 | 19 |
+| P7 distribution | #26 | 4 | #59–#62 | 13 |
+| E2 Firefox `userScripts` | #30 | 2 | #63–#64 | 6 |
+| X1 i18n parity | #33 | 2 | #65–#66 | 7 |
+| X2 security model doc | #34 | 2 | #67–#68 | 7 |
+| X4 user/enterprise docs | #36 | 2 | #69–#70 | 8 |
+
+Not split (<=5 d, one issue each): **P8 #27** (docs rewrite), **E0 #28**, **E1 #29**, **E3 #31**,
+**E4 #32**, **X3 #35** (done). Epic **#37** carries no milestone.
+
+**P0 is the exception**: #19 was mid-review when the split happened, so its children cover only
+the unfixed delta (worker, save dialog + CSP, external gate evidence) and its body stays as the
+record of what landed.
+
+**Sequencing.** Each slice carries its own `bullet-schedule` block: the parent's window, with
+starts staggered 2 days apart inside it, plus hard `depends-on` edges where siblings share files
+(e.g. #20a seam before every other P1 provider; #22e before #22f; #23b + #23e before #23h).
+14 slices are wave-ready today, gated only by their date.
 
 ## 10. Stack audit (2026-10-20, before any code)
 
