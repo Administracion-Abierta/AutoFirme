@@ -6,6 +6,9 @@
  * what older Windows/FNMT tools write uses PBES1 (the SHA-1 key derivation of Appendix B.2 plus
  * DES/RC2/RC4), whose primitives live in `./legacy-pbe`. The container MAC (Appendix B.3) is
  * verified when present, so a wrong PIN fails fast instead of decrypting to garbage.
+ *
+ * This module is a parser only. The seam treats it as the container backend: `parsePkcs12`'s
+ * output is what `src/lib/keys/pkcs12.ts` adapts to a `KeyProvider` (Refs #97).
  */
 
 import { type Bytes, type Der, concatBytes, explicit, integer, oid, parseDer, readTlv } from './asn1';
