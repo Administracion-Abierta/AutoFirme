@@ -19,6 +19,7 @@ import { DIGEST_OIDS, digestBytes } from './digest';
 import { trustedRoots } from './roots';
 import type { Bytes, Check, Signer, VerificationReport, VerifyOptions } from './types';
 import { summarize } from './types';
+import { verifyTimeStampImprint } from '../timestamp';
 
 const OID_SIGNED_DATA = '1.2.840.113549.1.7.2';
 const OID_MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
@@ -26,10 +27,24 @@ const OID_CONTENT_TYPE = '1.2.840.113549.1.9.3';
 const OID_SIGNING_TIME = '1.2.840.113549.1.9.5';
 /** Bare rsaEncryption carries no hash; the digest algorithm attribute supplies it. */
 const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
+/** `id-aa-timeStampToken`: CAdES-T over the signature, CAdES-C over the X Long refs. */
+const OID_TIME_STAMP_TOKEN = '1.2.840.113549.1.9.16.2.14';
+const OID_COMPLETE_CERTIFICATE_REFS = '1.2.840.113549.1.9.16.2.21';
+const OID_COMPLETE_REVOCATION_REFS = '1.2.840.113549.1.9.16.2.22';
 
 interface Attribute {
 	type: string;
 	values: Der[];
+}
+
+function parseAttribute(attribute: Der): Attribute {
+	return { type: oid(at(attribute, 0)), values: children(at(attribute, 1)) };
+}
+
+/** `unsignedAttrs [1] IMPLICIT`, after the signature — absent on BES signatures. */
+function parseUnsigned(signerFields: Der[]): Attribute[] {
+	const node = signerFields.find((field) => field.tag === 0xa1);
+	return node ? children(node).map(parseAttribute) : [];
 }
 
 interface SignedData {
@@ -42,6 +57,8 @@ interface SignedData {
 	signedAttributes: Attribute[];
 	/** Re-encoded as a SET OF — the exact bytes the signature covers. */
 	signedAttributesRaw: Bytes;
+	/** `unsignedAttrs [1]`, in wire order — timestamps and X Long refs live here, never signed. */
+	unsignedAttributes: Attribute[];
 	signature: Bytes;
 	issuerDer: Bytes | null;
 	serial: string | null;
@@ -80,14 +97,11 @@ export function parseCms(der: Bytes): SignedData {
 		certificates,
 		digestAlgorithmOid: oid(at(signerFields[2], 0)),
 		signatureAlgorithmOid: oid(at(signerFields[attributesAt + 1], 0)),
-		signedAttributes: (signedAttributesNode ? children(signedAttributesNode) : []).map((attribute) => ({
-			type: oid(at(attribute, 0)),
-			values: children(at(attribute, 1))
-		})),
+		signedAttributes: (signedAttributesNode ? children(signedAttributesNode) : []).map(parseAttribute),
 		signedAttributesRaw: signedAttributesNode
 			? wrap(TAG.SET, signedAttributesNode.content)
 			: new Uint8Array(),
-		signature: octets(signerFields[attributesAt + 2]),
+		unsignedAttributes: parseUnsigned(signerFields),
 		issuerDer: issuerAndSerial ? issuerAndSerial[0].raw : null,
 		serial: issuerAndSerial ? hex(issuerAndSerial[1].content) : null
 	};
@@ -97,6 +111,60 @@ function sameBytes(a: Bytes, b: Bytes): boolean {
 	if (a.length !== b.length) return false;
 	for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
 	return true;
+}
+
+function concatRaw(parts: Bytes[]): Bytes {
+	const out = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+	let offset = 0;
+	for (const part of parts) {
+		out.set(part, offset);
+		offset += part.length;
+	}
+	return out;
+}
+
+/**
+ * Every `timeStampToken` unsigned attribute must cover a known imprint: the signature value
+ * (CAdES-T) or the concatenated X Long refs (CAdES-C). A token over anything else — a different
+ * canonicalisation, another document, another signature — fails with its reason attached.
+ */
+async function verifyTimestamps(data: SignedData): Promise<Check[]> {
+	const tokens = data.unsignedAttributes.filter((attribute) => attribute.type === OID_TIME_STAMP_TOKEN);
+	if (tokens.length === 0) {
+		return [{ id: 'timestamp', status: 'info', detail: 'no unsigned timestamp — CAdES-BES' }];
+	}
+	const certRefs = data.unsignedAttributes.find((attribute) => attribute.type === OID_COMPLETE_CERTIFICATE_REFS);
+	const revRefs = data.unsignedAttributes.find((attribute) => attribute.type === OID_COMPLETE_REVOCATION_REFS);
+	const refsBytes = certRefs?.values[0] && revRefs?.values[0] ? concatRaw([certRefs.values[0].raw, revRefs.values[0].raw]) : null;
+	const imprints: { label: string; bytes: Bytes }[] = [{ label: 'the signature value', bytes: data.signature }];
+	if (refsBytes) imprints.push({ label: 'the certificate and revocation refs', bytes: refsBytes });
+	const checks: Check[] = [];
+	for (const token of tokens) {
+		const raw = token.values[0]?.raw;
+		if (!raw) {
+			checks.push({ id: 'timestamp', status: 'fail', detail: 'timestamp attribute carries no token' });
+			continue;
+		}
+		let matched: string | null = null;
+		let reason = '';
+		for (const imprint of imprints) {
+			try {
+				await verifyTimeStampImprint(raw, imprint.bytes);
+				matched = imprint.label;
+				break;
+			} catch (error) {
+				reason = (error as Error).message;
+			}
+		}
+		checks.push({
+			id: 'timestamp',
+			status: matched ? 'pass' : 'fail',
+			detail: matched
+				? `timestamp token covers ${matched}`
+				: `timestamp token covers neither the signature value nor the refs: ${reason}`
+		});
+	}
+	return checks;
 }
 
 export async function verifyCades(bytes: Bytes, options: VerifyOptions = {}): Promise<VerificationReport> {
@@ -239,6 +307,8 @@ export async function verifyCades(bytes: Bytes, options: VerifyOptions = {}): Pr
 			checks.push({ id: 'signingTime', status: 'fail', detail: `signingTime unreadable: ${(error as Error).message}` });
 		}
 	}
+
+	for (const check of await verifyTimestamps(data)) checks.push(check);
 
 	return { format: 'cades', ...summarize(checks, expired), checks, signer, signingTime };
 }
