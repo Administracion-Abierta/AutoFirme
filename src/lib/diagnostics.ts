@@ -88,6 +88,8 @@ export async function runBudget(
 	const signOut = await run({ ...request, pdf: pdfCopy }, onProgress);
 	if (signOut.kind !== 'sign-pades') throw new Error('engine returned no signature');
 	const signMs = Math.round(performance.now() - signStart);
+	// `signed` is transferred to the verify call, so its length must be read first.
+	const signedBytes = signOut.signed.byteLength;
 	onProgress?.('verify', null);
 	const verifyStart = performance.now();
 	const verifyOut = await run({ kind: 'verify', artifact: signOut.signed, trustedRoots }, onProgress);
@@ -98,7 +100,7 @@ export async function runBudget(
 	return {
 		signMs,
 		verifyMs,
-		signedBytes: signOut.signed.byteLength,
+		signedBytes,
 		verified,
 		pass: verified && signMs <= PDF_BUDGET.signMs && verifyMs <= PDF_BUDGET.verifyMs
 	};

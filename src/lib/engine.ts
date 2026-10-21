@@ -14,8 +14,6 @@ import { signPdf } from './pades';
 import { verifyArtifact } from './verify';
 import type { VerificationReport } from './verify';
 
-export type EngineRequestKind = 'sign-pades' | 'verify';
-
 export interface SignPadesRequest {
 	kind: 'sign-pades';
 	/** Owns an `ArrayBuffer` so it can ride the transfer list. */

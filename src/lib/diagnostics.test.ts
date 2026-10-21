@@ -6,7 +6,7 @@
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PDF_BUDGET, pdfWithContent, runBudget } from './diagnostics';
-import { runEngineSync } from './engine';
+import { runEngineSync, transferList, type EngineRequest, type EngineResult } from './engine';
 import { loadSignerSession } from './keystore';
 import {
 	createPkcs12Fixtures,
@@ -20,6 +20,19 @@ function derToPem(der: Uint8Array): string {
 	return `-----BEGIN CERTIFICATE-----\n${base64.match(/.{1,64}/g)!.join('\n')}\n-----END CERTIFICATE-----\n`;
 }
 
+
+/**
+ * Runs the engine across a transfer boundary like the worker does: the clone
+ * detaches every transferred buffer, so a length read after the sign step would
+ * silently become 0.
+ */
+async function runThroughTransfer(request: EngineRequest): Promise<EngineResult> {
+	const cloned = structuredClone(request, { transfer: transferList(request) }) as EngineRequest;
+	const result = await runEngineSync(cloned);
+	return structuredClone(result, {
+		transfer: result.kind === 'sign-pades' ? [result.signed] : []
+	}) as EngineResult;
+}
 let fixtures: Pkcs12Fixtures;
 
 beforeAll(() => {
@@ -52,11 +65,14 @@ describe('50 MB PAdES budget', () => {
 				privateKey: signer.key,
 				signingTime: Date.UTC(2026, 9, 21)
 			},
-			(request) => runEngineSync(request),
+			runThroughTransfer,
 			undefined,
 			trust
 		);
+		// Transfer detaches the signed buffer in the verify step; a 0 here means the
+		// length was read after the hand-off.
 		expect(result.verified).toBe(true);
+		expect(result.signedBytes).toBeGreaterThan(PDF_BUDGET.bytes);
 		expect(result.pass).toBe(true);
 		expect(result.signMs).toBeLessThanOrEqual(PDF_BUDGET.signMs);
 		expect(result.verifyMs).toBeLessThanOrEqual(PDF_BUDGET.verifyMs);
