@@ -40,6 +40,16 @@ function expectParity(name: string, table: Locales): void {
 	}
 }
 
+/** Both manifest strings the user reads outside the app: they carry the same `ES / EN` shape. */
+function expectBilingual(label: string, value: unknown): void {
+	expect(typeof value, `${label} must be a string`).toBe('string');
+	const parts = (value as string).split(' / ');
+	expect(parts.length, `${label} must be exactly ES / EN`).toBe(2);
+	for (const [index, part] of parts.entries()) {
+		expect(part.trim(), `${label} part ${index + 1} is blank`).not.toBe('');
+	}
+}
+
 describe('ES/EN copy parity', () => {
 	it('keeps the app copy table complete in both languages', () => {
 		expectParity('copy', copy as unknown as Locales);
@@ -52,11 +62,12 @@ describe('ES/EN copy parity', () => {
 	it('keeps the manifest description bilingual', () => {
 		// Chrome truncates store descriptions past 132 characters.
 		const { description } = JSON.parse(readFileSync('extension/manifest.json', 'utf8'));
-		expect(typeof description).toBe('string');
-		expect(description.length).toBeLessThanOrEqual(132);
-		const [es, en, ...extra] = description.split(' / ');
-		expect(extra, 'manifest description must be exactly ES / EN').toEqual([]);
-		expect(es.trim(), 'manifest description lacks ES').not.toBe('');
-		expect(en.trim(), 'manifest description lacks EN').not.toBe('');
+		expect((description as string).length).toBeLessThanOrEqual(132);
+		expectBilingual('manifest description', description);
+	});
+
+	it('keeps the toolbar title bilingual', () => {
+		const { action } = JSON.parse(readFileSync('extension/manifest.json', 'utf8'));
+		expectBilingual('manifest action.default_title', action?.default_title);
 	});
 });

@@ -18,7 +18,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Abrir AutoFirme"
+    "default_title": "Abrir AutoFirme / Open AutoFirme"
   },
   "options_page": "index.html",
   "icons": {
