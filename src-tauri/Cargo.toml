@@ -1,0 +1,12 @@
+[package]
+name = "autofirme-smartcard"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "autofirme_smartcard"
+path = "src/smartcard/mod.rs"
+
+[dependencies]
+cryptoki = "0.12.1"
+pcsc = "2.9"
