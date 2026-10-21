@@ -252,6 +252,7 @@ como PWA.
 | `pnpm preview` | Sirve el build estático. |
 | `pnpm check` | `svelte-check` + TypeScript de la app y la extensión. |
 | `pnpm test` | Vitest + pruebas de la extensión y de los artefactos. |
+| `pnpm perf` | Presupuestos de rendimiento: arranque en frío, PDF de 50 MB y lote de 500 archivos. |
 | `pnpm verify:real` | Firma real y verificación con OpenSSL. |
 | `pnpm test:extension:browser` | Flujo completo de la extensión en Chromium. |
 | `pnpm demo:registradores` | Prueba contra la web real de los registradores. |
