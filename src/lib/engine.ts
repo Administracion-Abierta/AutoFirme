@@ -94,6 +94,15 @@ export function createEngineClient(): EngineClient {
 			onProgress?: (phase: string, fraction: number | null) => void;
 		}
 	>();
+	// A worker that fails to load or dies mid-request never posts a reply; without these the
+	// `run` promise would hang forever and the caller's UI would stay stuck in "running".
+	const fail = (reason: string): void => {
+		const error = new Error(reason);
+		for (const slot of pending.values()) slot.reject(error);
+		pending.clear();
+	};
+	worker.onerror = (event) => fail(event.message || 'engine worker failed');
+	worker.onmessageerror = () => fail('engine worker sent a message that could not be cloned');
 	worker.onmessage = (event: MessageEvent<EngineResponse | EngineProgress>) => {
 		const message = event.data;
 		if ('phase' in message) {
@@ -116,7 +125,9 @@ export function createEngineClient(): EngineClient {
 		},
 		terminate() {
 			worker.terminate();
-			pending.clear();
+			// A request still in flight will never be answered; reject it instead of leaking a
+			// promise that never settles.
+			fail('engine worker terminated');
 		}
 	};
 }
