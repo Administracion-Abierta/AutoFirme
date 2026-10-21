@@ -1,0 +1,110 @@
+[
+  {
+    "n": "01",
+    "name": "CAdES-BES sign (detached, SHA-256)",
+    "status": "PASS",
+    "detail": "1520 bytes",
+    "artifacts": [
+      "docs/evidence/raw/item-01.cades.p7s"
+    ]
+  },
+  {
+    "n": "02",
+    "name": "CAdES self-verify (verifyArtifact)",
+    "status": "PASS",
+    "detail": "7 checks, 0 fail",
+    "artifacts": [
+      "docs/evidence/raw/item-02.cades-report.json"
+    ]
+  },
+  {
+    "n": "03",
+    "name": "CAdES openssl cms -verify interop",
+    "status": "PASS",
+    "detail": "openssl verified",
+    "artifacts": [
+      "docs/evidence/raw/item-03.openssl.log"
+    ]
+  },
+  {
+    "n": "04",
+    "name": "XAdES-EPES sign (enveloped)",
+    "status": "PASS",
+    "detail": "5845 chars",
+    "artifacts": [
+      "docs/evidence/raw/item-04.xades.xml"
+    ]
+  },
+  {
+    "n": "05",
+    "name": "XAdES self-verify (verifyArtifact)",
+    "status": "PASS",
+    "detail": "8 checks, 0 fail",
+    "artifacts": [
+      "docs/evidence/raw/item-05.xades-report.json"
+    ]
+  },
+  {
+    "n": "06",
+    "name": "XAdES xmlsec1 verify interop",
+    "status": "PASS",
+    "detail": "xmlsec1 OK",
+    "artifacts": [
+      "docs/evidence/raw/item-06.xmlsec1.log"
+    ]
+  },
+  {
+    "n": "07",
+    "name": "PAdES B-B sign (incremental update)",
+    "status": "PASS",
+    "detail": "6789 bytes",
+    "artifacts": [
+      "docs/evidence/raw/item-07.pades.pdf"
+    ]
+  },
+  {
+    "n": "09",
+    "name": "PAdES openssl+pdfsig interop (ByteRange CMS, prefix intact)",
+    "status": "PASS",
+    "detail": "openssl OK, prefix intact",
+    "artifacts": [
+      "docs/evidence/raw/item-09.interop.log"
+    ]
+  },
+  {
+    "n": "08",
+    "name": "PAdES self-verify (verifyArtifact)",
+    "status": "PASS",
+    "detail": "7 checks, 0 fail",
+    "artifacts": [
+      "docs/evidence/raw/item-08.pades-report.json"
+    ]
+  },
+  {
+    "n": "10",
+    "name": "OOXML sign (signature part added)",
+    "status": "PASS",
+    "detail": "4655 bytes",
+    "artifacts": [
+      "docs/evidence/raw/item-10.ooxml.docx"
+    ]
+  },
+  {
+    "n": "11",
+    "name": "Cross-family tamper negative (1-byte flip must fail)",
+    "status": "PASS",
+    "detail": "cades=invalid xades=invalid pades=invalid",
+    "artifacts": [
+      "docs/evidence/raw/item-11.negative.json"
+    ]
+  },
+  {
+    "n": "12",
+    "name": "Batch smoke (50 CAdES signs, <2 s/file)",
+    "status": "PASS",
+    "detail": "1.9 ms/file",
+    "artifacts": [
+      "docs/evidence/raw/item-12.perf.log"
+    ]
+  }
+]
