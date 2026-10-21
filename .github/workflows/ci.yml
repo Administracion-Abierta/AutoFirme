@@ -95,7 +95,8 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends \
-            git ca-certificates pkg-config libssl-dev libwebkit2gtk-4.1-dev \
+            build-essential curl git ca-certificates pkg-config libssl-dev \
+            libwebkit2gtk-4.1-dev \
             libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
             xvfb xauth \
             openssl xmlsec1 libxml2-utils zip
