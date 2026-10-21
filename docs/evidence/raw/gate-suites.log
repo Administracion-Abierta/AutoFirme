@@ -1,1 +1,17 @@
-JSON report written to /home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96/docs/evidence/raw/gate-suites.json
+$ npx vitest run src/lib/pkcs12.test.ts src/lib/cms.test.ts src/lib/timestamp.test.ts src/lib/xades.test.ts src/lib/c14n.test.ts src/lib/pades.test.ts src/lib/pades-visible.test.ts src/lib/batch.test.ts src/lib/verify.test.ts src/lib/certstore.test.ts src/lib/App.test.ts
+# the 12 gate items of #19, mapped to the suites it names
+
+
+ RUN  v5.0.4 /home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96
+
+
+ Test Files  11 passed (11)
+      Tests  133 passed (133)
+   Start at  23:04:28
+   Duration  18.59s (tests 55%, environment 31%, setup 6%, import 5%, transform 3%)
+
+Environment  jsdom was created 11 times · 15.01s total, 31% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+
+exit=0
