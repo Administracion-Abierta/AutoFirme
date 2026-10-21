@@ -1,7 +1,7 @@
 name: Release
 
 # Runs on the GitHub release that Release Please publishes, never on a plain tag: the
-# release PR is what keeps package.json, extension/manifest.json and CHANGELOG.md in step.
+# release PR is what keeps the five version files and CHANGELOG.md in step.
 on:
   release:
     types: [published]
@@ -53,4 +53,3 @@ jobs:
             dist/SHA256SUMS
             dist/autofirme-web-*.tar.gz
           if-no-files-found: error
-
