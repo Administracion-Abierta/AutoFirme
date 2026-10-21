@@ -17,9 +17,11 @@ import { int, seq, type Bytes } from './der';
 import { createTsaFixtures, type TsaFixtures } from '../test/fixtures';
 import {
 	OID_TIME_STAMP_TOKEN,
+	parseTimeStampResponse,
 	requestTimeStamp,
 	timeStampAttributes,
-	timeStampRequest
+	timeStampRequest,
+	verifyTimeStampImprint
 } from './timestamp';
 
 // jsdom's `crypto` has no `subtle`; the client needs real WebCrypto.
@@ -129,5 +131,18 @@ describe('RFC 3161 timestamp client', () => {
 
 		stubTsa(() => seq(seq(int(0))));
 		await expect(requestTimeStamp(TSA_URL, SIGNATURE)).rejects.toThrow(/without returning a token/);
+	});
+
+	it('verifyTimeStampImprint accepts the token for its own bytes, rejects anything else', async () => {
+		const imprint = new Uint8Array(await webcrypto.subtle.digest('SHA-256', SIGNATURE));
+		const token = parseTimeStampResponse(tsa.respond(timeStampRequest(imprint)));
+
+		await expect(verifyTimeStampImprint(token, SIGNATURE)).resolves.toBeUndefined();
+		await expect(verifyTimeStampImprint(token, new TextEncoder().encode('other bytes'))).rejects.toThrow(
+			/covers different bytes/
+		);
+		await expect(verifyTimeStampImprint(new Uint8Array([0x30, 0x00]), SIGNATURE)).rejects.toThrow(
+			/unreadable/
+		);
 	});
 });
