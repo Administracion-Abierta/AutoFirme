@@ -72,10 +72,11 @@ Build/test from the repo root (pnpm is canonical; the root `pnpm-lock.yaml` cove
   (`checks`, `mcp`, `shell`, `secret-scan`, `dependency-audit`), 1 review, and `CODEOWNERS`
   sign-off on the crypto paths.
 - Versioning is automatic: conventional commits merged into `main` produce a Release Please
-  PR that bumps the single product version in `package.json` **and**
-  `extension/manifest.json` (Chrome reads the manifest one) plus `CHANGELOG.md`. Never edit
-  those versions by hand; `pnpm check:versions` (in CI) fails when they drift or when a
-  release tag does not match.
+  PR that bumps the single product version in `package.json`, `extension/manifest.json`
+  (Chrome reads the manifest one), `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and
+  the shell's entry in `src-tauri/Cargo.lock`, plus `CHANGELOG.md`. Never edit those
+  versions by hand; `pnpm check:versions` (in CI) fails when they drift or when a release
+  tag does not match.
 - Crypto code MUST ship with a verification check (e.g. generated signature verified
   by `openssl cms -verify` in a script/test) before the issue can move to review.
 - UI: clean, modern, accessible; ES/EN copy. Prettier than AutoFirma is a requirement,
