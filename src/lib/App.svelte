@@ -25,6 +25,7 @@
 		type SignFormat,
 		type SignerCert
 	} from '#lib/sign';
+	import { saveBytes } from '#lib/save-file';
 	import { signXades } from '#lib/xades';
 	import BatchQueue from '#lib/components/BatchQueue.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
@@ -303,18 +304,10 @@
 		void queue.run(signer);
 	}
 
-	/** Batch ZIP: the queue holds the signed bytes, the archive is built on demand. */
-	function downloadZip() {
-		saveFile(t.queueArchive, buildZip(batch), 'application/zip');
-	}
-
-	function saveFile(name: string, bytes: Uint8Array<ArrayBuffer>, type: string) {
-		const url = URL.createObjectURL(new Blob([bytes], { type }));
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = name;
-		link.click();
-		URL.revokeObjectURL(url);
+	/** Batch ZIP: the queue holds the signed bytes, the archive is built on demand.
+	 *  Native save dialog on desktop, anchor download in the browser. */
+	async function downloadZip() {
+		await saveBytes(t.queueArchive, buildZip(batch), 'application/zip');
 	}
 
 

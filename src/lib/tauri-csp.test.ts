@@ -25,6 +25,10 @@ describe('shell CSP connect-src', () => {
 		expect(sources('connect-src')).toEqual(expect.arrayContaining(['https:', 'http:']));
 	});
 
+	it('keeps default-src untouched', () => {
+		expect(sources('default-src')).toEqual(["'self'"]);
+	});
+
 	it('keeps the IPC transport the Tauri commands need', () => {
 		expect(sources('connect-src')).toEqual(expect.arrayContaining(['ipc:', 'http://ipc.localhost']));
 	});
