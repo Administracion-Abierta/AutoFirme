@@ -13,6 +13,7 @@
 import type { Bytes } from './asn1';
 import { EXC_C14N, canonicalize } from './c14n';
 import { type SignerCert, type SigningAlgorithm, signBytes } from './sign';
+import { requestTimeStamp } from './timestamp';
 
 const DS = 'http://www.w3.org/2000/09/xmldsig#';
 const XADES = 'http://uri.etsi.org/01903/v1.3.2#';
@@ -55,6 +56,11 @@ export interface XadesSignatureOptions {
 	hash?: SigningAlgorithm['hash'];
 	/** Signing time; defaults to now. */
 	now?: Date;
+	/**
+	 * RFC 3161 TSA URL. When set, the canonicalised `ds:SignatureValue` is timestamped and the
+	 * token embedded as `SignatureTimeStamp/EncapsulatedTimeStamp` — the EPES becomes XAdES-T.
+	 */
+	timeStamp?: string;
 	/** Deterministic ids — for golden vectors and reproducible output. */
 	ids?: Partial<XadesIds>;
 }
@@ -232,6 +238,7 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 					</xades:DataObjectFormat>
 				</xades:SignedDataObjectProperties>
 			</xades:SignedProperties>
+			${options.timeStamp ? `<xades:UnsignedProperties><xades:UnsignedSignatureProperties><xades:SignatureTimeStamp><ds:CanonicalizationMethod Algorithm="${EXC_C14N}"/><xades:EncapsulatedTimeStamp/></xades:SignatureTimeStamp></xades:UnsignedSignatureProperties></xades:UnsignedProperties>` : ''}
 		</xades:QualifyingProperties>
 	</ds:Object>
 </ds:Signature>`;
@@ -250,6 +257,15 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 	const signedInfo = byId(doc, ids.signedInfo);
 	const signatureValue = await signBytes(signer, canonicalize(signedInfo, { exclusive: true }), hash);
 	byId(doc, ids.signatureValue).textContent = toBase64(signatureValue);
+
+	if (options.timeStamp) {
+		// XAdES-T: the TSA timestamps the canonicalised SignatureValue element, never the
+		// document (ETSI EN 319 132-1 §5.4). The imprint algorithm is fixed by the token (SHA-256).
+		const signatureValueBytes = canonicalize(byId(doc, ids.signatureValue), { exclusive: true });
+		const token = await requestTimeStamp(options.timeStamp, signatureValueBytes);
+		byId(doc, ids.signature).getElementsByTagNameNS(XADES, 'EncapsulatedTimeStamp')[0].textContent =
+			toBase64(token);
+	}
 
 	// Serialize every document child — top-level PIs/comments must survive signing.
 	const body = [...doc.childNodes].map((child) => new XMLSerializer().serializeToString(child)).join('');
