@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { explicit, parseDer } from '#lib/asn1';
+import { explicit, oid, parseDer } from '#lib/asn1';
 import { signCadesDetached } from '#lib/cms';
 import { loadSignerSession } from '#lib/keystore';
 import { requestTimeStamp } from '#lib/timestamp';
@@ -392,6 +392,41 @@ describe('timestamps, XAdES-T and CAdES-X Long (#125)', () => {
 			expect(stamps.every((entry) => entry.status === 'pass')).toBe(true);
 			expect(stamps.map((entry) => entry.detail).join(' | ')).toMatch(/refs/);
 			expect(report.ok).toBe(true);
+		});
+	});
+
+	it('passes both timestamps for CAdES-X Long type 1', async () => {
+		await withTsa(async () => {
+			const { signer } = await loadSignerSession(cades.p12, FIXTURE_PIN);
+			const signature = await signCadesDetached(signer, cades.content, { timeStamp: tsaUrl, xLong: 1 });
+			const report = await verifyArtifact(signature, roots());
+
+			const stamps = report.checks.filter((entry) => entry.id === 'timestamp');
+			expect(stamps).toHaveLength(2);
+			expect(stamps.every((entry) => entry.status === 'pass')).toBe(true);
+			// The escTimeStamp covers signature + CAdES-T token + refs (RFC 5126 §6.3.5).
+			expect(stamps.map((entry) => entry.detail).join(' | ')).toMatch(/CAdES-T timestamp and the certificate and revocation refs/);
+			expect(report.ok).toBe(true);
+		});
+	});
+
+	it('fails the CAdES-C timestamp when the refs no longer match its imprint', async () => {
+		await withTsa(async () => {
+			const { signer } = await loadSignerSession(cades.p12, FIXTURE_PIN);
+			const signature = await signCadesDetached(signer, cades.content, { timeStamp: tsaUrl, xLong: 2 });
+			// Flip one byte inside the certificate-refs value: the SET still parses, but the bytes the
+			// certCRLTimestamp covers are gone, so its check must fail with a reason.
+			const signerInfo = explicit(parseDer(signature).children[1], 0xa0).children[4].children[0];
+			const refs = signerInfo.children[6].children.find(
+				(attribute) => oid(attribute.children[0]) === '1.2.840.113549.1.9.16.2.21'
+			)!;
+			const value = refs.children[1].children[0].value;
+			signature[value.byteOffset - signature.byteOffset + 3] ^= 0x01;
+
+			const report = await verifyArtifact(signature, roots());
+			const stamps = report.checks.filter((entry) => entry.id === 'timestamp');
+			expect(stamps.some((entry) => entry.status === 'fail' && /covers neither/.test(entry.detail))).toBe(true);
+			expect(report.ok).toBe(false);
 		});
 	});
 
