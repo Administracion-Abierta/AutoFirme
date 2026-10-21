@@ -21,8 +21,9 @@ the project's maintainers.
 - The in-memory PIN cache, only when you tick the remember box: it lives in memory for
   the chosen minutes and disappears when the browser closes.
 
-You can delete a saved identity from the certificate picker, or reset the whole store
-from Settings. Uninstalling the extension removes its storage.
+You can delete a saved identity from the certificate picker. When the browser database is
+unavailable the picker also offers a full store reset. Uninstalling the extension removes
+its storage.
 
 ### When the extension uses the network
 
@@ -72,8 +73,9 @@ clave, PIN o certificado se envía a los mantenedores del proyecto.
 - La caché de PIN en memoria, solo si marcas la casilla: vive en memoria durante los
   minutos elegidos y desaparece al cerrar el navegador.
 
-Puedes borrar una identidad guardada desde el selector de certificados o restablecer todo
-el almacén desde Ajustes. Desinstalar la extensión elimina su almacenamiento.
+Puedes borrar una identidad guardada desde el selector de certificados. Cuando la base de
+datos del navegador no está disponible, ese mismo selector ofrece además reiniciar todo el
+almacén. Desinstalar la extensión elimina su almacenamiento.
 
 ### Cuándo usa la red
 
