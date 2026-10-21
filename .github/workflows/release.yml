@@ -24,7 +24,7 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # A release that bumps only one of the two version fields must not ship.
+      # A release that bumps only some of the five version files must not ship.
       - run: node scripts/check-versions.mjs ${{ github.event.release.tag_name }}
       - run: pnpm build
       - run: pnpm build:extension

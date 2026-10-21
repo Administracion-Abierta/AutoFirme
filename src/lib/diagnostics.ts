@@ -1,7 +1,8 @@
 /**
  * Runtime probes for the load-bearing question of #19: does WebCrypto work inside the
  * desktop webview (`tauri://localhost` on WebKitGTK)? The diagnostics page renders the
- * answer; the CI job runs the same probes headlessly.
+ * answer in-app; the run recorded below is what answered the question. CI only asserts
+ * the webview boots (`SHELL_SMOKE Finished` in the `shell` job), not the probe values.
  *
  * ANSWERED 2026-10-21 on `ubuntu:24.04`, `webkit2gtk-4.1`, `tauri 2.12.4`, production
  * mode (`--features tauri/custom-protocol`), driven headlessly under `xvfb-run`:
