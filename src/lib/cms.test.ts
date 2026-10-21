@@ -28,7 +28,8 @@ const OID_CONTENT_TYPE = '1.2.840.113549.1.9.3';
 const OID_MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
 const OID_SIGNING_TIME = '1.2.840.113549.1.9.5';
 const OID_SIGNING_CERTIFICATE_V2 = '1.2.840.113549.1.9.16.2.47';
-
+const OID_CERTIFICATE_REFS = '1.2.840.113549.1.9.16.2.21';
+const OID_REVOCATION_REFS = '1.2.840.113549.1.9.16.2.22';
 const SIGNING_TIME = new Date(Date.UTC(2026, 9, 14, 12, 0, 0));
 /** Vitest runs with the project directory as cwd; `import.meta.url` is an http URL under jsdom. */
 const GOLDEN_DIR = resolve(process.cwd(), 'src/test/fixtures/cades');
@@ -167,6 +168,83 @@ describe('CAdES-BES detached signing', () => {
 		const withoutKey = session.certificates.find((certificate) => certificate.key === null)!;
 
 		await expect(signCadesDetached(withoutKey, fixtures.content)).rejects.toThrow('no private key');
+	});
+
+	it('adds certificate and revocation refs for X Long type 1', async () => {
+		const tsa = createTsaFixtures();
+		try {
+			const { signer } = await loadSignerSession(fixtures.p12, FIXTURE_PIN);
+			vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+				const query = init.body;
+				if (!(query instanceof Uint8Array)) throw new Error('the timestamp request has no DER body');
+				return new Response(tsa.respond(query), { status: 200 });
+			});
+
+			const signature = await signCadesDetached(signer, fixtures.content, {
+				signingTime: SIGNING_TIME,
+				timeStamp: 'https://tsa.test/',
+				xLong: 1
+			});
+			vi.unstubAllGlobals();
+
+			expect(verify(signature, fixtures.contentPath, fixtures.caPath, ['-cades'])).toBeNull();
+			const unsigned = new Map(
+				signerInfo(signature).children[6].children.map((attribute) => [oid(attribute.children[0]), attribute])
+			);
+			expect([...unsigned.keys()].sort()).toEqual(
+				[OID_TIME_STAMP_TOKEN, OID_CERTIFICATE_REFS, OID_REVOCATION_REFS].sort()
+			);
+			// One OtherCertID sequence per embedded certificate; openssl parses the refs structure.
+			expect(unsigned.get(OID_CERTIFICATE_REFS)!.children[1].children[0].tag).toBe(0x30);
+
+			// SET OF sorts attributes, so locate the token by OID instead of position.
+			const timeStampAttr = [...unsigned.values()].find(
+				(entry) => oid(entry.children[0]) === OID_TIME_STAMP_TOKEN
+			)!;
+			const token = timeStampAttr.children[1].children[0].raw;
+			const { signature: value } = cmsTimeStamp(signature);
+			expect(tsVerifyToken(tsa.dir, tsa.certPath, token, value)).toMatch(/Verification: OK/);
+		} finally {
+			vi.unstubAllGlobals();
+			rmSync(tsa.dir, { recursive: true, force: true });
+		}
+	});
+
+	it('timestamps the refs for X Long type 2 (CAdES-C timestamp)', async () => {
+		const tsa = createTsaFixtures();
+		try {
+			const { signer } = await loadSignerSession(fixtures.p12, FIXTURE_PIN);
+			vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+				const query = init.body;
+				if (!(query instanceof Uint8Array)) throw new Error('the timestamp request has no DER body');
+				return new Response(tsa.respond(query), { status: 200 });
+			});
+
+			const signature = await signCadesDetached(signer, fixtures.content, {
+				signingTime: SIGNING_TIME,
+				timeStamp: 'https://tsa.test/',
+				xLong: 2
+			});
+			vi.unstubAllGlobals();
+
+			expect(verify(signature, fixtures.contentPath, fixtures.caPath, ['-cades'])).toBeNull();
+			const unsigned = signerInfo(signature).children[6].children;
+			const timeStamps = unsigned.filter((attribute) => oid(attribute.children[0]) === OID_TIME_STAMP_TOKEN);
+			// One token over the signature value, one over the refs.
+			expect(timeStamps).toHaveLength(2);
+			expect(unsigned.map((attribute) => oid(attribute.children[0])).sort()).toEqual(
+				[OID_TIME_STAMP_TOKEN, OID_TIME_STAMP_TOKEN, OID_CERTIFICATE_REFS, OID_REVOCATION_REFS].sort()
+			);
+		} finally {
+			vi.unstubAllGlobals();
+			rmSync(tsa.dir, { recursive: true, force: true });
+		}
+	});
+	it('refuses X Long without a TSA (it builds on CAdES-T)', async () => {
+		const { signer } = await loadSignerSession(fixtures.p12, FIXTURE_PIN);
+		await expect(
+			signCadesDetached(signer, fixtures.content, { signingTime: SIGNING_TIME, xLong: 1 })
+		).rejects.toThrow(/builds on CAdES-T/);
 	});
 });
 
