@@ -1,45 +1,56 @@
-# Deploy (Cloudflare Worker `autofirme`, static assets)
+# Release & distribution (GitHub Releases is the only channel)
 
-Static build, zero backend. Signing runs in the browser; the Worker serves files
-only (assets-only Worker, no `main` entrypoint, no edge code).
+No hosted product, no deploy. Versions ship as release assets; milestones and
+`release-please` own the numbering. This file describes the release story —
+for the retired Worker deploy, see the note at the bottom.
 
-Live URL: https://autofirme.eduard3v.workers.dev
+## Channel
 
-## How it deploys
+**GitHub Releases is the only distribution channel.** No apt/dnf repo, no docs
+site, no demo host, no third-party store as primary (locked in
+`docs/DESKTOP-ROADMAP.md` §1, decision 9).
 
-- Pushes to `main` run CI (`checks` job) and then the `deploy` job:
-  `pnpm install --frozen-lockfile && pnpm build && pnpm exec wrangler deploy`.
-- PRs and `develop` never touch the production Worker (`develop` ships the dev
-  pre-release instead — see `release-develop.yml`).
-- `wrangler.jsonc` is the contract: `name: autofirme`, `assets.directory: ./build`,
-  `not_found_handling: 404-page` (deep entries `/?entry=sign`, `/?op=sign…`,
-  `/?shared=1` boot from `404.html`, which is the app shell).
+## What a release contains
 
-## Setup (once, manual)
+| Asset | Produce | Use |
+|---|---|---|
+| Extension ZIP + `SHA256SUMS` | `pnpm package:extension` | Load unpacked / store install |
+| `autofirme-web-<tag>.tar.gz` | release workflow packs `build/` | Extension options page bundle, archived for reproducibility |
+| Desktop installer per platform (Linux first) | Tauri bundler (see `docs/DESKTOP-ROADMAP.md` phases) | The full product |
+| `SHA256SUMS` over all assets | release workflow | Integrity check before install |
+| Minisign signatures | desktop updater path | Trust without a store |
 
-1. Cloudflare dashboard → My Profile → API Tokens → create a token with
-   `Account:Read` + `Workers Scripts:Edit` (narrowest scope that deploys).
-2. GitHub repo → Settings → Secrets and variables → Actions → add:
-   - `CLOUDFLARE_API_TOKEN` (the token value)
-   - `CLOUDFLARE_ACCOUNT_ID` (`d56347ecdd18776f5fae3b468ce5134a`)
-3. No environment variables, no bindings, no Functions. The app needs none.
+The release workflow (`.github/workflows/release.yml`) builds the extension
+package **twice from scratch** and diffs the `SHA256SUMS`: a change that breaks
+packaging reproducibility fails the release before upload.
 
-## Conventions
+## Versioning
 
-- Do NOT let `wrangler deploy` re-scaffold the project: if it offers `sv add` /
-  adapter-cloudflare / a `main` entrypoint, decline — this repo stays on
-  `adapter-static` with an assets-only config. If scaffolding ever lands,
-  revert it (`git checkout -- package.json pnpm-lock.yaml tsconfig.json vite.config.ts`
-  and delete `src/app.d.ts`, `static/.assetsignore`).
-- `static/_headers` ships immutable caching for `/_app/immutable/*` and icons; do not
-  cache `/`, `service-worker.js` or the manifest beyond revalidation — installs and
-  updates depend on fresh copies.
-- After deploy: open the production URL on Chrome Android, confirm the install prompt,
-  share a PDF to the app, and check the sign flow opens with the file preloaded.
+Automatic via Release Please: conventional commits merged into `main` produce a
+release PR that bumps the single product version in `package.json` **and**
+`extension/manifest.json` (Chrome reads the manifest one) plus `CHANGELOG.md`.
+Never edit those versions by hand. `pnpm check:versions` (also a CI gate) fails
+when they drift or when a release tag does not match — see
+`scripts/check-versions.mjs`.
 
-## Limits
+## Signing keys
 
-- `share_target` POST bodies never reach the Worker runtime: the service worker
-  intercepts them and redirects into the sign flow (see `src/service-worker.ts`).
-- Transparent AutoScript interception is extension-only; portals reach the PWA through
-  share, file-open, or the deep-link contract (`docs/PWA-SIGNING.md`).
+- `SHA256SUMS` ships with every release; verify before installing.
+- Minisign signatures cover the desktop updater path (roadmap: Apple Developer
+  Program purchase rides the P7 budget; Keychain provider mandatory).
+- The extension stays **unsigned**: Chrome needs Developer Mode for a manual
+  install until a store listing exists.
+
+## Milestones
+
+Release train follows the roadmap phases (`docs/DESKTOP-ROADMAP.md` §4):
+Linux desktop first, Windows second, macOS last (notarization is the long pole),
+Firefox `userScripts` (#18) after the Windows MSI exists.
+
+## Retired: Cloudflare Worker deploy (P8)
+
+The SPA used to ship as an assets-only Cloudflare Worker (`autofirme`,
+`wrangler.jsonc` → `./build`, `404.html` app shell). That deploy is retired:
+no website is published anymore. If Worker scaffolding (`wrangler.jsonc`,
+`adapter-cloudflare`, a Worker entrypoint) still exists in the tree, it belongs
+to code-deletion issue #19, not to this doc. Do not re-add hosting docs.
