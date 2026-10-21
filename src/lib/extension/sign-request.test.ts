@@ -70,6 +70,14 @@ describe('format dispatch', () => {
   expect(Buffer.from(enveloped.signature!, 'base64').toString()).toContain('<ds:Signature');
  });
 
+ it('keeps the legacy SHA1withRSA XAdES path for old portals', async () => {
+  const xml = '<?xml version="1.0"?><root><value>1</value></root>';
+  const legacy = await signRequest({ ...request, format: 'XAdES', mode: 'implicit', algorithm: 'SHA1withRSA', data: Buffer.from(xml).toString('base64') }, session.signer, session.certificates);
+  const text = Buffer.from(legacy.signature!, 'base64').toString();
+  expect(text).toContain('http://www.w3.org/2000/09/xmldsig#rsa-sha1');
+  expect(text).toContain('<ds:Signature');
+ });
+
  it('applies AutoFirma’s visible-signature parameters', async () => {
   const pdf = readFileSync(join(process.cwd(), 'test/fixtures/pades-source.pdf'));
   const stamped = await signRequest({
