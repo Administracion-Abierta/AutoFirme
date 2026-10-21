@@ -31,14 +31,24 @@ const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
 const OID_TIME_STAMP_TOKEN = '1.2.840.113549.1.9.16.2.14';
 const OID_COMPLETE_CERTIFICATE_REFS = '1.2.840.113549.1.9.16.2.21';
 const OID_COMPLETE_REVOCATION_REFS = '1.2.840.113549.1.9.16.2.22';
+/** `id-aa-ets-escTimeStamp` — CAdES-C time-stamp over signature + refs (RFC 5126 §6.3.5). */
+const OID_ESC_TIME_STAMP = '1.2.840.113549.1.9.16.2.25';
+/** `id-aa-ets-certCRLTimestamp` — time-stamp over the refs alone (RFC 5126 §6.3.6). */
+const OID_CERT_CRL_TIME_STAMP = '1.2.840.113549.1.9.16.2.26';
 
 interface Attribute {
 	type: string;
 	values: Der[];
+	/** `attrType` TLV plus `attrValues` SET TLV — the bytes RFC 5126 §6.3.5/§6.3.6 hash. */
+	imprint: Bytes;
 }
 
 function parseAttribute(attribute: Der): Attribute {
-	return { type: oid(at(attribute, 0)), values: children(at(attribute, 1)) };
+	return {
+		type: oid(at(attribute, 0)),
+		values: children(at(attribute, 1)),
+		imprint: concatRaw([at(attribute, 0).raw, at(attribute, 1).raw])
+	};
 }
 
 /** `unsignedAttrs [1] IMPLICIT`, after the signature — absent on BES signatures. */
@@ -125,30 +135,47 @@ function concatRaw(parts: Bytes[]): Bytes {
 }
 
 /**
- * Every `timeStampToken` unsigned attribute must cover a known imprint: the signature value
- * (CAdES-T) or the concatenated X Long refs (CAdES-C). A token over anything else — a different
- * canonicalisation, another document, another signature — fails with its reason attached.
+ * Every timestamps unsigned attribute is checked against the imprint RFC 5126 defines for its
+ * own OID: `id-aa-timeStampToken` covers the signature value (CAdES-T); `id-aa-ets-escTimeStamp`
+ * covers signature, CAdES-T token and refs (X Long type 1, §6.3.5); `id-aa-ets-certCRLTimestamp`
+ * covers the refs alone (type 2, §6.3.6). Anywhere else it lives — under the CAdES-T OID, over a
+ * different canonicalisation or another document — fails with its reason attached.
  */
 async function verifyTimestamps(data: SignedData): Promise<Check[]> {
-	const tokens = data.unsignedAttributes.filter((attribute) => attribute.type === OID_TIME_STAMP_TOKEN);
-	if (tokens.length === 0) {
+	const stamps = data.unsignedAttributes.filter((attribute) =>
+		[OID_TIME_STAMP_TOKEN, OID_ESC_TIME_STAMP, OID_CERT_CRL_TIME_STAMP].includes(attribute.type)
+	);
+	if (stamps.length === 0) {
 		return [{ id: 'timestamp', status: 'info', detail: 'no unsigned timestamp — CAdES-BES' }];
 	}
 	const certRefs = data.unsignedAttributes.find((attribute) => attribute.type === OID_COMPLETE_CERTIFICATE_REFS);
 	const revRefs = data.unsignedAttributes.find((attribute) => attribute.type === OID_COMPLETE_REVOCATION_REFS);
-	const refsBytes = certRefs?.values[0] && revRefs?.values[0] ? concatRaw([certRefs.values[0].raw, revRefs.values[0].raw]) : null;
-	const imprints: { label: string; bytes: Bytes }[] = [{ label: 'the signature value', bytes: data.signature }];
-	if (refsBytes) imprints.push({ label: 'the certificate and revocation refs', bytes: refsBytes });
+	// Concatenated `attrType`+`attrValues` of both refs attributes (RFC 5126 §6.3.5/§6.3.6 NOTE 2).
+	const refs = certRefs && revRefs ? concatRaw([certRefs.imprint, revRefs.imprint]) : null;
+	const simple = data.unsignedAttributes.filter((attribute) => attribute.type === OID_TIME_STAMP_TOKEN);
+	const imprints: { type: string; label: string; bytes: Bytes }[] = [
+		{ type: OID_TIME_STAMP_TOKEN, label: 'the signature value', bytes: data.signature }
+	];
+	if (refs) imprints.push({ type: OID_CERT_CRL_TIME_STAMP, label: 'the certificate and revocation refs', bytes: refs });
+	if (refs && simple.length > 0) {
+		imprints.push({
+			type: OID_ESC_TIME_STAMP,
+			label: 'the signature value, its CAdES-T timestamp and the certificate and revocation refs',
+			bytes: concatRaw([data.signature, simple[0].imprint, refs])
+		});
+	}
 	const checks: Check[] = [];
-	for (const token of tokens) {
-		const raw = token.values[0]?.raw;
+	for (const stamp of stamps) {
+		const raw = stamp.values[0]?.raw;
 		if (!raw) {
 			checks.push({ id: 'timestamp', status: 'fail', detail: 'timestamp attribute carries no token' });
 			continue;
 		}
 		let matched: string | null = null;
 		let reason = '';
-		for (const imprint of imprints) {
+		// A token may legitimately satisfy more than one OID's imprint, so try them all; only the
+		// candidates valid for this attribute's own OID are accepted.
+		for (const imprint of imprints.filter((candidate) => candidate.type === stamp.type)) {
 			try {
 				await verifyTimeStampImprint(raw, imprint.bytes);
 				matched = imprint.label;

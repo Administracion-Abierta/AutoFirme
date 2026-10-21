@@ -11,6 +11,7 @@
 import {
 	type Bytes,
 	concatBytes,
+	derContent,
 	derInteger,
 	explicitTagged,
 	implicitTagged,
@@ -35,6 +36,10 @@ const OID_SIGNING_CERTIFICATE_V2 = '1.2.840.113549.1.9.16.2.47';
 const OID_COMPLETE_CERTIFICATE_REFS = '1.2.840.113549.1.9.16.2.21';
 /** `id-aa-ets-revocationRefs` — CompleteRevocationRefs (RFC 5126 §6.2.2). */
 const OID_COMPLETE_REVOCATION_REFS = '1.2.840.113549.1.9.16.2.22';
+/** `id-aa-ets-escTimeStamp` — CAdES-C time-stamp (RFC 5126 §6.3.5); X Long type 1. */
+const OID_ESC_TIME_STAMP = '1.2.840.113549.1.9.16.2.25';
+/** `id-aa-ets-certCRLTimestamp` — time-stamped certs/CRLs refs (RFC 5126 §6.3.6); type 2. */
+const OID_CERT_CRL_TIME_STAMP = '1.2.840.113549.1.9.16.2.26';
 const OID_SHA256 = '2.16.840.1.101.3.4.2.1';
 const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
 const OID_ECDSA_WITH_SHA256 = '1.2.840.10045.4.3.2';
@@ -142,20 +147,30 @@ export async function signCadesDetached(
 	}
 	const unsigned: Bytes[] = [];
 	if (options.timeStamp) {
-		unsigned.push(attribute(OID_TIME_STAMP_TOKEN, await requestTimeStamp(options.timeStamp, signature)));
-	}
-	if (options.xLong !== undefined && options.timeStamp) {
-		const embedded = [cert, ...(options.chain ?? [])].filter((entry, index, all) =>
-			all.findIndex((other) => other.der.length === entry.der.length && other.der.every((b, i) => b === entry.der[i])) === index
-		).map((entry) => entry.der);
-		const { certRefs, revRefs } = await xLongRefs(embedded);
-		unsigned.push(attribute(OID_COMPLETE_CERTIFICATE_REFS, certRefs));
-		unsigned.push(attribute(OID_COMPLETE_REVOCATION_REFS, revRefs));
-		if (options.xLong === 2) {
-			// CAdES-C timestamp: over the refs, never the signature (RFC 5126 §6.3).
-			const refsImprint = concatBytes([certRefs, revRefs]);
+		const token = await requestTimeStamp(options.timeStamp, signature);
+		unsigned.push(attribute(OID_TIME_STAMP_TOKEN, token));
+		if (options.xLong !== undefined) {
+			const embedded = [cert, ...(options.chain ?? [])].filter((entry, index, all) =>
+				all.findIndex((other) => other.der.length === entry.der.length && other.der.every((b, i) => b === entry.der[i])) === index
+			).map((entry) => entry.der);
+			const { certRefs, revRefs } = await xLongRefs(embedded);
+			const certRefsAttr = attribute(OID_COMPLETE_CERTIFICATE_REFS, certRefs);
+			const revRefsAttr = attribute(OID_COMPLETE_REVOCATION_REFS, revRefs);
+			unsigned.push(certRefsAttr, revRefsAttr);
+			// RFC 5126 §6.3.5/§6.3.6 NOTE 2 hashes each referenced attribute as `attrType` plus
+			// `attrValues`, without the outer SEQUENCE — `derContent` strips exactly that header.
+			const refs = concatBytes([derContent(certRefsAttr), derContent(revRefsAttr)]);
 			unsigned.push(
-				attribute(OID_TIME_STAMP_TOKEN, await requestTimeStamp(options.timeStamp, refsImprint))
+				attribute(
+					// Type 2 covers the refs alone; type 1 adds the signature and its CAdES-T token.
+					options.xLong === 1 ? OID_ESC_TIME_STAMP : OID_CERT_CRL_TIME_STAMP,
+					await requestTimeStamp(
+						options.timeStamp,
+						options.xLong === 1
+							? concatBytes([signature, derContent(attribute(OID_TIME_STAMP_TOKEN, token)), refs])
+							: refs
+					)
+				)
 			);
 		}
 	}
