@@ -16,10 +16,13 @@ self-hostable by anyone.
 - **Client-side rendered SPA.** Signing/verification runs in the browser
   (WebCrypto API + WASM where needed). No signing server: private keys never
   leave the client.
-- **Primary surface = the web app, installable as a PWA (#47).** No desktop/Electron/Tauri build:
-  discarded in `docs/PIVOT-STUDY.md` §5. The extension is the only surface that can intercept a
-  portal's `AutoScript` call; a PWA cannot. DNIe/smartcard support is a possible improvement
-  (`README.md`), not a reason to revive a desktop app.
+- **Primary surface = the web app, installable as a PWA (#47).** The extension is the
+  only surface that can intercept a portal's `AutoScript` call; a PWA cannot.
+  `src-tauri/` is not a second product: it is the #19 probe that proves the engine runs
+  unmodified under `tauri://localhost` on Linux, and the CI `shell` job gates it. No
+  desktop build ships — the "discarded for now" call in `docs/PIVOT-STUDY.md` §5 stands.
+  DNIe/smartcard support is a possible improvement (`README.md`), not a reason to revive
+  a desktop app.
 - **Self-host first:** static build deployable on any nginx/k3s/static host,
   zero backend required for core flows.
 - **Reference, don't port:** AutoFirma 1.9 — https://github.com/ctt-gob-es/clienteafirma
