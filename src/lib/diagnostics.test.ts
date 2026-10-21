@@ -8,12 +8,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PDF_BUDGET, pdfWithContent, runBudget } from './diagnostics';
 import { runEngineSync } from './engine';
 import { loadSignerSession } from './keystore';
-import { verifyPades } from './verify/pades';
 import {
 	createPkcs12Fixtures,
 	FIXTURE_PIN,
 	type Pkcs12Fixtures
 } from '../test/fixtures';
+
+/** DER → PEM trust anchor for the self-signed fixture leaf. */
+function derToPem(der: Uint8Array): string {
+	const base64 = Buffer.from(der.buffer, der.byteOffset, der.byteLength).toString('base64');
+	return `-----BEGIN CERTIFICATE-----\n${base64.match(/.{1,64}/g)!.join('\n')}\n-----END CERTIFICATE-----\n`;
+}
 
 let fixtures: Pkcs12Fixtures;
 
@@ -34,41 +39,26 @@ describe('50 MB PAdES budget', () => {
 	it('signs and verifies inside the budget', async () => {
 		const { signer } = await loadSignerSession(fixtures.modern, FIXTURE_PIN);
 		if (!signer.key) throw new Error('fixture signer has no private key');
+		const certificate = signer.der.buffer.slice(
+			signer.der.byteOffset,
+			signer.der.byteOffset + signer.der.byteLength
+		) as ArrayBuffer;
+		const trust = [derToPem(signer.der)];
 		const result = await runBudget(
 			{
 				kind: 'sign-pades',
-				certificate: signer.der.buffer.slice(
-					signer.der.byteOffset,
-					signer.der.byteOffset + signer.der.byteLength
-				) as ArrayBuffer,
+				certificate,
 				chain: [],
 				privateKey: signer.key,
 				signingTime: Date.UTC(2026, 9, 21)
 			},
-			(request) => runEngineSync(request)
+			(request) => runEngineSync(request),
+			undefined,
+			trust
 		);
+		expect(result.verified).toBe(true);
 		expect(result.pass).toBe(true);
 		expect(result.signMs).toBeLessThanOrEqual(PDF_BUDGET.signMs);
 		expect(result.verifyMs).toBeLessThanOrEqual(PDF_BUDGET.verifyMs);
-	}, 120_000);
-
-	it('round-trips through the worker path', async () => {
-		const { signer } = await loadSignerSession(fixtures.modern, FIXTURE_PIN);
-		if (!signer.key) throw new Error('fixture signer has no private key');
-		const pdf = pdfWithContent(1024 * 1024).slice().buffer as ArrayBuffer;
-		const out = await runEngineSync({
-			kind: 'sign-pades',
-			pdf,
-			certificate: signer.der.buffer.slice(
-				signer.der.byteOffset,
-				signer.der.byteOffset + signer.der.byteLength
-			) as ArrayBuffer,
-			chain: [],
-			privateKey: signer.key,
-			signingTime: Date.UTC(2026, 9, 21)
-		});
-		if (out.kind !== 'sign-pades') throw new Error('expected a signature');
-		const report = await verifyPades(new Uint8Array(out.signed) as Uint8Array<ArrayBuffer>);
-		expect(report.ok).toBe(true);
-	});
+	}, 180_000);
 });

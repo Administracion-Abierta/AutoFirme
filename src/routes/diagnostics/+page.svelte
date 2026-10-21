@@ -7,7 +7,7 @@
 	let p12: Uint8Array<ArrayBuffer> | null = $state(null);
 	let phase = $state('');
 	let fraction = $state<number | null>(null);
-	let result = $state<{ signMs: number; verifyMs: number; signedBytes: number; pass: boolean } | null>(null);
+	let result = $state<{ signMs: number; verifyMs: number; signedBytes: number; verified: boolean; pass: boolean } | null>(null);
 	let error = $state('');
 	let running = $state(false);
 
@@ -68,6 +68,7 @@
 				<tr><td>Sign</td><td>{result.signMs} ms (budget {PDF_BUDGET.signMs})</td></tr>
 				<tr><td>Verify</td><td>{result.verifyMs} ms (budget {PDF_BUDGET.verifyMs})</td></tr>
 				<tr><td>Signed</td><td>{result.signedBytes} bytes</td></tr>
+				<tr><td>Verified</td><td>{result.verified ? 'yes' : 'NO'}</td></tr>
 				<tr><td>Verdict</td><td>{result.pass ? 'PASS' : 'FAIL'}</td></tr>
 			</tbody>
 		</table>

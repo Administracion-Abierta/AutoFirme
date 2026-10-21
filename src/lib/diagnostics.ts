@@ -4,7 +4,7 @@
  * shell smoke agree on what "too slow" means.
  */
 
-import { runEngineSync, type EngineRequest } from './engine';
+import { runEngineSync, type EngineRequest, type EngineResult } from './engine';
 
 export const PDF_BUDGET = {
 	/** Bytes of the synthetic PDF the budget is asserted against. */
@@ -17,6 +17,8 @@ export interface BudgetResult {
 	signMs: number;
 	verifyMs: number;
 	signedBytes: number;
+	/** Verify step accepted the produced signature — timing alone never passes. */
+	verified: boolean;
 	pass: boolean;
 }
 
@@ -64,29 +66,40 @@ function concat(...chunks: Uint8Array[]): Uint8Array<ArrayBuffer> {
 	return out;
 }
 
+export type EngineRunner = (
+	request: EngineRequest,
+	onProgress?: (phase: string, fraction: number | null) => void
+) => Promise<EngineResult>;
+
 /**
  * Runs the 50 MB sign+verify budget through any engine runner — the worker client
  * in the browser, `runEngineSync` in tests. Progress posts keep the UI alive.
+ * `trustedRoots` anchors the verify step (the fixture leaf is self-signed).
  */
 export async function runBudget(
 	request: Omit<Extract<EngineRequest, { kind: 'sign-pades' }>, 'pdf'>,
-	run: (request: EngineRequest, onProgress?: (phase: string, fraction: number | null) => void) => Promise<unknown>,
-	onProgress?: (phase: string, fraction: number | null) => void
+	run: EngineRunner = runEngineSync,
+	onProgress?: (phase: string, fraction: number | null) => void,
+	trustedRoots?: string[]
 ): Promise<BudgetResult> {
 	const pdf = pdfWithContent(PDF_BUDGET.bytes);
 	const pdfCopy = pdf.slice().buffer as ArrayBuffer;
 	const signStart = performance.now();
-	const signOut = (await run({ ...request, pdf: pdfCopy }, onProgress)) as { signed: ArrayBuffer };
+	const signOut = await run({ ...request, pdf: pdfCopy }, onProgress);
+	if (signOut.kind !== 'sign-pades') throw new Error('engine returned no signature');
 	const signMs = Math.round(performance.now() - signStart);
 	onProgress?.('verify', null);
 	const verifyStart = performance.now();
-	await run({ kind: 'verify', artifact: signOut.signed }, onProgress);
+	const verifyOut = await run({ kind: 'verify', artifact: signOut.signed, trustedRoots }, onProgress);
 	const verifyMs = Math.round(performance.now() - verifyStart);
+	if (verifyOut.kind !== 'verify') throw new Error('engine returned no verification report');
 	onProgress?.('done', 1);
+	const verified = verifyOut.report.ok;
 	return {
 		signMs,
 		verifyMs,
 		signedBytes: signOut.signed.byteLength,
-		pass: signMs <= PDF_BUDGET.signMs && verifyMs <= PDF_BUDGET.verifyMs
+		verified,
+		pass: verified && signMs <= PDF_BUDGET.signMs && verifyMs <= PDF_BUDGET.verifyMs
 	};
 }

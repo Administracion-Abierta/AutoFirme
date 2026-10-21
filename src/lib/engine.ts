@@ -31,6 +31,8 @@ export interface SignPadesRequest {
 export interface VerifyRequest {
 	kind: 'verify';
 	artifact: ArrayBuffer;
+	/** PEM trust anchors; the fixture leaf is self-signed so tests pass it as its own root. */
+	trustedRoots?: string[];
 }
 
 export type EngineRequest = SignPadesRequest | VerifyRequest;
@@ -63,7 +65,9 @@ export async function runEngineSync(request: EngineRequest): Promise<EngineResul
 		const pdf = signed as Uint8Array<ArrayBuffer>;
 		return { kind: 'sign-pades', signed: pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer };
 	}
-	const report = await verifyArtifact(new Uint8Array(request.artifact) as Uint8Array<ArrayBuffer>);
+	const report = await verifyArtifact(new Uint8Array(request.artifact) as Uint8Array<ArrayBuffer>, {
+		trustedRoots: request.trustedRoots
+	});
 	return { kind: 'verify', report };
 }
 
