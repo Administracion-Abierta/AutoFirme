@@ -31,6 +31,9 @@ async function capture(env) {
   return {...connected,item:[...env.bridge.coordinator.requests.values()][0]};
 }
 function setup(deps){const env=browser();env.bridge=createBridge(env.chrome,deps);return env;}
+// `chrome.windows.create` resolves after a microtask-plus tick, so a fixed sleep is a coin
+// flip on a loaded runner. Poll for the state the assertion needs instead.
+const until=async(wanted,what)=>{for(let i=0;i<400;i++){const value=wanted();if(value)return value;await new Promise(resolve=>setTimeout(resolve,5));}throw Error('timed out waiting for '+what);};
 
 test('a clean install registers the wildcard bridge and captures website calls',async()=>{
   const env=setup();env.state.granted.add('http://*/*');env.state.granted.add('https://*/*');await env.bridge.ready;
@@ -338,7 +341,7 @@ test('the MCP bridge authenticates, opens a chooser and returns the finished sig
 
     const signingTime='2026-10-20T12:34:56.000Z';
     socket.message({type:'sign',id:'job-1',protocol:'autofirme-bridge.v1',format:'cades',certId:'cert-1',data:'YQ==',signingTime});
-    await new Promise(resolve=>setTimeout(resolve,20));
+    await until(()=>[...env.bridge.coordinator.requests.values()][0]?.chooserTabId,'the bridge chooser');
     const item=[...env.bridge.coordinator.requests.values()][0];
     assert.ok(item,'the bridge opened a consent request');
     assert.equal(item.bridge,true);assert.equal(item.origin,'mcp');assert.equal(item.certId,'cert-1');
@@ -348,7 +351,7 @@ test('the MCP bridge authenticates, opens a chooser and returns the finished sig
     assert.equal(view.data,'YQ==');
     await env.bridge.handleMessage({type:'request:begin',id:item.id},chooser(item));
     await env.bridge.handleMessage({type:'request:complete',id:item.id,result:{certificate:'YQ==',signature:'Yg=='}},chooser(item));
-    await new Promise(resolve=>setTimeout(resolve,20));
+    await until(()=>socket.sent.find(message=>message.type==='result'&&message.id==='job-1'),'the bridge result');
     assert.deepEqual(socket.sent.at(-1),{type:'result',id:'job-1',ok:true,value:{signed_b64:'Yg=='}});
     assert.equal(env.bridge.coordinator.requests.size,0);
     assert.ok(env.state.removed.includes(item.windowId),'the chooser closes after the answer');
