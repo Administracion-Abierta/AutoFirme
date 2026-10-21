@@ -39,7 +39,7 @@ Product decisions are locked in `docs/DESKTOP-ROADMAP.md` §1.
    tag `reference/decompile-1.9` is the record. Re-generate with jadx if ever needed
    (command in `docs/REVERSING-NOTES.md` §7) — don't edit the trees, and never derive
    new Rust code from them; `docs/architecture.md` is the only source.
-4. No new web deploy surface. No wrangler/worker config, no hosting docs, no landing
+4. No new web deploy surface. No hosting config, no hosting docs, no landing
    page: GitHub Releases is the only distribution channel (`docs/DEPLOY.md`). If a
    deploy scaffold reappears (`adapter-cloudflare`, a Worker entrypoint), revert it.
 5. The app lives at the repo root — SvelteKit, Svelte 5, Tailwind v4, TypeScript.
