@@ -127,7 +127,7 @@ test('adapter failures never replay and cancellation uses original error contrac
 
 test('transport errors and cancellations reach the page in the portal error shape', async () => {
   const errors = [];
-  const api = { sign() {}, selectCertificate() {} };
+  const api = { sign(..._args) { void _args; }, selectCertificate(..._args) { void _args; } };
   wrapAutoScript(api, async () => ({ kind: 'error' }));
   api.sign('YQ==', 'SHA256withRSA', 'CAdES', '', () => assert.fail(), (...values) => errors.push(values));
   api.selectCertificate('', () => assert.fail(), (...values) => errors.push(values));
@@ -138,7 +138,7 @@ test('transport errors and cancellations reach the page in the portal error shap
     assert.match(message, /AutoFirme/);
   }
   const cancels = [];
-  const cancelApi = { sign() {}, selectCertificate() {} };
+  const cancelApi = { sign(..._args) { void _args; }, selectCertificate(..._args) { void _args; } };
   wrapAutoScript(cancelApi, async () => ({ kind: 'cancel' }));
   cancelApi.sign('YQ==', 'SHA256withRSA', 'CAdES', '', () => assert.fail(), (...values) => cancels.push(values));
   cancelApi.selectCertificate('', () => assert.fail(), (...values) => cancels.push(values));

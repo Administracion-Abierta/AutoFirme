@@ -13,7 +13,7 @@ function win() {
 	const intervals = new Map();
 	return {
 		location: { origin: 'https://site.test' },
-		sent: [],
+		sent: /** @type {any[]} */ ([]),
 		intervals,
 		addEventListener(name, fn) {
 			const handlers = listeners.get(name) || [];
@@ -33,7 +33,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 test('a distinct MiniApplet global is intercepted like AutoScript', async () => {
 	const window = win();
 	let originals = 0;
-	window.MiniApplet = { sign() { originals++; }, selectCertificate() { originals++; } };
+	window.MiniApplet = { sign(..._args) { void _args; originals++; }, selectCertificate(..._args) { void _args; originals++; } };
 	installAdapter(window, async () => ({ kind: 'result', signature: 'c2ln', certificate: 'Y2VydA==' }));
 	const seen = await new Promise((resolve, reject) => {
 		window.MiniApplet.sign('YQ==', 'SHA256withRSA', 'CAdES', '', (signature, certificate) => resolve({ signature, certificate }), reject);
@@ -47,7 +47,7 @@ test('a distinct MiniApplet global is intercepted like AutoScript', async () => 
 
 test('MiniApplet aliasing the same AutoScript object wraps exactly once', async () => {
 	const window = win();
-	const api = { calls: 0, sign() { this.calls++; } };
+	const api = { calls: 0, sign(..._args) { void _args; this.calls++; } };
 	window.AutoScript = api;
 	window.MiniApplet = api;
 	let transports = 0;
@@ -62,7 +62,7 @@ test('a late MiniApplet assignment is wrapped by the setter', async () => {
 	const window = win();
 	installAdapter(window, async () => ({ kind: 'result', signature: 'c2ln', certificate: 'Y2VydA==' }));
 	let originals = 0;
-	window.MiniApplet = { sign() { originals++; } };
+	window.MiniApplet = { sign(..._args) { void _args; originals++; } };
 	const seen = await new Promise((resolve, reject) => {
 		window.MiniApplet.sign('YQ==', 'SHA256withRSA', 'CAdES', '', (signature) => resolve(signature), reject);
 	});
