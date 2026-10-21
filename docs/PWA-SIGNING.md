@@ -2,8 +2,8 @@
 
 Installable via Chrome Android today: `static/manifest.webmanifest` (name, icons,
 `shortcuts`, `share_target`, `file_handlers`), `src/service-worker.ts` (offline shell,
-never caches runtime output), install prompt in `PwaControls.svelte`. Served over HTTPS
-by Cloudflare Pages (`docs/DEPLOY.md`).
+never caches runtime output), install prompt in `PwaControls.svelte`. Served over HTTPS by
+any static host (`docs/DEPLOY.md`).
 
 Signing only — no verify surface on any entry point.
 

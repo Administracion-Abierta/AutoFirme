@@ -11,7 +11,7 @@ real browser and roughly five minutes.
 
 | Tool | Why |
 |---|---|
-| Node 22+ | the runner |
+| Node 24 | the runner |
 | `openssl` on `PATH` | generates the throwaway identity and verifies every signature |
 | Chrome for Testing or Chromium | Playwright's download works; branded Google Chrome 137+ ignores `--load-extension` and the runner refuses it up front |
 
