@@ -61,7 +61,7 @@ as `application/json` (`{"signedDocument":{"bytes":<b64>,"name":…},"originalDo
 |---|---|---|---|---|---|
 | `cades.p7s` (+ detached `cades.content.bin`) | `CAdES-BASELINE-B` | true / **true** | INDETERMINATE | `NO_CERTIFICATE_CHAIN_FOUND` | Full document |
 | `xades.xml` | `XAdES-BASELINE-B` | true / **true** | INDETERMINATE | `NO_CERTIFICATE_CHAIN_FOUND` | Full XML file with transformations |
-| `pades.pdf` | `PAdES-BASELINE-B` | true / **true** | INDETERMINATE | `NO_CERTIFICATE_CHAIN_FOUND` | The document ByteRange : [0, 1590, 6120, 669] |
+| `pades.pdf` | `PAdES-BES` | true / **true** | INDETERMINATE | `NO_CERTIFICATE_CHAIN_FOUND` | The document ByteRange : [0, 1590, 6120, 669] |
 
 **Does DSS agree with us? Yes on everything we claim.** For all three families DSS reports the
 signature value intact and valid, the digest over the right content, the right signer

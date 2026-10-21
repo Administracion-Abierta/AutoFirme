@@ -5,8 +5,9 @@
     "status": "PASS",
     "detail": "1520 bytes",
     "artifacts": [
-      "docs/evidence/raw/item-01.cades.p7s"
-    ]
+      "docs/evidence/raw/cades.p7s"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "02",
@@ -14,8 +15,9 @@
     "status": "PASS",
     "detail": "7 checks, 0 fail",
     "artifacts": [
-      "docs/evidence/raw/item-02.cades-report.json"
-    ]
+      "docs/evidence/raw/cades.selfverify.json"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "03",
@@ -23,8 +25,9 @@
     "status": "PASS",
     "detail": "openssl verified",
     "artifacts": [
-      "docs/evidence/raw/item-03.openssl.log"
-    ]
+      "docs/evidence/raw/cades.openssl.log"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "04",
@@ -32,8 +35,9 @@
     "status": "PASS",
     "detail": "5845 chars",
     "artifacts": [
-      "docs/evidence/raw/item-04.xades.xml"
-    ]
+      "docs/evidence/raw/xades.xml"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "05",
@@ -41,8 +45,9 @@
     "status": "PASS",
     "detail": "8 checks, 0 fail",
     "artifacts": [
-      "docs/evidence/raw/item-05.xades-report.json"
-    ]
+      "docs/evidence/raw/xades.selfverify.json"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "06",
@@ -50,8 +55,9 @@
     "status": "PASS",
     "detail": "xmlsec1 OK",
     "artifacts": [
-      "docs/evidence/raw/item-06.xmlsec1.log"
-    ]
+      "docs/evidence/raw/xades.xmlsec1.log"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "07",
@@ -59,8 +65,9 @@
     "status": "PASS",
     "detail": "6789 bytes",
     "artifacts": [
-      "docs/evidence/raw/item-07.pades.pdf"
-    ]
+      "docs/evidence/raw/pades.pdf"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "09",
@@ -68,8 +75,9 @@
     "status": "PASS",
     "detail": "openssl OK, prefix intact",
     "artifacts": [
-      "docs/evidence/raw/item-09.interop.log"
-    ]
+      "docs/evidence/raw/pades.interop.log"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "08",
@@ -77,8 +85,9 @@
     "status": "PASS",
     "detail": "7 checks, 0 fail",
     "artifacts": [
-      "docs/evidence/raw/item-08.pades-report.json"
-    ]
+      "docs/evidence/raw/pades.selfverify.json"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "10",
@@ -86,8 +95,9 @@
     "status": "PASS",
     "detail": "4655 bytes",
     "artifacts": [
-      "docs/evidence/raw/item-10.ooxml.docx"
-    ]
+      "docs/evidence/raw/ooxml.docx"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "11",
@@ -95,8 +105,9 @@
     "status": "PASS",
     "detail": "cades=invalid xades=invalid pades=invalid",
     "artifacts": [
-      "docs/evidence/raw/item-11.negative.json"
-    ]
+      "docs/evidence/raw/tamper.negative.json"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
     "n": "12",
@@ -104,7 +115,8 @@
     "status": "PASS",
     "detail": "1.9 ms/file",
     "artifacts": [
-      "docs/evidence/raw/item-12.perf.log"
-    ]
+      "docs/evidence/raw/batch.perf.log"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   }
 ]

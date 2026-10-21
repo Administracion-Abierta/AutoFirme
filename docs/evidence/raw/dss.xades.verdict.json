@@ -1,9 +1,9 @@
 {
   "source": "https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/services/rest/validation/validateSignature",
   "request_date": "2026-10-21",
-  "method": "POST application/json {signedDocument:{bytes,name}[,originalDocuments]}",
   "http_status": 200,
-  "document": "item-04.xades.xml",
+  "method": "POST application/json {signedDocument:{bytes,name}[,originalDocuments]}",
+  "document": "xades.xml",
   "validation_policy": "QES AES/QC AES TL based",
   "signatures_count": 1,
   "valid_signatures_count": 0,

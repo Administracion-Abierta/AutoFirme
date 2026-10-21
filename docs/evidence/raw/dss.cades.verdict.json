@@ -1,9 +1,9 @@
 {
   "source": "https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/services/rest/validation/validateSignature",
   "request_date": "2026-10-21",
-  "method": "POST application/json {signedDocument:{bytes,name}[,originalDocuments]}",
   "http_status": 200,
-  "document": "item-01.cades.p7s",
+  "method": "POST application/json {signedDocument:{bytes,name}[,originalDocuments]}",
+  "document": "cades.p7s",
   "validation_policy": "QES AES/QC AES TL based",
   "signatures_count": 1,
   "valid_signatures_count": 0,
@@ -19,8 +19,8 @@
     "signature_scope": [
       {
         "value": "Full document",
-        "Id": "D-06EC4BFB5D1A33702386093385D8D5755045D29C34CB834EB9FB8D6497E54B0F",
-        "name": "item-03.doc.bin",
+        "Id": "D-6B6BAD8A3648D043DEC75339DA423B724986B3E5E7088FCADADE56C44850CA95",
+        "name": "cades.content.bin",
         "scope": "FULL"
       }
     ],

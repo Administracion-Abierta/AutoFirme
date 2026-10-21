@@ -18,7 +18,7 @@ Requests ran 2026-10-21, HTTP 200 for all three families. Raw responses in
 |---|---|---|---|---|
 | `raw/cades.p7s` + `raw/cades.content.bin` | `CAdES-BASELINE-B` | true | **true** | INDETERMINATE / `NO_CERTIFICATE_CHAIN_FOUND` |
 | `raw/xades.xml` | `XAdES-BASELINE-B` | true | **true** | INDETERMINATE / `NO_CERTIFICATE_CHAIN_FOUND` |
-| `raw/pades.pdf` | `PAdES-BASELINE-B` | true | **true** | INDETERMINATE / `NO_CERTIFICATE_CHAIN_FOUND` |
+| `raw/pades.pdf` | `PAdES-BES` | true | **true** | INDETERMINATE / `NO_CERTIFICATE_CHAIN_FOUND` |
 
 Signer read back by DSS on all three: `Ñandú Prueba`, RSA-2048, SHA-256 — matching the
 `*.selfverify.json` reports. PAdES scope read by DSS: `The document ByteRange : [0, 1590, 6120, 669]`
@@ -56,7 +56,7 @@ forbidden endpoint if you stop there. `POST` with the JSON above is the working 
 - Substituted oracles for the PAdES artifact: `pdfsig` (poppler 24.x) reports `Signature #1`,
   signer `CN=Ñandú Prueba`, `SHA-256`, `SubFilter ETSI.CAdES.detached`, `Signed Ranges
   [0 - 1590], [6120 - 6789]`, `Signature is Valid`; `qpdf --check` (12.4.2) exits 0; DSS wraps it in
-  the same `PAdES-BASELINE-B` verdict as above. Three independent parsers agree.
+  the same `PAdES-BES` verdict as above. Three independent parsers agree.
 - Human follow-up: open `docs/evidence/raw/pades.pdf` in Acrobat and confirm the signature panel
   shows a valid signature and "the entire document is signed". Acrobat reports an unknown issuer for
   the self-signed fixture (`Certificate issuer isn't Trusted` — `pdfsig` says the same), which is
