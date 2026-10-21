@@ -15,9 +15,11 @@ import { createPrivateKey, sign as nodeSign } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { cleanup, render } from '@testing-library/svelte';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Bytes } from '../asn1';
 import { certificateSource, PKCS12_SOURCE } from '../certstore';
+import Pkcs11Badge from './pkcs11-badge.svelte';
 import {
 	certFilterReason,
 	isModulePath,
@@ -363,5 +365,22 @@ describe('certificate sources for the badge', () => {
 	it('defaults an upload to pkcs12 and passes a token source through', () => {
 		expect(certificateSource(undefined)).toBe(PKCS12_SOURCE);
 		expect(certificateSource(certFor('Signer').source)).toBe(BADGE);
+	});
+});
+
+describe('source badge', () => {
+	it('renders pkcs11:<module> with the slot identity, and nothing for an upload', () => {
+		const { container } = render(Pkcs11Badge, {
+			props: { source: BADGE, slot: { id: 0, description: 'AutoFirme Virtual Reader 0' } }
+		});
+		const badge = container.querySelector('[data-cert-source]');
+		expect(badge?.textContent).toBe(BADGE);
+		expect(badge?.getAttribute('title')).toBe(`${BADGE} — AutoFirme Virtual Reader 0 (slot 0)`);
+
+		// A PKCS#12 upload: the file name is the badge, so this renders nothing at all.
+		cleanup();
+		expect(
+			render(Pkcs11Badge, { props: { source: PKCS12_SOURCE } }).container.textContent?.trim()
+		).toBe('');
 	});
 });
