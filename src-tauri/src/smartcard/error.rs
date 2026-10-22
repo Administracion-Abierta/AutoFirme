@@ -68,8 +68,15 @@ pub fn map_pcsc(code: pcsc::Error) -> Option<SmartcardError> {
         // names that state explicitly and the UI must not render a raw code.
         P::UnknownReader => Some(SmartcardError::NoReader),
         P::NoSmartcard => Some(SmartcardError::CardAbsent),
-        // Card inserted but its type is unknown to PC/SC/OpenSC.
+        // Card inserted but its ident/type is not recognised by PC/SC.
         P::UnknownCard => Some(SmartcardError::UnsupportedCard(format!("{code:?}"))),
+        // The issue's third named state: a card the reader/OpenSC cannot drive
+        // (`SCARD_E_CARD_UNSUPPORTED`) or cannot talk to at all
+        // (`SCARD_W_UNSUPPORTED_CARD`, e.g. ATR conflicts). Both used to fall
+        // through to `Transmission` and leak a raw PC/SC code.
+        P::CardUnsupported | P::UnsupportedCard => {
+            Some(SmartcardError::UnsupportedCard(format!("{code:?}")))
+        }
         P::RemovedCard => Some(SmartcardError::CardRemovedMidSession),
         // `SCARD_F_COMM_ERROR` is the client<->resource-manager channel, i.e.
         // pcscd itself (down, or refusing this client); card-side removal
@@ -144,5 +151,13 @@ mod tests {
             map_pcsc(pcsc::Error::ReaderUnavailable),
             Some(SmartcardError::Transmission(_))
         ));
+        // The issue names "card unsupported by the installed OpenSC" as its own
+        // clean state; these are the PC/SC codes that express it.
+        for code in [pcsc::Error::CardUnsupported, pcsc::Error::UnsupportedCard] {
+            assert!(
+                matches!(map_pcsc(code), Some(SmartcardError::UnsupportedCard(_))),
+                "{code:?} must map to the typed unsupported-card state"
+            );
+        }
     }
 }
