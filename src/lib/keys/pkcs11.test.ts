@@ -91,6 +91,19 @@ function createProbes(): Probes {
 		keyIds.set(label, `${index + 1}`);
 	});
 
+	// A key kind the provider has no mechanism for. Ed25519 is one OpenSSL writes and
+	// `parseCertificate` reports as `other`, so it stands in for any such token key.
+	openssl(['genpkey', '-algorithm', 'ED25519', '-out', 'other.pem'], dir);
+	openssl([
+		'req', '-x509', '-key', 'other.pem', '-out', 'other.pem.crt', '-days', '3650', '-sha256',
+		'-set_serial', '0x1f', '-subj', '/C=ES/O=AutoFirme/CN=other',
+		'-addext', 'basicConstraints=critical,CA:FALSE',
+		'-addext', 'keyUsage=critical,digitalSignature'
+	], dir);
+	openssl(['x509', '-in', 'other.pem.crt', '-outform', 'DER', '-out', 'other.der'], dir);
+	der.set('Other', new Uint8Array(readFileSync(join(dir, 'other.der'))));
+	keyIds.set('Other', 'ff');
+
 	return { dir, der, keyIds, publicKeyPem: readFileSync(join(dir, 'key.pub.pem'), 'utf8') };
 }
 
@@ -308,6 +321,14 @@ describe('token objects', () => {
 		expect(one?.commonName).toBe('Única');
 		expect(one?.tokenRef.slotId).toBe(7);
 		expect(objectToSignerCert({ keyId: 'x', label: 'no', der: new Uint8Array([1]) }, BADGE, 0)).toBeNull();
+	});
+
+	it('drops a certificate whose key kind has no mechanism, instead of offering RSA for it', () => {
+		// A DSA or Ed25519 token key would be handed `CKM_SHA256_RSA_PKCS` and fail at
+		// `C_SignInit` — after the user had already picked it in the picker.
+		expect(objectToSignerCert(objectFor('Other'), BADGE, 0)).toBeNull();
+		const listed = objectsToSignerCerts([objectFor('Other'), objectFor('Signer')], BADGE, 0);
+		expect(listed.map((cert) => cert.commonName)).toEqual(['Signer']);
 	});
 });
 
