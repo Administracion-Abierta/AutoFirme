@@ -96,8 +96,11 @@ for (const path of literalSources) {
 	const markup = source.replace(/<script[\s\S]*?<\/script>/g, '');
 	const literals = [
 		...markup.matchAll(/>([^<>{}]+)</g),
-		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=["']([^"'{}]*)["']/g)
-	].map((match) => match[1].trim());
+		// Either quote style, but the value must not contain its own delimiter: matching the
+		// quotes independently truncated `title="don't save"` to `don` and let
+		// `placeholder="'Guardar fichero'"` through entirely.
+		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=(?:"([^"{}]*)"|'([^'{}]*)')/g)
+	].map((match) => (match[1] ?? match[2]).trim());
 	for (const literal of literals) {
 		if (!/\p{L}/u.test(literal)) continue;
 		if (LITERAL_ALLOWLIST.has(literal) || EXAMPLE_URL.test(literal)) continue;
