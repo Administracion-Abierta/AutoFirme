@@ -87,12 +87,7 @@ impl Pkcs11Signer {
         digest: &[u8],
         pin: &AuthPin,
     ) -> Result<Vec<u8>, SmartcardError> {
-        if digest.is_empty() {
-            return Err(SmartcardError::Transmission("empty digest".into()));
-        }
-        let mut encoded = Vec::with_capacity(digest.len() + 19);
-        encoded.extend_from_slice(digest_info_prefix(digest.len())?);
-        encoded.extend_from_slice(digest);
+        let (mechanism, encoded) = sign_mechanism_and_payload(digest)?;
 
         let session = self.open_logged_in(slot, pin)?;
 
@@ -119,7 +114,7 @@ impl Pkcs11Signer {
         })?;
 
         session
-            .sign(&Mechanism::RsaPkcs, key, &encoded)
+            .sign(&mechanism, key, &encoded)
             .map_err(|e| map_pkcs11(&e))
     }
 
@@ -143,6 +138,25 @@ impl Pkcs11Signer {
         }
         Ok(session)
     }
+}
+
+/// Mechanism and payload for one signature: raw PKCS#1 v1.5 over
+/// `DigestInfo(digest)`, i.e. `CKM_RSA_PKCS` over bytes we already encoded.
+///
+/// Kept separate from [`Pkcs11Signer::sign_digest`] so tests can pin both
+/// halves: choosing a hash-and-sign mechanism or passing the bare digest is
+/// self-consistent under the token's own `C_Verify` and therefore invisible
+/// there, but no CMS verifier accepts the result.
+fn sign_mechanism_and_payload(
+    digest: &[u8],
+) -> Result<(Mechanism<'static>, Vec<u8>), SmartcardError> {
+    if digest.is_empty() {
+        return Err(SmartcardError::Transmission("empty digest".into()));
+    }
+    let mut encoded = Vec::with_capacity(digest.len() + 19);
+    encoded.extend_from_slice(digest_info_prefix(digest.len())?);
+    encoded.extend_from_slice(digest);
+    Ok((Mechanism::RsaPkcs, encoded))
 }
 
 /// DigestInfo prefixes (RFC 8017 §9.2 / EMSA-PKCS1-v1_5) for the hashes DNIe
@@ -204,6 +218,7 @@ pub fn map_pkcs11(err: &CkError) -> SmartcardError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cryptoki::mechanism::MechanismType;
 
     /// Known answer from RFC 8017 §B.1 / FIPS 180-4: `sha256("abc")`, wrapped in
     /// `DigestInfo`. This is the exact byte string a CMS verifier recomputes, so
@@ -224,6 +239,35 @@ mod tests {
         let mut encoded = digest_info_prefix(32).unwrap().to_vec();
         encoded.extend_from_slice(&sha256_abc);
         assert_eq!(encoded, expected);
+    }
+
+    /// Finding 1 of the review, pinned without a token: the payload must be
+    /// `DigestInfo(digest)` signed with the *raw* mechanism. Reverting either
+    /// half (bare digest, or `CKM_SHA256_RSA_PKCS`) doubles the hash and passes
+    /// every token-side check, so only this test catches it.
+    #[test]
+    fn sign_payload_is_digest_info_over_the_given_digest() {
+        for len in [32usize, 48, 64] {
+            let digest = vec![0xABu8; len];
+            let (mechanism, payload) = sign_mechanism_and_payload(&digest).unwrap();
+            assert_eq!(
+                mechanism.mechanism_type(),
+                MechanismType::RSA_PKCS,
+                "a hash-and-sign mechanism would hash the digest a second time"
+            );
+            assert_eq!(payload.len(), len + 19);
+            assert_eq!(&payload[..19], digest_info_prefix(len).unwrap());
+            assert_eq!(&payload[19..], &digest[..]);
+            assert_ne!(payload, digest, "the bare digest must never be signed");
+        }
+        assert!(matches!(
+            sign_mechanism_and_payload(&[]),
+            Err(SmartcardError::Transmission(_))
+        ));
+        assert!(matches!(
+            sign_mechanism_and_payload(&[0u8; 20]),
+            Err(SmartcardError::UnsupportedCard(_))
+        ));
     }
 
     #[test]
