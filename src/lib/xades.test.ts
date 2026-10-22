@@ -10,10 +10,12 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { rmSync } from 'node:fs';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
 	FIXTURE_PIN,
 	createPkcs12Fixtures,
+	createTsaFixtures,
 	writeFixtureFile,
 	xmlsec1Verify,
 	type Pkcs12Fixtures
@@ -262,10 +264,56 @@ describe('signXades', () => {
 		// The EC container is self-signed, so the leaf is its own trust anchor.
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'ec.pem'))).toBe('OK');
 	});
-
 	it('refuses to sign a document that already carries a signature', async () => {
 		await expect(
 			signXades({ xml: signed, certificates: session.certificates, signer: session.signer })
 		).rejects.toThrow(/already signed/);
+	});
+
+	it('embeds a SignatureTimeStamp over the canonicalised SignatureValue (XAdES-T)', async () => {
+		const tsa = createTsaFixtures();
+		try {
+			vi.stubGlobal(
+				'fetch',
+				async (_url: string, init: RequestInit) => new Response(tsa.respond(init.body as Uint8Array), { status: 200 })
+			);
+			const stamped = await signXades({
+				xml: SAMPLE,
+				certificates: session.certificates,
+				signer: session.signer,
+				ids: IDS,
+				now: NOW,
+				timeStamp: 'https://tsa.test/'
+			});
+			vi.unstubAllGlobals();
+
+			const stampedRoot = parse(stamped).documentElement;
+			const timeStamp = elements(stampedRoot, XADES, 'SignatureTimeStamp')[0];
+			expect(timeStamp).toBeDefined();
+			expect(elements(timeStamp, DS, 'CanonicalizationMethod')[0].getAttribute('Algorithm')).toBe(
+				'http://www.w3.org/2001/10/xml-exc-c14n#'
+			);
+			// xmlsec1 ignores the unsigned properties and still verifies the core signature.
+			const path = writeFixtureFile(fixtures.dir, 'facturae-t.xsig', encoder.encode(stamped));
+			expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+
+			// The token imprint is the digest of the canonicalised SignatureValue element.
+			const token = Buffer.from(
+				elements(timeStamp, XADES, 'EncapsulatedTimeStamp')[0].textContent!,
+				'base64'
+			);
+			const valueBytes = canonicalize(elements(stampedRoot, DS, 'SignatureValue')[0], { exclusive: true });
+			const digestHex = createHash('sha256').update(valueBytes).digest('hex');
+			const tokenPath = writeFixtureFile(fixtures.dir, 'sig-t.p7', new Uint8Array(token));
+			const output = execFileSync(
+				'openssl',
+				['ts', '-verify', '-in', tokenPath, '-token_in', '-digest', digestHex, '-CAfile', tsa.certPath],
+				{ encoding: 'utf8' }
+			);
+			expect(`${output}`).toMatch(/Verification: OK/);
+		} finally {
+			vi.unstubAllGlobals();
+			rmSync(tsa.dir, { recursive: true, force: true });
+		}
 	});
 });

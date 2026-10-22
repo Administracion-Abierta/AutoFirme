@@ -18,7 +18,7 @@ pnpm check       # tsc --noEmit
 pnpm e2e         # builds, then signs through the stdio server and verifies with openssl cms -verify
 ```
 
-Requires Node ≥ 22 and `openssl` on `PATH` (tests and the e2e check only).
+Requires Node 24 (`engines.node`) and `openssl` on `PATH` (tests and the e2e check only).
 
 ## Configuration
 

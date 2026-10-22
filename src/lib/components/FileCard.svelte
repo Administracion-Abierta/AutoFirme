@@ -5,6 +5,7 @@
 	import { TableCell, TableRow } from '#lib/components/ui/table/index.js';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import FileIcon from '@lucide/svelte/icons/file';
+	import { saveBytes } from '#lib/save-file';
 	import { formatBytes } from '#lib/sign';
 	import type { Snippet } from 'svelte';
 	import type { BatchDocument, DocumentStatus } from '#lib/batch';
@@ -40,15 +41,15 @@
 
 	const status = $derived<DocumentStatus | null>(entry?.status ?? null);
 
-	/** Saves the signature this row already holds in the queue — no re-signing, no fetch. */
-	function downloadSigned() {
+	/** Saves the signature this row already holds in the queue — no re-signing, no fetch.
+	 *  Native save dialog on desktop, anchor download in the browser. */
+	async function downloadSigned() {
 		if (!entry?.bytes) return;
-		const url = URL.createObjectURL(new Blob([entry.bytes], { type: 'application/octet-stream' }));
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = entry.output || `${file.name}.csig`;
-		link.click();
-		URL.revokeObjectURL(url);
+		await saveBytes(
+			entry.output || `${file.name}.csig`,
+			entry.bytes as Uint8Array<ArrayBuffer>,
+			'application/octet-stream'
+		);
 	}
 </script>
 

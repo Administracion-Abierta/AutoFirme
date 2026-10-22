@@ -25,12 +25,14 @@
 		type SignFormat,
 		type SignerCert
 	} from '#lib/sign';
+	import { saveBytes } from '#lib/save-file';
 	import { signXades } from '#lib/xades';
 	import BatchQueue from '#lib/components/BatchQueue.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
 	import FileCard from '#lib/components/FileCard.svelte';
 	import FileDrop from '#lib/components/FileDrop.svelte';
 	import PwaControls from '#lib/components/PwaControls.svelte';
+	import { isDesktop } from '#lib/desktop';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.js';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -65,6 +67,7 @@
 	import LanguagesIcon from '@lucide/svelte/icons/languages';
 	import CodeIcon from '@lucide/svelte/icons/code';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import PlugIcon from '@lucide/svelte/icons/plug';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
@@ -301,18 +304,10 @@
 		void queue.run(signer);
 	}
 
-	/** Batch ZIP: the queue holds the signed bytes, the archive is built on demand. */
-	function downloadZip() {
-		saveFile(t.queueArchive, buildZip(batch), 'application/zip');
-	}
-
-	function saveFile(name: string, bytes: Uint8Array<ArrayBuffer>, type: string) {
-		const url = URL.createObjectURL(new Blob([bytes], { type }));
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = name;
-		link.click();
-		URL.revokeObjectURL(url);
+	/** Batch ZIP: the queue holds the signed bytes, the archive is built on demand.
+	 *  Native save dialog on desktop, anchor download in the browser. */
+	async function downloadZip() {
+		await saveBytes(t.queueArchive, buildZip(batch), 'application/zip');
 	}
 
 
@@ -459,7 +454,7 @@
 				<h1 class="font-display text-lg font-semibold tracking-tight">{t.brand}</h1>
 			</div>
 			<div class="flex shrink-0 items-center gap-2">
-				<PwaControls copy={t} />
+				{#if !isDesktop()}<PwaControls copy={t} />{/if}
 				<Button
 					variant="ghost"
 					size="icon"
@@ -1104,6 +1099,14 @@
 					>
 						<CodeIcon class="size-4" aria-hidden="true" />
 						{t.sourceCode}
+					</a>
+
+					<a
+						class="text-primary flex w-fit items-center gap-1.5 text-sm underline decoration-primary/40 underline-offset-4"
+						href="/diagnostics"
+					>
+						<ActivityIcon class="size-4" aria-hidden="true" />
+						{t.diagnosticsLink}
 					</a>
 				</div>
 			{/if}

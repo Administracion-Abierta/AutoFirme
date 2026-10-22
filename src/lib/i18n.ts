@@ -20,6 +20,8 @@ export interface Copy {
 	privacyTitle: string;
 	/** Link to the project's source repository, in the Ayuda section. */
 	sourceCode: string;
+	/** Link to the in-app diagnostics page (P0.4 smoke table). */
+	diagnosticsLink: string;
 	/** Label of the header help menu. */
 	helpMenu: string;
 	/** Header settings button and modal title. */
@@ -165,6 +167,7 @@ export const copy: Record<Lang, Copy> = {
 		helpMenu: 'Ayuda',
 		privacyTitle: 'Privacidad',
 		sourceCode: 'Código fuente',
+		diagnosticsLink: 'Diagnóstico del navegador',
 		installApp: 'Instalar app',
 		updateApp: 'Actualizar versión',
 		pinMemoryTitle: 'PIN en memoria',
@@ -263,6 +266,7 @@ export const copy: Record<Lang, Copy> = {
 			certValidity: 'Vigencia del certificado',
 			certChain: 'Cadena de confianza',
 			signingTime: 'Fecha de firma',
+			timestamp: 'Sello de tiempo',
 			unsupported: 'Formato no comprobable en este entorno'
 		},
 		storeTitle: 'Firmas guardadas',
@@ -328,6 +332,7 @@ export const copy: Record<Lang, Copy> = {
 		helpMenu: 'Help',
 		privacyTitle: 'Privacy',
 		sourceCode: 'Source code',
+		diagnosticsLink: 'Browser diagnostics',
 		installApp: 'Install app',
 		updateApp: 'Update version',
 		pinMemoryTitle: 'PIN in memory',
@@ -426,6 +431,7 @@ export const copy: Record<Lang, Copy> = {
 			certValidity: 'Certificate validity',
 			certChain: 'Trust chain',
 			signingTime: 'Signing time',
+			timestamp: 'Timestamp',
 			unsupported: 'Format not checkable in this environment'
 		},
 		storeTitle: 'Saved signatures',

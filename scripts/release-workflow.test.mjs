@@ -1,14 +1,9 @@
 /**
- * Regression for the #3 review findings: the release pipeline must stay on the
- * `release: published` trigger (finding 1), run the double-build / SHA256SUMS gate
- * inside the publishing `artifacts` job before any upload (finding 3), ship the
- * ghcr.io image only after that gate passes (finding 4), and keep the out-of-scope
- * Chrome Web Store job and build attestation out (findings 5 and 6).
+ * Regression for the release pipeline after #19 (A1/A1b).
  *
- * Each assertion guards a shipped-scope invariant, not wording: removing or
- * re-placing the gate so it no longer runs before publication fails CI here.
- * Finding 2 (branch based on `develop`) is a git-state fact with no in-repo
- * subject; it was fixed by the merge and cannot pin in a test.
+ * The image job, the Cloudflare deploy job and the develop site tarball are gone: nothing
+ * referenced `Containerfile` or `wrangler` in `package.json`, so those jobs could never succeed.
+ * Each assertion below guards a shipped-scope invariant, not wording.
  */
 
 import { test } from 'node:test';
@@ -17,118 +12,98 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const workflow = readFileSync(
-	join(dirname(fileURLToPath(import.meta.url)), '..', '.github', 'workflows', 'release.yml'),
-	'utf8'
-);
-const devWorkflow = readFileSync(
-	join(dirname(fileURLToPath(import.meta.url)), '..', '.github', 'workflows', 'release-develop.yml'),
-	'utf8'
-);
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const read = (path) => readFileSync(join(root, path), 'utf8');
+const workflow = read('.github/workflows/release.yml');
+const devWorkflow = read('.github/workflows/release-develop.yml');
+const ciWorkflow = read('.github/workflows/ci.yml');
+const pkg = JSON.parse(read('package.json'));
 
-/** Body of one top-level job in release-develop.yml. */
-function devJob(name) {
-	const start = devWorkflow.indexOf(`\n  ${name}:\n`);
-	assert.ok(start >= 0, `job ${name} missing from release-develop.yml`);
-	const rest = devWorkflow.slice(start + 1);
+/** Body of one top-level job in a workflow file. */
+function job(source, name) {
+	const start = source.indexOf(`\n  ${name}:\n`);
+	assert.ok(start >= 0, `job ${name} missing`);
+	const rest = source.slice(start + 1);
 	const next = rest.slice(1).search(/^ {2}\S/m);
 	return next < 0 ? rest : rest.slice(0, next + 1);
 }
 
-/** Body of one top-level job, from `  <name>:` to the next two-space key. */
-function job(name) {
-	const start = workflow.indexOf(`\n  ${name}:\n`);
-	assert.ok(start >= 0, `job ${name} missing from release.yml`);
-	const rest = workflow.slice(start + 1);
-	const next = rest.slice(1).search(/^ {2}\S/m);
-	return next < 0 ? rest : rest.slice(0, next + 1);
-}
-
-test('release runs on the published release, never on a bare tag push (finding 1)', () => {
-	// Exact pin of the whole trigger block: `release: published` must be the only
-	// trigger. A loose `tags:` check misses e.g. `push: tags: [v*]` added next to
-	// `release:` (both live at different indents), which would silently re-enable
-	// the obsolete tag pipeline the issue forbids.
+test('release runs on the published release, never on a bare tag push', () => {
 	const onStart = workflow.indexOf('\non:\n');
 	assert.ok(onStart >= 0, 'on: block missing');
 	const onEnd = workflow.indexOf('\npermissions:', onStart);
 	assert.ok(onEnd > onStart, 'permissions: must follow on:');
-	assert.equal(
-		workflow.slice(onStart + 1, onEnd),
-		'on:\n  release:\n    types: [published]\n'
-	);
+	assert.equal(workflow.slice(onStart + 1, onEnd), 'on:\n  release:\n    types: [published]\n');
 });
 
-test('the artifacts job builds twice and diffs SHA256SUMS before uploading (finding 3)', () => {
-	const artifacts = job('artifacts');
+test('the artifacts job builds twice and diffs SHA256SUMS before uploading', () => {
+	const artifacts = job(workflow, 'artifacts');
 	assert.match(artifacts, /cp dist\/SHA256SUMS sums-a\.txt/);
 	assert.match(artifacts, /rm -rf dist build \.svelte-kit/);
 	assert.match(artifacts, /diff sums-a\.txt dist\/SHA256SUMS/);
 	const packs = artifacts.match(/pnpm package:extension/g);
 	assert.ok(packs && packs.length === 2, `expected exactly 2 package:extension runs, got ${packs?.length}`);
-	// The gate is only meaningful before anything reaches the release.
 	assert.ok(
 		artifacts.indexOf('diff sums-a.txt') < artifacts.indexOf('gh release upload'),
 		'reproducibility diff must run before gh release upload'
 	);
 });
 
-test('the image job publishes the Containerfile to ghcr.io after the gate (finding 4)', () => {
-	const image = job('image');
-	assert.match(image, /needs: artifacts/);
-	assert.match(image, /packages: write/);
-	assert.match(image, /registry: ghcr\.io/);
-	assert.match(image, /file: Containerfile/);
+test('the ghcr image job is gone (A1)', () => {
+	for (const source of [workflow, devWorkflow]) {
+		assert.doesNotMatch(source, /^\s+image:/m, 'image job must not come back');
+		assert.doesNotMatch(source, /ghcr\.io/);
+		assert.doesNotMatch(source, /packages: write/);
+		assert.doesNotMatch(source, /Containerfile/);
+	}
 });
 
-test('out-of-scope chrome-webstore and attestation stay out (findings 5, 6)', () => {
+test('the Cloudflare deploy job is gone (A1)', () => {
+	assert.doesNotMatch(ciWorkflow, /^\s+deploy:/m);
+	assert.doesNotMatch(ciWorkflow, /wrangler/);
+	if (pkg.devDependencies?.wrangler ?? pkg.dependencies?.wrangler) {
+		assert.fail('wrangler is installed again: reinstate a deploy job or drop the dependency');
+	}
+});
+
+test('the develop static tarball is gone (A1)', () => {
+	assert.doesNotMatch(devWorkflow, /autofirme-web-dev\.tar\.gz/);
+});
+
+test('out-of-scope chrome-webstore and attestation stay out', () => {
 	assert.doesNotMatch(workflow, /chrome/i, 'Chrome Web Store is deferred to its own issue');
 	assert.doesNotMatch(workflow, /attest-build-provenance|id-token/, 'not requested in #3');
 });
 
 // The develop pre-release channel: every push to develop ships code + extension zip
-// as a marked-unstable dev-<sha> pre-release and the site as a ghcr dev image.
+// as a marked-unstable dev-<sha> pre-release.
 
 test('develop release triggers only on develop pushes and manual dispatch', () => {
 	const onEnd = devWorkflow.indexOf('\npermissions:');
 	assert.ok(onEnd > 0, 'permissions must follow on:');
 	assert.equal(
 		devWorkflow.slice(0, onEnd),
-		`name: Develop release\n\n# Every push to develop ships a pre-release tagged dev-<short-sha>: the rolling\n# test channel for the extension zip, the static site and the container image.\n# Production releases keep coming from release-please on main (release.yml).\non:\n  push:\n    branches: [develop]\n  workflow_dispatch:\n`
+		`name: Develop release\n\n# Every push to develop ships a pre-release tagged dev-<short-sha>: the rolling\n# test channel for the extension zip and the static site. Production releases\n# keep coming from release-please on main (release.yml).\non:\n  push:\n    branches: [develop]\n  workflow_dispatch:\n`
 	);
 });
 
 test('develop artifacts job publishes the pre-release with code, extension zip and checksums', () => {
-	const artifacts = devJob('artifacts');
+	const artifacts = job(devWorkflow, 'artifacts');
 	assert.match(artifacts, /pnpm build\n/);
 	assert.match(artifacts, /pnpm package:extension/);
-	assert.match(artifacts, /tar -czf dist\/autofirme-web-dev\.tar\.gz -C build \./);
 	// The tag is commit-pinned so a release always maps to exactly one tree.
 	assert.match(artifacts, /TAG="dev-\$\{GITHUB_SHA::7\}"/);
 	assert.match(artifacts, /--target "\$GITHUB_SHA"/);
 	assert.match(artifacts, /--prerelease/);
 	assert.match(artifacts, /--title "\[Development build\] \$TAG/);
 	assert.match(artifacts, /--notes "\$NOTES"/);
-	assert.match(artifacts, /dist\/autofirme-extension-\*\.zip dist\/SHA256SUMS dist\/autofirme-web-dev\.tar\.gz/);
+	assert.match(artifacts, /dist\/autofirme-extension-\*\.zip dist\/SHA256SUMS/);
 });
 
 test('develop releases are labelled as development builds', () => {
-	const artifacts = devJob('artifacts');
+	const artifacts = job(devWorkflow, 'artifacts');
 	assert.match(artifacts, /NOTES: \|-/);
 	assert.match(artifacts, /not for production use/);
 	// The label is a user-facing promise; the notes must also state the channel.
 	assert.match(artifacts, /Rolling pre-release/);
-});
-
-test('develop image job pushes the site image to ghcr after the release exists', () => {
-	const image = devJob('image');
-	assert.match(image, /needs: artifacts/);
-	assert.match(image, /packages: write/);
-	// The org name has uppercase; the tag expression must come from the lowercased output.
-	assert.match(image, /lower=\$\{GITHUB_REPOSITORY,,\}/);
-	assert.match(image, /tags: ghcr\.io\/\$\{\{ steps\.repo\.outputs\.lower \}\}:dev,ghcr\.io\/\$\{\{ steps\.repo\.outputs\.lower \}\}:dev-\$\{\{ github\.sha \}\}/);
-	assert.ok(
-		!devWorkflow.includes('${{ github.repository }}:'),
-		'raw repository interpolation produces uppercase ghcr paths and fails'
-	);
 });

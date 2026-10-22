@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimum the web app needs: core events/windows plus the save dialog. No fs, shell or sidecar permission.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-save"]
+}
