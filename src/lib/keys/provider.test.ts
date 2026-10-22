@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Bytes } from '../asn1';
-import { signBytes, type SignerCert } from '../sign';
+import { signBytes, type SignerCert, type SignerSession } from '../sign';
+import { createPkcs12Provider } from './pkcs12';
 import type { KeyProvider } from './provider';
 
 /**
@@ -82,5 +83,43 @@ describe('KeyProvider seam', () => {
 		await signBytes(testCert({ provider }), DOCUMENT, 'SHA-512');
 
 		expect(seen[0]).toEqual(DOCUMENT);
+	});
+});
+
+describe('PKCS#12 adapter', () => {
+	it('reports the container kind and lists the session certificates', async () => {
+		const first = testCert({ id: 'first' });
+		const second = testCert({ id: 'second' });
+		const session: SignerSession = { certificates: [first, second], signer: second };
+		const provider = createPkcs12Provider(session);
+
+		expect(provider.metadata).toEqual({ kind: 'pkcs12', id: 'pkcs12', label: 'PKCS#12 file' });
+		expect(await provider.list()).toEqual([first, second]);
+	});
+
+	it('looks certificates up by id and misses unknown ids', async () => {
+		const first = testCert({ id: 'first' });
+		const second = testCert({ id: 'second' });
+		const provider = createPkcs12Provider({ certificates: [first, second], signer: second });
+
+		expect(await provider.getCert('first')).toBe(first);
+		expect(await provider.getCert('nope')).toBeNull();
+	});
+
+	it('signs over the document through the shared software backend', async () => {
+		const pair = await crypto.subtle.generateKey(
+			{ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+			true,
+			['sign', 'verify']
+		);
+		const cert = testCert({
+			key: pair.privateKey,
+			algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }
+		});
+		const provider = createPkcs12Provider({ certificates: [cert], signer: cert });
+
+		const signature = await signBytes({ ...cert, provider }, DOCUMENT);
+
+		expect(await crypto.subtle.verify('RSASSA-PKCS1-v1_5', pair.publicKey, signature, DOCUMENT)).toBe(true);
 	});
 });
