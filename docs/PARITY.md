@@ -114,7 +114,7 @@ Original: `keystores/AOKeyStore.java:13-31` (18 store types), dispatch
 | JMulticard pure-Java card stack (APDU over PC/SC) | `keystores/AOKeyStoreManagerHelperFullJava.java:27`; `jmulticard/**` | n/a — not browser-reachable | **missing** | needed — desktop product (native card stack via the `KeyProvider` seam) |
 | Generic PKCS#11 module picker (`.dll/.so/.dylib`) | `AOKeyStoreManagerHelperPkcs11.java:28`; `AOKeyStoreManagerFactory.java:266` | none | **missing** | needed — desktop product (native PKCS#11 module picker) |
 | Several certificates per container, picker, expiry shown | `ui/preferences/PreferencesPanelKeystores.java:57` | `src/lib/components/CertPicker.svelte`, `src/lib/keystore.ts` (`expired`/`notYetValid` per cert) | **full** | needed |
-| Storing identities for reuse (new in the web app, no original equivalent) | — (the original re-reads the OS store each run) | `src/lib/certstore.ts` (IndexedDB, identities sealed with PBKDF2→AES-GCM; #29) | **full** | needed — the browser-side bridge until the desktop OS keystore lands |
+| Storing identities for reuse (new in our app, no original equivalent) | — (the original re-reads the OS store each run) | `src/lib/certstore.ts` (IndexedDB, identities sealed with PBKDF2→AES-GCM; #29) | **full** | needed — the browser-side bridge until the desktop OS keystore lands |
 
 ## E. Batch / massive signing
 
