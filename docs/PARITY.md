@@ -140,12 +140,12 @@ The original has two unrelated things called "batch":
 | Signature viewer window (`VisorFirma`) | `standalone/VisorFirma.java:24`; `standalone/ui/VisorPanel.java:63` | `src/lib/verify/` report rendered by the verify panel in `src/lib/App.svelte` | **full** | needed |
 | i18n ES/EN | Java `.properties` bundles | `src/lib/i18n.ts` | **full** | needed |
 | OS installers, localhost SSL cert, root-cert injection into OS/browser stores | `decompiled-configurador/sources/es/gob/afirma/standalone/configurator/ConfiguratorLinux.java:27`; `…/ConfiguratorMacOSX.java:244`; `…/ui/restoreconfig/RestoreConfigFirefox*.java` | none — `Containerfile` (caddy) + static build (#12); deploy docs | **missing** | needed — desktop product (per-OS installers own HTTPS/trust; no deploy exists anymore) |
-| Auto-updater (`updateSite`, per-OS versions) | `standalone/updater/Updater.java:22,126`; `SimpleAfirma.java:662` | none; PWA service worker #47 (open) | **missing** | needed — desktop product (minisign updater path; extension updates ride the store/manual ZIP) |
+| Auto-updater (`updateSite`, per-OS versions) | `standalone/updater/Updater.java:22,126`; `SimpleAfirma.java:662` | none — the desktop product owns the updater (#47 closed, PWA retired) | **missing** | needed — desktop product (minisign updater path; extension updates ride the store/manual ZIP) |
 | Plugin jars from a `plugins` dir | `standalone/SimpleAfirma.java:92`; `plugins/manager/PluginInfoLoader.java` | none | **missing** | browser-moot — no dynamic native code in a page; replacement: MCP tool servers (#46) |
 | File-system dialogs / "reveal output folder" | `AOUIFactory.getLoadFiles`; `MassiveResultProcessPanel.java:93` `Desktop.getDesktop().open` | native file picker + browser downloads (per-row `Descargar` and the batch ZIP) | **full** | browser-moot — the browser sandbox owns file I/O; the web-native equivalent is in place |
 | Proxy configuration with encrypted password | `ui/preferences/ProxyPanel.java:23,183` | n/a — the browser owns the proxy | **missing** | browser-moot |
 | Look-and-feel / high-contrast / font scaling | `LookAndFeelManager.java`; `MassiveResultProcessPanel.java:74` | Tailwind v4 themes (`src/app.css`, `src/lib/theme.ts`), semantic markup | **partial** | browser-moot — replaced by the browser's own zoom/high-contrast; accessibility is a repo requirement (AGENTS.md), not a parity row |
-| Desktop-app packaging, per-OS JRE handling | `Configurator*.java`; `standalone/updater/**` | static SPA + `Containerfile`; desktop install #47 (open) | **partial** | needed — desktop product (per-OS packaging; extension ZIP already ships) |
+| Desktop-app packaging, per-OS JRE handling | `Configurator*.java`; `standalone/updater/**` | static SPA + `Containerfile`; desktop install #47 closed (PWA retired) | **partial** | needed — desktop product (per-OS packaging; extension ZIP already ships) |
 
 ## G. Gap list — missing **and** needed, prioritized
 
@@ -204,7 +204,7 @@ See the *Verdict* column — the owner is stated per row.
 The two products replace AutoFirma for: **CAdES-BES + CAdES-T** and **XAdES-EPES** signing, **CAdES, XAdES
 and PAdES verification** (PAdES without form-modification/shadow-attack depth), **PAdES B-B and B-T
 signing with visible signatures**, certificate loading from **PKCS#12**, **batch** signing with a
-manifest, ES/EN UI, and self-hosting. The gap between that and "drop-in replacement" is
+manifest and ES/EN UI. The gap between that and "drop-in replacement" is
 concentrated in four places: **PAdES depth** (LTV, PSA/shadow checks), **office formats** (OOXML
 unwired, ODF absent, FacturaE absent), **long-term validity** (XAdES-T, OCSP/CRL, anchors = FNMT
 only), and **multi-signature** (no co-sign/counter-sign). The desktop half of AutoFirma —
