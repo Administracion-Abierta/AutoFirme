@@ -212,6 +212,11 @@ mod tests {
 }
 `;
 
+// Everything the embed can go wrong on (colliding variants, non-embedable characters) is
+// recorded while the tables above are built, so the guard has to run before the write:
+// a file that does not compile must never reach disk.
+if (problems.length > 0) fail();
+
 const i18nRs = join(root, 'src-tauri/src/i18n.rs');
 const current = (() => {
 	try {
