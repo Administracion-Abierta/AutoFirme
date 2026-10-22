@@ -29,9 +29,9 @@ select `dist/extension`. Pin AutoFirme to the toolbar. Clicking it opens the
 responsive full app in a separate resizable window that remains open when focus
 moves to another window. The app also offers an Open in tab action.
 
-The standalone web build remains `pnpm build`, producing `build/`. Extension code
-is bundled locally; this is not a hosted iframe. The extension uses Chrome's
-installation/update system, so PWA install/update buttons are web-only.
+The SvelteKit build (`pnpm build`) still produces `build/`, now the extension's options
+page and the local dev harness — no website ships. Extension code is bundled locally;
+this is not a hosted iframe. The extension uses Chrome's installation/update system.
 
 ## 2. App features
 

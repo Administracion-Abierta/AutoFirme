@@ -13,10 +13,10 @@ engines, batch queue, PDF stamp controls, saved outputs, settings and translatio
 The extension bundles the app locally instead of loading a hosted page or copying
 its engines into a second application.
 
-`pnpm build` produces the ordinary SvelteKit site. `pnpm build:extension` uses a
-standalone Vite entry to produce `dist/extension`. That entry avoids SvelteKit's
-inline bootstrap and the webapp service worker. PWA installation and update
-controls appear only in the web build. Chrome installs and updates the extension.
+`pnpm build` produces the SvelteKit output that serves as the extension's options
+page and the local dev harness. `pnpm build:extension` uses a standalone Vite entry
+to produce `dist/extension`. That entry avoids SvelteKit's inline bootstrap and the
+app service worker. Chrome installs and updates the extension.
 
 The Manifest V3 policy is `script-src 'self'; object-src 'none'`. Scripts, fonts
 and styles ship in the package. The build checker rejects inline executable
