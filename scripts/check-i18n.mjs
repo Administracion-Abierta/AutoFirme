@@ -145,79 +145,89 @@ const rust = `//! ES/EN copy for the desktop shell, generated from \`src/lib/i18
 /// Language the shell is running in. Spanish is the default.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Lang {
-	Es,
-	En,
+    Es,
+    En,
 }
 
 impl Lang {
-	pub const ALL: &'static [Lang] = &[Lang::Es, Lang::En];
+    pub const ALL: &'static [Lang] = &[Lang::Es, Lang::En];
 
-	/// Two-letter tag, the same one the SPA stores in its settings.
-	pub const fn code(self) -> &'static str {
-		match self {
-			Lang::Es => "es",
-			Lang::En => "en",
-		}
-	}
+    /// Two-letter tag, the same one the SPA stores in its settings.
+    pub const fn code(self) -> &'static str {
+        match self {
+            Lang::Es => "es",
+            Lang::En => "en",
+        }
+    }
 
-	/// Anything unknown falls back to Spanish, the app's default.
-	pub fn parse(code: &str) -> Lang {
-		match code {
-			"en" => Lang::En,
-			_ => Lang::Es,
-		}
-	}
+    /// Anything unknown falls back to Spanish, the app's default.
+    pub fn parse(code: &str) -> Lang {
+        match code {
+            "en" => Lang::En,
+            _ => Lang::Es,
+        }
+    }
 }
 
 /// Every catalogue key. Removing one from \`src/lib/i18n.ts\` removes the variant, so
 /// callers that still name it stop compiling and the compiler names the key.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Key {
-${keys.map((key) => `\t${variant(key)},`).join('\n')}
+${keys.map((key) => `    ${variant(key)},`).join('\n')}
 }
 
 impl Key {
-	pub const ALL: &'static [Key] = &[
-${keys.map((key) => `\t\tKey::${variant(key)},`).join('\n')}
-\t];
+    pub const ALL: &'static [Key] = &[
+${keys.map((key) => `        Key::${variant(key)},`).join('\n')}
+    ];
 
-	/// The dotted catalogue path, as it appears in \`src/lib/i18n.ts\`.
-	pub fn name(self) -> &'static str {
-		match self {
-${keys.map((key) => `\t\t\tKey::${variant(key)} => ${literal(key)},`).join('\n')}
-		}
-	}
+    /// The dotted catalogue path, as it appears in \`src/lib/i18n.ts\`.
+    pub fn name(self) -> &'static str {
+        match self {
+${keys.map((key) => `            Key::${variant(key)} => ${literal(key)},`).join('\n')}
+        }
+    }
 
-	pub fn parse(name: &str) -> Option<Key> {
-		match name {
-${keys.map((key) => `\t\t\t${literal(key)} => Some(Key::${variant(key)}),`).join('\n')}
-			_ => None,
-		}
-	}
+    pub fn parse(name: &str) -> Option<Key> {
+        match name {
+${keys.map((key) => `            ${literal(key)} => Some(Key::${variant(key)}),`).join('\n')}
+            _ => None,
+        }
+    }
 }
 
 /// The copy for one key in one language.
 pub fn get(lang: Lang, key: Key) -> &'static str {
-	match (lang, key) {
+    match (lang, key) {
 ${keys
-	.map((key) => `\t\t(Lang::Es, Key::${variant(key)}) => ${literal(es.get(key))},\n\t\t(Lang::En, Key::${variant(key)}) => ${literal(en.get(key))},`)
-	.join('\n')}
-	}
+	.map((key) => `        (Lang::Es, Key::${variant(key)}) => ${literal(es.get(key))},\n        (Lang::En, Key::${variant(key)}) => ${literal(en.get(key))},`)
+    .join('\n')}
+    }
 }
 
 #[cfg(test)]
 mod tests {
-	use super::*;
+    use super::*;
 
-	#[test]
-	fn every_key_is_translated_in_both_languages() {
-		for &lang in Lang::ALL {
-			for &key in Key::ALL {
-				assert!(!get(lang, key).is_empty(), "{} has no copy for {}", key.name(), lang.code());
-				assert_eq!(Key::parse(key.name()), Some(key), "{} does not round-trip", key.name());
-			}
-		}
-	}
+    #[test]
+    fn every_key_is_translated_in_both_languages() {
+        for &lang in Lang::ALL {
+            for &key in Key::ALL {
+                assert!(
+                    !get(lang, key).is_empty(),
+                    "{} has no copy for {}",
+                    key.name(),
+                    lang.code()
+                );
+                assert_eq!(
+                    Key::parse(key.name()),
+                    Some(key),
+                    "{} does not round-trip",
+                    key.name()
+                );
+            }
+        }
+    }
 }
 `;
 
