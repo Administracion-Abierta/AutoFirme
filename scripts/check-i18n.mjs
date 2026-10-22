@@ -33,6 +33,12 @@ const EXAMPLE_URL = /^https?:\/\//;
 
 const problems = [];
 const note = (message) => problems.push(message);
+/** Reports every problem found so far and stops: a broken catalogue is never embedded. */
+function fail() {
+	console.error(`i18n check failed (${problems.length}):`);
+	for (const problem of problems) console.error(`  ${problem}`);
+	process.exit(1);
+}
 
 /** Flattens `copy` into `key -> {es, en}`; nested records (`certErrors`) become `certErrors.*`. */
 function flatten(node, prefix = '', out = new Map()) {
@@ -90,7 +96,7 @@ for (const path of literalSources) {
 	const markup = source.replace(/<script[\s\S]*?<\/script>/g, '');
 	const literals = [
 		...markup.matchAll(/>([^<>{}]+)</g),
-		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)="([^"{}]*)"/g)
+		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=["']([^"'{}]*)["']/g)
 	].map((match) => match[1].trim());
 	for (const literal of literals) {
 		if (!/\p{L}/u.test(literal)) continue;
@@ -98,6 +104,11 @@ for (const path of literalSources) {
 		note(`${shown}: hardcoded user-visible text ${JSON.stringify(literal)} — move it to src/lib/i18n.ts`);
 	}
 }
+
+// A catalogue with parity or inventory problems must not be embedded: the tables below
+// index `es`/`en` by the ES key set, so a key missing from EN would crash the generator
+// instead of naming it. Both modes stop here, before anything is written.
+if (problems.length > 0) fail();
 
 // 3. Rust embed --------------------------------------------------------------
 const pascal = (part) => part.charAt(0).toUpperCase() + part.slice(1);
@@ -223,11 +234,7 @@ if (current !== rust) {
 	}
 }
 
-if (problems.length > 0) {
-	console.error(`i18n check failed (${problems.length}):`);
-	for (const problem of problems) console.error(`  ${problem}`);
-	process.exit(1);
-}
+if (problems.length > 0) fail();
 
 console.log(
 	`i18n ok: ${keys.length} keys, ES/EN parity, no hardcoded copy in ${literalSources.length} Svelte files`
