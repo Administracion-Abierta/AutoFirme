@@ -88,7 +88,7 @@ resumen SHA-256 hacia la TSA: nunca el documento, nunca la clave.
 ```bash
 pnpm install
 pnpm dev                  # servidor de desarrollo
-pnpm build                # sitio estático en build/
+pnpm build                # build/ (opciones de la extensión + arnés local)
 pnpm preview              # servir build/
 pnpm test                 # 244 pruebas (vitest) + 81 de Node
 pnpm check                # svelte-check + tsc
