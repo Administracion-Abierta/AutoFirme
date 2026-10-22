@@ -165,5 +165,5 @@ OpenSSL independently verifies generated CAdES and PDF signatures.
 
 See [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md) for the
 recorded results and checks that still need a physical browser or desktop app.
-The extension inherits the webapp's format and trust-verification limits. It does
+The extension inherits the app's format and trust-verification limits. It does
 not add online revocation checks or OS biometrics.

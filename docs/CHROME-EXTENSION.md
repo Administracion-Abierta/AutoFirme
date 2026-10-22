@@ -38,7 +38,7 @@ this is not a hosted iframe. The extension uses Chrome's installation/update sys
 Use the same signing and verification workflows, certificate import and saved
 identities, PDF visible image/text stamps, implemented signature formats, batch
 queue and ZIP downloads, saved outputs, themes and ES/EN language controls as the
-webapp. Files and keys are processed locally. Optional timestamping contacts the
+desktop app. Files and keys are processed locally. Optional timestamping contacts the
 configured TSA when Chrome grants access to its origin.
 
 Identities are sealed in extension-origin IndexedDB using the app's existing
@@ -133,7 +133,7 @@ cannot authorize replay. Worker restarts fail pending requests safely.
 
 Certificate-chain packaging does not establish trust for an administration. The
 extension does not add online revocation checks or OS biometrics. It inherits the
-webapp's format and verification limitations. It has not had an external security
+app's format and verification limitations. It has not had an external security
 audit; real administration sites and physical Windows/macOS Chrome still require
 compatibility testing. Browser external-protocol rules may affect actual AutoFirma
 launch during fallback.

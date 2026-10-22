@@ -1,4 +1,4 @@
-# USE-CASES.md — what AutoFirma 1.9 really does, and where AutoFirma Web stands
+# USE-CASES.md — what AutoFirma 1.9 really does, and where AutoFirme stands
 
 Feature matrix of the **shipped AutoFirma 1.9** (`autofirma.jar`, the reference implementation) against
 this repo. Written for #41. It answers three questions per capability:
@@ -30,8 +30,8 @@ cross-reading: <https://github.com/ctt-gob-es/clienteafirma>.
 | `DONE` | shipped in this repo, exercised by a test or a cross-check |
 | `PARTIAL` | partly there — engine without UI, or UI without the profile/options |
 | `MISSING` | not implemented |
-| `N/A-BROWSER` | existed only because AutoFirma is a desktop Java app; the SPA replaces the mechanism |
-| `OUT-OF-SCOPE` | deliberately out of scope for a browser app (per AGENTS.md "browser replaces them") |
+| `N/A-BROWSER` | existed only because AutoFirma is a desktop Java app; the browser extension replaces the mechanism |
+| `OUT-OF-SCOPE` | deliberately out of scope for the two products (per AGENTS.md) |
 
 **Priority legend** (for `MISSING`/`PARTIAL` rows only)
 
@@ -46,12 +46,12 @@ cross-reading: <https://github.com/ctt-gob-es/clienteafirma>.
 
 | Channel | 1.9 evidence | What it offers | Our status |
 |---|---|---|---|
-| Swing GUI | `standalone/SimpleAfirma.java:84,152,607`; `standalone/ui/MainMenu.java:53-160` | Abrir / Firmar (Ctrl-F) / Ver firma (Ctrl-V), Herramientas → restaurar configuración, plugins, preferencias, Ayuda | Workbench SPA (`src/lib/App.svelte`) — `PARTIAL` |
+| Swing GUI | `standalone/SimpleAfirma.java:84,152,607`; `standalone/ui/MainMenu.java:53-160` | Abrir / Firmar (Ctrl-F) / Ver firma (Ctrl-V), Herramientas → restaurar configuración, plugins, preferencias, Ayuda | Workbench UI (`src/lib/App.svelte`) — `PARTIAL` |
 | CLI (`autofirma` / `autofirmacl`) | `standalone/CommandLineLauncher.java:263-288`; `standalone/CommandLineCommand.java:5-10`; `standalone/CommandLineParameters.java:10-27` | Commands `listaliases`, `sign`, `cosign`, `countersign`, `verify`, `batchsign` + `-i -o -alias -filter -store -format -password -algorithm -config -operation -gui -certgui -preurl -posturl -xml -r` | `N/A-BROWSER` (no shell) |
 | Browser protocol | `standalone/protocol/ProtocolInvocationLauncher.java:109,132,151,203,251,306,372,437`; params in `core/misc/protocol/UrlParameters.java:18-32` | `afirma://` `websocket`, `service`, `batch`, `selectcert`, `save`, `signandsave`, `sign`/`cosign`/`countersign`, `load` | `N/A-BROWSER` mechanism; the *equivalent* embed API is `MISSING` (§8, P0) |
 | Plugins (JVM SPI) | `standalone/plugins/AfirmaPlugin.java:6`; `standalone/plugins/manager/PluginLoader.java:24`; `standalone/plugins/PluginCommand.java:4` | third-party menu actions, CLI commands, sign data processors, custom JARs | `OUT-OF-SCOPE` |
 | Configurator (separate JAR) | `standalone/configurator/common/PreferencesManager.java:14`; `standalone/ui/restoreconfig/RestoreConfigLinux.java:25` | registers the protocol handler, installs CA certs into Firefox/Chrome/OS stores, unattended install | `OUT-OF-SCOPE` |
-| Per-browser detection (incl. Safari) and per-OS paths | `core/misc/Platform.java:18-23,106-113` | the configurator picks the browser/OS-specific integration to install (Firefox cert DB, Chrome/OS store, macOS dock…) | `OUT-OF-SCOPE` — the SPA is *run by* the browser, so there is nothing to detect or install. In the shipped core this detection has no caller anyway `[INFERENCE: rg "BROWSER\|getBrowser" outside Platform.java → only unrelated third-party hits]` |
+| Per-browser detection (incl. Safari) and per-OS paths | `core/misc/Platform.java:18-23,106-113` | the configurator picks the browser/OS-specific integration to install (Firefox cert DB, Chrome/OS store, macOS dock…) | `OUT-OF-SCOPE` — the app *is* the browser client, so there is nothing to detect or install. In the shipped core this detection has no caller anyway `[INFERENCE: rg "BROWSER\|getBrowser" outside Platform.java → only unrelated third-party hits]` |
 
 ## 2. What can be signed — formats
 
@@ -170,7 +170,7 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 
 | Operation | 1.9 evidence | Meaning | Our status |
 |---|---|---|---|
-| `afirma://sign`, `cosign`, `countersign` | `standalone/protocol/ProtocolInvocationLauncher.java:372`; `core/misc/protocol/UrlParametersToSignAndSave.java:25,31` (`cop`, `format`, `algorithm`, …) | a web form hands a document (or a URL/fileId) to AutoFirma, gets the signature back | `N/A-BROWSER` — the SPA **is** the signer; drop the document, sign locally |
+| `afirma://sign`, `cosign`, `countersign` | `standalone/protocol/ProtocolInvocationLauncher.java:372`; `core/misc/protocol/UrlParametersToSignAndSave.java:25,31` (`cop`, `format`, `algorithm`, …) | a web form hands a document (or a URL/fileId) to AutoFirma, gets the signature back | `N/A-BROWSER` — the app **is** the signer; drop the document, sign locally |
 | `…/signandsave` + storage servlet | `standalone/protocol/ProtocolInvocationLauncher.java:306`; `UrlParametersToSave`, `UrlParameters.STORAGE_SERVLET_PARAM` | AutoFirma POSTs the result back to the calling server | `MISSING` by design (static, no backend) — a caller-side download is the equivalent (per-row `Descargar`, batch ZIP) |
 | `…/load`, `…/save` | `standalone/protocol/ProtocolInvocationLauncher.java:437,251` | pass a file in/out of the local disk | `N/A-BROWSER` (File System Access API / downloads instead) |
 | `…/selectcert` | `standalone/protocol/ProtocolInvocationLauncher.java:203` | a page asks the user to choose a certificate | `N/A-BROWSER` (`src/lib/components/CertPicker.svelte`) |

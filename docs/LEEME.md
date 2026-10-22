@@ -7,7 +7,7 @@ Documento en español, conciso y completo, sobre lo que **ya funciona**. La vers
 
 ## Qué es
 
-Firma y verificación electrónica con certificados X.509, **100 % en el navegador**: sin servidor de
+Firma y verificación electrónica con certificados X.509, **100 % en el dispositivo**: sin servidor de
 firma, sin backend, sin que la clave privada salga del equipo. Clon funcional de AutoFirma 1.9
 (reescritura limpia en TypeScript, no traducción del Java). Referencia:
 [`architecture.md`](architecture.md), [`PARITY.md`](PARITY.md), [`USE-CASES.md`](USE-CASES.md).

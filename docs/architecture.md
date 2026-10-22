@@ -1,7 +1,7 @@
 # architecture.md — AutoFirma signing core (reference for the web rewrite)
 
 Reference map of the signing core of **AutoFirma 1.9** (upstream `afirma-core`), written for the
-AutoFirma Web rewrite. It was built from a jadx 1.5.6 decompilation of the 1.9 `autofirma.jar`;
+AutoFirme rewrite. It was built from a jadx 1.5.6 decompilation of the 1.9 `autofirma.jar`;
 that tree left the repo in #26 — recover it with
 `git checkout reference/decompile-1.9 -- decompiled`. Every row is anchored to a `file:line` of
 that tree or marked `[INFERENCE]`. Decompilation is lossy (names, generics, lambdas) — treat this
@@ -54,7 +54,7 @@ Format names, digest names (`SHA1/256/384/512`), JCA algorithm names
 `:66-82`, `:83-84`); `getDigestAlgorithmName`/`composeSignatureAlgorithmName` (`:90`, `:120`)
 normalise user input (OIDs, `SHA-256`, `http://…xmldsig#sha1`) to JCA names.
 
-**Rewrite note:** this registry is the natural shape for the SPA's `signers/<format>/` modules —
+**Rewrite note:** this registry is the natural shape for our engine's `signers/<format>/` modules —
 one entry point per format, same signature.
 
 ## 2. Tri-phase signing — the hinge of the whole rewrite
@@ -254,7 +254,7 @@ Full shaded inventory: REVERSING-NOTES.md §6. Classification for the rewrite:
 | `es.gob.jmulticard` (+ `javax.smartcardio`) | **dead for browsers** | PC/SC, native (§4) |
 | `com.sun.jna` / `jna.platform` | **dead for browsers** | native access (PC/SC fixups, Windows COM, Apple) |
 | Apache PDFBox (`org.apache.pdfbox`) | **not used in the signing core** | appears only as `…contentstream.operator.OperatorName` imports in unrelated classes (e.g. `XAdESSigner.java:62`, `keystores/KeyStoreUtilities.java:32`) — a jadx constant-resolution artifact, not real usage `[INFERENCE]` |
-| Swing UI (`standalone/ui/**`, `es/gob/afirma/ui`), `standalone/protocol/**` (WebSocket/`afirma://`) | **dead** | replaced by the SPA |
+| Swing UI (`standalone/ui/**`, `es/gob/afirma/ui`), `standalone/protocol/**` (WebSocket/`afirma://`) | **dead** | replaced by our engine + UI |
 | Rhino + `proxy-vole`, twelve-monkeys ImageIO, `ini4j`, `Java-WebSocket` | **dead** | Rhino only reachable via iText AcroForm JS / MSV validation / PAC autodiscovery — the signing path never runs it; the rest are image IO, prefs, the local socket server |
 | `massive/` (batch/directory signing) | out of scope | batch mode has no browser equivalent; revisit later |
 
@@ -297,7 +297,7 @@ equivalent of `AOPkcs1Signer`.
 `standalone/protocol/**` (41 classes: `ProtocolInvocationLauncher*`, `AfirmaWebSocketServerV4`,
 `ServiceInvocationManager`, `CommandProcessorThread`, `NativeSignDataProcessor`) plus
 `SimpleAfirma.main` (`standalone/SimpleAfirma.java:607`) exist only to bridge a webpage to a local
-Java app over a local socket / `afirma://` handler. In an SPA the page *is* the signer: URI parsing
+Java app over a local socket / `afirma://` handler. In our engine the app *is* the signer: URI parsing
 (`core/misc/protocol/{ProtocolInvocationUriParserUtil,UrlParameters}.java`) survives as a pure
 function, everything else is deleted. Likewise `signers/*/client/**` (the remote-signing clients)
 collapse into `crypto.subtle` calls.
