@@ -31,7 +31,7 @@ function win() {
 }
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-test('a distinct MiniApplet global is intercepted like AutoScript', async () => {
+test('a distinct MiniApplet global is intercepted like AutoScript', { timeout: 5_000 }, async () => {
 	const window = win();
 	let originals = 0;
 	window.MiniApplet = { sign(..._args) { void _args; originals++; }, selectCertificate(..._args) { void _args; originals++; } };
@@ -59,7 +59,7 @@ test('MiniApplet aliasing the same AutoScript object wraps exactly once', async 
 	assert.equal(api.calls, 1, 'fallback resumes the original exactly once');
 });
 
-test('a late MiniApplet assignment is wrapped by the setter', async () => {
+test('a late MiniApplet assignment is wrapped by the setter', { timeout: 5_000 }, async () => {
 	const window = win();
 	installAdapter(window, async () => ({ kind: 'result', signature: 'c2ln', certificate: 'Y2VydA==' }));
 	let originals = 0;
@@ -71,7 +71,7 @@ test('a late MiniApplet assignment is wrapped by the setter', async () => {
 	assert.equal(originals, 0);
 });
 
-test('a non-configurable global is wrapped in place and the poll catches replacements', async () => {
+test('a non-configurable global is wrapped in place and the poll catches replacements', { timeout: 5_000 }, async () => {
 	const window = win();
 	let originals = 0;
 	const api = { sign(..._args) { void _args; originals++; } };
