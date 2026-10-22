@@ -7,7 +7,7 @@ En español: las funciones de la extensión están en [LEEME.md](LEEME.md).
 
 ## 1. Shared app, separate build target
 
-The web build and extension render the same `src/routes/+page.svelte` and
+The SvelteKit build and the extension render the same `src/routes/+page.svelte` and
 `App.svelte`. Both use the existing certificate store, signing and verification
 engines, batch queue, PDF stamp controls, saved outputs, settings and translations.
 The extension bundles the app locally instead of loading a hosted page or copying
