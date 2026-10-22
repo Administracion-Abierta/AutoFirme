@@ -209,8 +209,8 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 5. **FacturaE profile** (XAdES with policy, role, production place) — §2.
 6. **XAdES-T** (generate `SignatureTimeStamp`) and display of received timestamps — §4.3
    (CAdES-T and PAdES B-T generation already ship, #43).
-7. **DNIe / smartcard path** — a no-key-export PKCS#11 helper decision (`README.md`
-   "Possible improvements"); desktop route discarded (`docs/PIVOT-STUDY.md` §5).
+7. **DNIe / smartcard path** — desktop scope via the `KeyProvider` seam (PKCS#11/PC/SC,
+   `docs/DESKTOP-ROADMAP.md` §1); `README.md` "Alcance actual y limitaciones".
 8. **Embeddable API for a calling web page** (`postMessage`/iframe), i.e. what replaces `afirma://sign`
    for forms — §8.
 
@@ -253,6 +253,6 @@ rg -n "SignValiderFactory.getSignValider" work/decompiled/sources/es/gob/afirma/
 rg -n "BROWSER|getBrowser" work/decompiled/sources/es/gob/afirma/   # only Platform.java (§1)
 ```
 
-Our side: `README.md` (per-issue status — its "PKCS#12 support" section predates the
-PBES1/MAC work in `4c9f6c31` and is stale), `src/lib/sign.ts` (which formats the UI exposes),
+Our side: `README.md` ("Formatos y algoritmos", "Alcance actual y limitaciones"),
+`src/lib/sign.ts` (which formats the UI exposes),
 `src/lib/verify/index.ts` (which artifacts the verifier accepts).

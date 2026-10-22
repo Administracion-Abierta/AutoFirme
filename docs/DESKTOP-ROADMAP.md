@@ -1,7 +1,7 @@
 # AutoFirme Desktop — features roadmap
 
 Status: **approved plan, not started**. No code exists yet. This document supersedes
-`docs/PIVOT-STUDY.md` §5 (desktop rejected) and the "four shells" model in `README.md`.
+`docs/PIVOT-STUDY.md` §5 (desktop rejected) and the retired PWA/self-host framing in `README.md`.
 
 ## 1. Decisions (locked 2026-10-20)
 

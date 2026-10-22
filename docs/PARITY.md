@@ -51,7 +51,7 @@ table (constants `:13-30`); `getSigner(byte[])` `:36` content-sniffs in table or
 | PAdES B-B, incremental update, `adbe.pkcs7.detached` / `ETSI.CAdES.detached` | `signers/pades/AOPDFSigner.java:118,378`; `pades/PdfUtil.java:129` append mode | `src/lib/pades.ts:293 signPdf`, wired into the picker (`src/lib/sign.ts:20`) | **full** — engine + UI, openssl/pdfsig-checked (#11) | needed |
 | PAdES visible signature (image/text, page, position) | `standalone/ui/preferences/PreferencesPanelPades.java:52`; `signers/pades/AOPDFSigner.java` appearance path | `src/lib/pades-visible.ts`, sign panel toggle off-by-default (#45) | **full** | needed |
 | PAdES-T / LTV (DSS, `ETSI.RFC3161`, DocTimeStamp) | `signers/pades/PdfTimestamper.java:31,60`; `signvalidation/SignatureFormatDetectorPadesCades.java:27` | `src/lib/pades.ts:19,510,516` (B-T via TSA); LTV DSS/DocTimeStamp still absent | **partial** (B-T full, no LTV) | needed (#43) |
-| OOXML (docx/xlsx/pptx) signature part + origin | `signers/ooxml/AOOOXMLSigner.java:188`; `ooxml/OOXMLZipHelper.java:41,232` | `src/lib/ooxml.ts:255 signOoxmlPackage` | **partial** — library written and tested, **not called** from `src/lib/App.svelte`/`src/lib/batch.ts` (`README.md` "Status") | needed |
+| OOXML (docx/xlsx/pptx) signature part + origin | `signers/ooxml/AOOOXMLSigner.java:188`; `ooxml/OOXMLZipHelper.java:41,232` | `src/lib/ooxml.ts:255 signOoxmlPackage` | **partial** — library written and tested, **not called** from `src/lib/App.svelte`/`src/lib/batch.ts` (`README.md` "Formatos y algoritmos") | needed |
 | ODF (`.odt`/`.ods`) signature via manifest | `signers/odf/AOODFSigner.java:336,366` | none | **missing** | needed (low priority — office formats are rare in Spanish admin flows) |
 | FacturaE 3.0/3.1 (XAdES Enveloped forced, FacturaE policy, parameter + claimed-role whitelist) | `signers/xades/AOFacturaESigner.java:26-27` (`POLICY_FACTURAE_30/31`), `:29-49` (`ALLOWED_PARAMS`, `FORMAT=…ENVELOPED`), `:81,85` (`signerClaimedRoles`, default `emisor`), `:89,94` (policy whitelist), `:69` cosign throws | none | **missing** | needed (public-sector invoicing is AutoFirma's flagship use case) |
 | Raw PKCS#1 (`NONE`, `.p1`, sign-only) | `core/signers/AOPkcs1Signer.java:21` (`.p1`), `:25` (sign), `:117` (`isSign` always false) | none exposed; `src/lib/sign.ts:77 signBytes` is the internal primitive | **partial** (internal only) | browser-moot as a UI feature — nothing a user picks |
@@ -158,7 +158,7 @@ Each line is issue-sized. `P0` breaks the "drop-in replacement" promise for a no
    (`signvalidation/ValidatePdfSignature.java:64,71,164`); byte-range, digest and chain already
    ship (`src/lib/verify/pades.ts`). *(New — not covered by an open issue.)*
 2. OOXML signing is written and tested but unreachable from the UI (`src/lib/ooxml.ts`,
-   `README.md` "Status"); wire it, with verify-side honesty about the missing validator.
+   `README.md` "Formatos y algoritmos"); wire it, with verify-side honesty about the missing validator.
 3. DNIe / CERES smartcard users have no path yet: desktop scope via the `KeyProvider` seam
    (PKCS#11/PC/SC; `docs/DESKTOP-ROADMAP.md`). Decision recorded 2026-10-20: desktop is the
    full product, extension keeps PKCS#12-only. *(New.)*
