@@ -163,7 +163,7 @@ for verdict in sorted(glob.glob(os.path.join(RAW, "dss.*.verdict.json"))):
     if fmt is None or valid is None:
         report("E", f"raw/{os.path.basename(verdict)} carries no signature format / valid verdict")
         continue
-    for doc in DOCS[:2]:
+    for doc in DOCS[:3]:  # GATE-12.md, external-validators.md, PARITY.md — all three quote formats
         text = read(doc)
         if family not in text:
             continue
