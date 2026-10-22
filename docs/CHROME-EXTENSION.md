@@ -1,8 +1,8 @@
 # Chrome extension
 
-The Chrome extension renders the AutoFirme Svelte webapp. It shares the app,
+The Chrome extension renders the AutoFirme Svelte app. It shares the app,
 certificate store, signing and verification engines, batch queue and stamp controls
-with the ordinary web build.
+with the desktop product's WebView (and with the local dev harness).
 
 See [CHROME-EXTENSION-DESIGN.md](CHROME-EXTENSION-DESIGN.md) for the implementation
 and request protocol, and [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md)
@@ -42,9 +42,9 @@ webapp. Files and keys are processed locally. Optional timestamping contacts the
 configured TSA when Chrome grants access to its origin.
 
 Identities are sealed in extension-origin IndexedDB using the app's existing
-PIN-protected store. Unlocking uses the certificate container's PIN. The hosted
-webapp and extension are different origins: existing webapp storage does not
-migrate automatically. Import certificates into the extension. The extension does
+PIN-protected store. Unlocking uses the certificate container's PIN. The retired
+hosted web app and the extension are different origins: storage saved under the old
+web app does not migrate automatically. Import certificates into the extension. The extension does
 not provide operating-system certificate-store access or a native helper.
 
 ### MCP bridge

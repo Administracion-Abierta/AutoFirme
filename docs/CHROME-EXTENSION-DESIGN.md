@@ -21,7 +21,7 @@ app service worker. Chrome installs and updates the extension.
 The Manifest V3 policy is `script-src 'self'; object-src 'none'`. Scripts, fonts
 and styles ship in the package. The build checker rejects inline executable
 scripts, dynamic code execution, remote bootstrap assets, missing app modules
-and webapp service-worker registration.
+and app service-worker registration.
 
 | Component | Responsibility |
 |---|---|
@@ -58,8 +58,8 @@ mutations also handle disclosure and PIN/import changes when painting is paused.
 Resizing uses the original browser-frame height to avoid viewport feedback loops.
 
 The extension uses the app's PIN-protected identity store in extension-origin
-IndexedDB. Hosted webapp storage belongs to a different origin and does not migrate
-automatically. Private keys and PINs stay in extension-owned contexts. This build
+IndexedDB. Storage from the retired hosted web app belongs to a different origin and
+does not migrate automatically. Private keys and PINs stay in extension-owned contexts. This build
 uses imported PKCS#12 identities and does not access the operating-system store.
 
 ## 3. Website access
