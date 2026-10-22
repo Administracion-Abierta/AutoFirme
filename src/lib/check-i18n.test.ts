@@ -6,9 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // Regression pins for the review findings on `scripts/check-i18n.mjs` (Refs #119). The checker is
 // the only guard the hardcoded-copy inventory has, so its own blind spots are worth a test:
-// the review found two (a single-quote-only attribute regex, and quotes inside the value
-// truncating the match). Both were fixed by widening the regex; these tests keep a later
-// simplification from narrowing it again.
+// the review found three (a single-quote-only attribute regex, quotes inside the value truncating
+// the match, and text runs that a tag did not delimit on both sides). Each was fixed by widening
+// the rule; these tests keep a later simplification from narrowing them again.
 //
 // The checker derives its root from its own path, so the fixture needs a copy of the script next
 // to a real `src/` tree: it imports `src/lib/i18n.ts` and scans every `.svelte` under `src`.
@@ -72,6 +72,33 @@ describe('check-i18n inventory', () => {
 			'<button aria-label={t.formatTitle}></button>',
 			'<button aria-label="{t.formatTitle}: {file.name}"></button>',
 			'<p>{t.formatTitle}</p>'
+		]) {
+			const result = check(svelte);
+			expect(result.status, svelte).toBe(0);
+		}
+	});
+
+	// The text rule used to demand a `<` on both sides of a run, so it only saw copy hugging two
+	// tags. Copy sitting next to a block or inside a text run with an interpolation was invisible:
+	// every expression is lifted out and the rest is split on tags, which covers all of these.
+	it('catches copy delimited by blocks or interpolation, not just by tags', () => {
+		for (const svelte of [
+			'{#if x}\n\tGuardar fichero\n{/if}',
+			'{#each files as f}\n\tGuardar fichero\n{/each}',
+			'<p>Guardar fichero {t.name}</p>',
+			'<p>{t.name} Guardar fichero</p>',
+			'<p>{`Guardar fichero`}</p>'
+		]) {
+			const result = check(svelte);
+			expect(result.status, svelte).toBe(1);
+			expect(result.stderr, svelte).toContain('hardcoded user-visible text "Guardar fichero"');
+		}
+
+		for (const svelte of [
+			'{#if x}<p>{t.title}</p>{/if}',
+			'<p>{t.title} {t.name}</p>',
+			'<p>{`${t.title} ${t.name}`}</p>',
+			'<button onclick={() => (open = true)}></button>'
 		]) {
 			const result = check(svelte);
 			expect(result.status, svelte).toBe(0);

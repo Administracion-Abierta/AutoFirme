@@ -87,6 +87,37 @@ function svelteFiles(dir, out = []) {
 	return out;
 }
 
+/**
+ * Removes every `{…}` expression, nested braces and quoted strings included. What is left of a
+ * component is text and tags only, so text runs can be found whatever delimits them.
+ */
+function stripExpressions(source) {
+	let out = '';
+	for (let i = 0; i < source.length; i++) {
+		if (source[i] !== '{') {
+			out += source[i];
+			continue;
+		}
+		let depth = 1;
+		let quote = null;
+		let end = i + 1;
+		for (; end < source.length; end++) {
+			const char = source[end];
+			if (quote) {
+				if (char === '\\') end++;
+				else if (char === quote) quote = null;
+			} else if (char === '"' || char === "'" || char === '`') quote = char;
+			else if (char === '{') depth++;
+			else if (char === '}') {
+				depth--;
+				if (depth === 0) break;
+			}
+		}
+		i = end;
+	}
+	return out;
+}
+
 const literalSources = [...svelteFiles(join(root, 'src'))];
 for (const path of literalSources) {
 	const source = readFileSync(path, 'utf8');
@@ -95,7 +126,13 @@ for (const path of literalSources) {
 	// a closing `>`, so generics and comments would otherwise parse as text nodes.
 	const markup = source.replace(/<script[\s\S]*?<\/script>/g, '');
 	const literals = [
-		...markup.matchAll(/>([^<>{}]+)</g),
+		// Every expression is lifted out first and the rest is split on tags, so what is left is real
+		// text whatever delimits it: the older `>([^<>{}]+)<` rule only saw runs hugging two tags,
+		// so copy inside `{#if}`/`{#each}`/`{#key}` blocks and `>Copy {name}<` runs were invisible.
+		// Svelte comments come out too: they are prose, not copy.
+		...stripExpressions(markup)
+			.replace(/<!--[\s\S]*?-->/g, '')
+			.split(/<[^>]*>/g),
 		// Either quote style, but the value must not contain its own delimiter: matching the
 		// quotes independently truncated `title="don't save"` to `don` and let
 		// `placeholder="'Guardar fichero'"` through entirely.
@@ -104,9 +141,11 @@ for (const path of literalSources) {
 		// *nothing but* one quoted string counts: `aria-label="{t.formatTitle}"` and
 		// `aria-label={t.title}` are lookups, and `class={'grid grid-cols-2'}` is not copy at
 		// all, so widening past the attribute list above would drown the gate in false alarms.
-		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=\{\s*(?:"([^"{}]*)"|'([^'{}]*)')\s*\}/g),
-		...markup.matchAll(/>\{\s*(?:"([^"{}]*)"|'([^'{}]*)')\s*\}</g)
-	].map((match) => (match[1] ?? match[2]).trim());
+		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=\{\s*(?:"([^"{}]*)"|'([^'{}]*)'|`([^`{}]*)`)\s*\}/g),
+		// A backtick literal with no interpolation is the same defect as a quoted one: the value
+		// is a string, not a lookup.
+		...markup.matchAll(/>\{\s*(?:"([^"{}]*)"|'([^'{}]*)'|`([^`{}]*)`)\s*\}</g)
+	].map((match) => (typeof match === 'string' ? match : (match[1] ?? match[2] ?? match[3])).trim());
 	for (const literal of literals) {
 		if (!/\p{L}/u.test(literal)) continue;
 		if (LITERAL_ALLOWLIST.has(literal) || EXAMPLE_URL.test(literal)) continue;
