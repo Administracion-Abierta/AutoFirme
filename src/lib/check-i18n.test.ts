@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -76,5 +76,23 @@ describe('check-i18n inventory', () => {
 			const result = check(svelte);
 			expect(result.status, svelte).toBe(0);
 		}
+	});
+});
+
+describe('check-i18n Rust embed', () => {
+	// The crate's own sources are 4-space, so a tab-indented embed stood out in every diff and
+	// `cargo fmt` would rewrite it wholesale. The generator is run (not just the copied artifact
+	// read) so this pins the template itself; rustfmt is deliberately not invoked, it is not a
+	// build dependency here.
+	it('generates the module indented the way the crate is', () => {
+		const result = spawnSync(process.execPath, ['scripts/check-i18n.mjs'], {
+			cwd: fixture,
+			encoding: 'utf8'
+		});
+		expect(result.status).toBe(0);
+
+		const generated = readFileSync(join(fixture, 'src-tauri/src/i18n.rs'), 'utf8');
+		expect(generated).not.toContain('\t');
+		expect(generated).toContain('\n    Es,\n    En,\n');
 	});
 });
