@@ -402,8 +402,12 @@ describe('signing through the provider', () => {
 		expect(sign.mock.calls[0][3]).toEqual(new Uint8Array(await crypto.subtle.digest('SHA-256', data)));
 		expect(raw.length).toBe(64); // P-256: two 32-byte coordinates
 
-		// The token form is `r || s`; X.509/CMS wants `SEQUENCE { r, s }`, and `cms.ts` is the
-		// component that converts. openssl accepts the converted DER over the same data.
+		// The token form is `r || s`; X.509/CMS wants `SEQUENCE { r, s }` (`der.ts`'s
+		// `ecdsaRawToDer`, mirrored locally in `cms.ts`). What this proves is that the bytes a
+		// token returns convert to a DER signature openssl accepts — NOT that the CMS path
+		// consumes them: `signCadesDetached` (and `signBytes` below it) throws "has no private
+		// key" for a `key: null` signer before any conversion, so vendoring the token into the
+		// CMS path is a separate step in `sign.ts` (#97).
 		openssl(['ec', '-in', 'ec.pem', '-pubout', '-out', 'ec.pub.pem'], probes.dir);
 		writeFileSync(join(probes.dir, 'ec-data.bin'), data);
 		writeFileSync(join(probes.dir, 'ec-signature.der'), ecdsaRawToDer(raw, 32));
