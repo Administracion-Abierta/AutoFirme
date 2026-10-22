@@ -3,8 +3,8 @@
 **Issue:** #28 (stdio, CAdES only) and #46 (remote transport, deployment). **Status:**
 recommendation implemented — `mcp/` ships both transports. En español: qué hace el servidor MCP, en [LEEME.md](LEEME.md).
 
-AutoFirma Web's signing engine is a client-side SPA: the private key never leaves the browser and
-the CLI equivalent — desktop AutoFirma — is a Java GUI an agent cannot drive. The goal is to let a
+The signing engine (`src/lib/`) runs client-side — in the extension today, in the desktop WebView
+next — so the private key never leaves the machine, and the CLI equivalent — desktop AutoFirma — is a Java GUI an agent cannot drive. The goal is to let a
 coding agent on the same machine sign and verify documents through this engine, with an MCP server
 as the surface.
 

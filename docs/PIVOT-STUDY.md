@@ -1,5 +1,9 @@
 # Product-surface study: extension, desktop app, sign-only page
 
+**Superseded 2026-10-20 by [`DESKTOP-ROADMAP.md`](DESKTOP-ROADMAP.md) §1**, which locks the
+
+desktop app + extension as the two products and retires the hosted web app. Kept as history.
+
 **Status:** decisions recorded 2026-10-16 — the desktop app is **discarded for now**, the web app
 stays the primary surface and users who want a standalone app **install the PWA**, and DNIe /
 smartcard support moved to

@@ -45,7 +45,7 @@ when they drift or when a release tag does not match — see
 
 Release train follows the roadmap phases (`docs/DESKTOP-ROADMAP.md` §4):
 Linux desktop first, Windows second, macOS last (notarization is the long pole),
-Firefox `userScripts` (#18) after the Windows MSI exists.
+Firefox `userScripts` (#117) after the Windows MSI exists.
 
 ## Retired: Cloudflare Worker deploy (P8)
 

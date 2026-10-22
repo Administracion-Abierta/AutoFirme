@@ -1,8 +1,9 @@
-# AutoFirma Web — qué tiene la aplicación
+# AutoFirme — qué tienen las aplicaciones
 
 Documento en español, conciso y completo, sobre lo que **ya funciona**. La versión inglesa está en
-[`README.md`](../README.md). El análisis de superficies (extensión, app de escritorio, página de
-firma) y las decisiones tomadas está en [`PIVOT-STUDY.md`](PIVOT-STUDY.md).
+[`README.md`](../README.md). Las decisiones de producto están en
+[`DESKTOP-ROADMAP.md`](DESKTOP-ROADMAP.md) §1, que sustituye al análisis de superficies de
+[`PIVOT-STUDY.md`](PIVOT-STUDY.md).
 
 ## Qué es
 
@@ -11,9 +12,9 @@ firma, sin backend, sin que la clave privada salga del equipo. Clon funcional de
 (reescritura limpia en TypeScript, no traducción del Java). Referencia:
 [`architecture.md`](architecture.md), [`PARITY.md`](PARITY.md), [`USE-CASES.md`](USE-CASES.md).
 
-Superficie principal: **app web instalable como PWA**. No hay app de escritorio (descartada); la
-extensión de Chrome es la única superficie que intercepta las llamadas `AutoScript` de las sedes
-electrónicas.
+Dos productos sobre un solo motor: la **app de escritorio** (Tauri, en construcción) y la
+**extensión de Chrome MV3**. Ya no hay web: la extensión es la superficie que intercepta las
+llamadas `AutoScript` de las sedes electrónicas.
 
 ## Firmar
 
@@ -42,7 +43,7 @@ firmar ni de DSA.
 - Anclas de confianza incluidas: raíz **FNMT AC RAIZ FNMT-RCM** (`scripts/fetch-roots.sh` la
   actualiza comprobando asunto y huella).
 - **No hay** acceso al almacén del sistema (Windows-MY, Llavero, NSS) ni a certificados de DNIe o
-  tarjeta: el navegador no lo expone. Ver `README.md` → *Mejoras posibles*.
+  tarjeta: el navegador no lo expone. Llegan con la app de escritorio (`DESKTOP-ROADMAP.md`).
 
 ## Verificar
 
@@ -66,19 +67,16 @@ Copia **español e inglés** (`src/lib/i18n.ts`, español por defecto); cambio d
 reflejados en la URL. Modo claro/oscuro antes del primer pintado (`static/theme-bootstrap.js`),
 responsive de 320 a 1280 px, navegación por teclado y roles ARIA en pestañas y diálogos.
 
-## Instalable y autoalojable
+## Distribución
 
-- **PWA (#47):** `pnpm build` emite `manifest.webmanifest` + `service-worker.js`; el encabezado
-  muestra **Instalar aplicación** cuando el navegador dispara `beforeinstallprompt` y
-  **Actualizar versión** cuando hay un nuevo *worker*. La shell se precachea: **firmar funciona sin
-  red**. Nunca se guarda en caché nada generado (solo `GET` del mismo origen, sin `cache.put`).
-- **Autoalojo:** artefacto estático en `build/`, servible por cualquier nginx/k3s; `Caddyfile` y
-  `Containerfile` incluidos (node → caddy). Requiere **HTTPS** para el servicio y para instalar.
-- **Extensión Chrome MV3 (#24):** la aplicación completa más un puente que intercepta `AutoScript` en
+- **App de escritorio (Tauri):** se instala por sistema operativo desde los assets del release
+  (minisign + `SHA256SUMS`); aún no hay binarios publicados. Ver `DEPLOY.md`.
+- **Extensión Chrome MV3 (#24):** la interfaz completa más un puente que intercepta `AutoScript` en
   cualquier sitio HTTP/HTTPS desde la instalación, con selector origin-bound y confirmación explícita;
-  excepciones por sitio y TSA con permiso propio. Solo Chrome por ahora (Firefox en #18).
-- **Servidor MCP (#28, #46):** mismo motor bajo Node 22, transporte stdio y HTTP, herramientas
-  `autofirma_list_certs`, `autofirma_sign`, `autofirma_verify` (CAdES); contenedor y `deploy/k3s.yaml`.
+  excepciones por sitio y TSA con permiso propio. ZIP firmado por release; solo Chrome por ahora,
+  Firefox en [#117](https://git.eduard3v.com/EduarD3V/AutoFirme/issues/117).
+- **Servidor MCP (#28, #46):** mismo motor bajo Node, transporte stdio y HTTP, herramientas
+  `autofirma_list_certs`, `autofirma_sign`, `autofirma_verify` (CAdES); `mcp/Containerfile`.
 
 ## Privacidad
 
@@ -122,7 +120,8 @@ y una transacción administrativa con certificado personal
 | Documento | Contenido |
 |---|---|
 | [`../README.md`](../README.md) | versión inglesa, mapa de rutas y guías por función |
-| [`PIVOT-STUDY.md`](PIVOT-STUDY.md) | superficies y decisiones (PWA sí, escritorio no) |
+| [`PIVOT-STUDY.md`](PIVOT-STUDY.md) | superficies y decisiones (histórico, sustituido por `DESKTOP-ROADMAP.md`) |
+| [`DESKTOP-ROADMAP.md`](DESKTOP-ROADMAP.md) | decisiones de producto: escritorio + extensión |
 | [`CHROME-EXTENSION.md`](CHROME-EXTENSION.md) | extensión: instalación, contrato de sitio, límites |
 | [`PARITY.md`](PARITY.md) | matriz de paridad con AutoFirma 1.9 y lista de huecos |
 | [`USE-CASES.md`](USE-CASES.md) | casos de uso de 1.9 y su alcance aquí |
