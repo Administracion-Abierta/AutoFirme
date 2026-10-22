@@ -191,11 +191,16 @@ export class Pkcs11Provider {
 
 /* ------------------------------------------------------------------ filters */
 
-/** OIDs that mark a certificate as usable for document signing (RFC 5280 §4.2.1.12/13). */
+/**
+ * OIDs that mark a certificate as usable for document signing. RFC 5280 §4.2.1.12 lists the
+ * generic purposes; `1.3.6.1.5.5.7.3.36` is RFC 9336 `id-kp-documentSigning`, which a qualified
+ * Spanish certificate (FNMT, SafeSign) carries on its own instead of codeSigning.
+ */
 const SIGNING_EKUS: Record<string, true> = {
 	'1.3.6.1.5.5.7.3.3': true, // codeSigning
 	'1.3.6.1.5.5.7.3.2': true, // clientAuth
 	'1.3.6.1.5.5.7.3.4': true, // emailProtection
+	'1.3.6.1.5.5.7.3.36': true, // id-kp-documentSigning (RFC 9336)
 	'2.5.29.37.0': true // anyExtendedKeyUsage
 };
 

@@ -56,7 +56,7 @@ function openssl(args: string[], cwd: string): string {
 
 /**
  * One RSA key shared by every fixture (the filter only reads extensions, and the sign test needs
- * one real key), plus six self-signed certificates whose extensions are the cases under test.
+ * one real key), plus seven self-signed certificates whose extensions are the cases under test.
  * `-not_before`/`-not_after` pin the two skewed validity windows; OpenSSL ≥ 3.4 has them.
  */
 function createProbes(): Probes {
@@ -72,6 +72,9 @@ function createProbes(): Probes {
 		['Encipher', 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,keyEncipherment', ['-days', '3650']],
 		// digitalSignature present, but the EKU only allows TLS server use.
 		['Tls', 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=serverAuth', ['-days', '3650']],
+		// RFC 9336 `id-kp-documentSigning`: what a qualified document-signing certificate carries
+		// instead of the RFC 5280 codeSigning/emailProtection that predate it.
+		['Document', 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=1.3.6.1.5.5.7.3.36', ['-days', '3650']],
 		['Authority', 'basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign', ['-days', '3650']],
 		// A window entirely in the past, and one entirely in the future: both are excludes.
 		['Expired', 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature', ['-not_before', '20240101000000Z', '-not_after', '20250101000000Z']],
@@ -250,6 +253,10 @@ describe('certificate filters', () => {
 
 	it('hides a certificate whose EKU has no signing purpose', () => {
 		expect(certFilterReason(certFor('Tls'))).toBe('eku');
+	});
+
+	it('accepts a qualified document-signing certificate (RFC 9336 id-kp-documentSigning)', () => {
+		expect(certFilterReason(certFor('Document'))).toBeNull();
 	});
 
 	it('hides a CA certificate', () => {
