@@ -7,7 +7,7 @@ Status: **approved plan, not started**. No code exists yet. This document supers
 
 | # | Decision | Consequence |
 |---|---|---|
-| 1 | **No web product.** The Cloudflare-hosted SPA stops being a published app. | The Worker deploy is retired in P8. `build/` survives as the extension's options page and as the dev harness. `AGENTS.md`'s "wrangler stays assets-only" rule becomes vestigial and must be replaced. |
+| 1 | **No web product.** The Cloudflare-hosted SPA stops being a published app. | The Worker deploy is retired in P8. `build/` survives as the extension's options page and as the dev harness. `AGENTS.md` rule 4 (no new web deploy surface) locks the retirement in place. |
 | 2 | OS order: **Linux → Windows → macOS**. | v0.1 is Linux-only. Windows is the second target, macOS last (notarization + Developer Program are the long poles). |
 | 3 | **Desktop and extension are separate products.** Extension ships standalone: in-extension PKCS#12 signing and its own portal interception, no desktop dependency. The optional bridge between them is a **native messaging host**, never a localhost API. | No `triphase.ts` retarget. The extension keeps its own MCP bridge (agents → browser-confirmed signature). The desktop app gets its own MCP. They share the engine source, not a runtime. |
 | 4 | Certificate store: **OS keystore + PKCS#11 authoritative; PKCS#12 import kept; IndexedDB demoted to migration-only.** | One-time migration path; every cert shows its source. Divergence between stores becomes a bug class, not a feature. |
