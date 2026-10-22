@@ -1,9 +1,10 @@
 /**
  * PKCS#11 key provider (issue #100): any cryptoki module (SafeSign, FNMT, eID middleware)
  * as a key source. The module path is always caller-supplied — never hardcoded — and this
- * file owns no native binding: `CryptokiModule` is the minimal structural seam the native
- * bridge (Tauri `pkcs11_*` commands, OpenSC probe in #98) implements. Until a bridge lands,
- * `unavailableModule()` keeps the picker honest instead of pretending hardware exists.
+ * file owns no native binding: `CryptokiModule` is the minimal structural seam a native
+ * bridge would implement. No bridge is registered in this tree — no Tauri command exposes a
+ * module, and the OpenSC probe in #98 is Rust-only — so until one lands, `unavailableModule()`
+ * keeps the picker honest instead of pretending hardware exists.
  */
 
 import { oid, parseDer, type Bytes } from '../asn1';
@@ -29,7 +30,7 @@ export interface Pkcs11Object {
 	der: Bytes;
 }
 
-/** Minimal cryptoki surface the provider needs. The native bridge implements this. */
+/** Minimal cryptoki surface the provider needs. A native bridge would implement this. */
 export interface CryptokiModule {
 	listSlots(): Promise<Pkcs11Slot[]>;
 	/** `C_FindObjects` for `CKO_CERTIFICATE`. Runs after `login`, which is what unlocks them. */
