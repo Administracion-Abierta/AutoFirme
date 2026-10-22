@@ -188,7 +188,7 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 | Default format per file type (`-format auto`) | prefs `PREFERENCE_GENERAL_DEFAULT_FORMAT_{PDF,XML,BIN,OOXML,ODF,FACTURAE}` `standalone/configurator/common/PreferencesManager.java:37-42` | `PARTIAL` (fixed three-format picker) | P1 |
 | Language/locale selection | `PREFERENCES_LOCALE` `standalone/configurator/common/PreferencesManager.java:29`; `standalone/SimpleAfirma.java:504` (`buildLocale`) | `DONE` (ES/EN, `src/lib/i18n.ts`) | — |
 | Help window, About dialog, version | `SimpleAfirma.showHelp`, `standalone/ui/AboutDialog.java` | `MISSING` | P2 |
-| Update check / updater | `standalone/updater/Updater.java:20`; pref `PREFERENCE_GENERAL_UPDATECHECK` | `N/A-BROWSER` (static hosting) | — |
+| Update check / updater | `standalone/updater/Updater.java:20`; pref `PREFERENCE_GENERAL_UPDATECHECK` | `MISSING` (desktop product owns the updater, #47 closed) | P1 |
 | Proxy configuration | `standalone/ProxyUtil.java`, `standalone/ProxyConfig.java`, `standalone/ui/preferences/ProxyPanel.java:22` | `N/A-BROWSER` (the browser proxies) | — |
 | Diagnostic data window, debug logging (`afirma_debug`, `-Dafirma_debug_level`) | `standalone/ui/DataDebugDialog.java`; `SimpleAfirma.configureLog` | `PARTIAL` (technical reasons in the verify report) | P2 |
 | VDI/low-resource optimisation, HiDPI | pref `PREFERENCE_GENERAL_VDI_OPTIMIZATION`; `standalone/ui/ScalablePane.java`, `LookAndFeelManager` | `N/A-BROWSER` | — |
