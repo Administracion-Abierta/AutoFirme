@@ -80,11 +80,40 @@ export function isModulePath(value: string): boolean {
 	return /\.(so(\.\d+)*|dll|dylib)$/i.test(value.trim());
 }
 
-/** Cryptoki mechanisms this provider names. Both hash and sign in one `C_Sign` call. */
+/**
+ * Cryptoki mechanisms the provider names, by key type. `CKM_ECDSA_SHA256` (0x1044) is NOT used:
+ * probed against SoftHSM 2.6 (`pkcs11-tool -M` lists only the raw `CKM_ECDSA` as an ECDSA entry
+ * with `sign`), `C_SignInit` with 0x1044 answers `CKR_MECHANISM_INVALID` (0x70) while 0x1041
+ * signs. `CKM_SHA256_RSA_PKCS` (0x40) *is* offered there and its signature verified with openssl.
+ *
+ * The asymmetry is the mechanism's, not ours: the RSA mechanism hashes the input itself, the raw
+ * ECDSA one signs whatever bytes it is given, so `sign()` hashes for EC and the bridge stays a
+ * plain `C_Sign` — see `signingMechanism`.
+ */
 export const SIGNING_MECHANISMS = {
 	rsa: 'CKM_SHA256_RSA_PKCS',
-	ec: 'CKM_ECDSA_SHA256'
+	/** Raw ECDSA: input is the SHA-256 digest, output is `r || s`. */
+	ec: 'CKM_ECDSA'
 } as const;
+
+/**
+ * What `C_Sign` receives for one certificate: the raw mechanism plus the bytes it binds.
+ * RSA mechanisms hash internally; raw `CKM_ECDSA` does not, so the digest is computed here.
+ * The app signs SHA-256 throughout (`objectToSignerCert` pins it, `cms.ts` emits that digest
+ * OID), so another hash is refused instead of being signed under the wrong one.
+ */
+export async function signingMechanism(
+	algorithm: SignerCert['algorithm'],
+	data: Bytes
+): Promise<{ mechanism: string; payload: Bytes }> {
+	if (algorithm && algorithm.hash !== 'SHA-256')
+		throw new Pkcs11Error('sign-failed', `unsupported hash: ${algorithm.hash}`);
+	if (algorithm?.name !== 'ECDSA') return { mechanism: SIGNING_MECHANISMS.rsa, payload: data };
+	return {
+		mechanism: SIGNING_MECHANISMS.ec,
+		payload: new Uint8Array(await crypto.subtle.digest('SHA-256', data))
+	};
+}
 
 export interface Pkcs11ProviderOptions {
 	/** Absolute path (or OS store name) of the cryptoki library — always caller-supplied. */
@@ -154,10 +183,8 @@ export class Pkcs11Provider {
 		if (cert.source !== this.sourceLabel || !Number.isInteger(slotId) || slotId < 0 || !keyId)
 			throw new Pkcs11Error('sign-failed', 'certificate does not belong to this module');
 		if (pin !== undefined) await this.bridge.login(slotId, pin);
-		// Both mechanisms hash and sign in one call, so the bridge gets the to-be-signed bytes
-		// and no `DigestInfo` guessing. A non-EC key is RSA: that is what the token offered.
-		const mechanism = cert.algorithm?.name === 'ECDSA' ? SIGNING_MECHANISMS.ec : SIGNING_MECHANISMS.rsa;
-		return this.bridge.sign(cert.tokenRef.slotId, cert.tokenRef.keyId, mechanism, data);
+		const { mechanism, payload } = await signingMechanism(cert.algorithm, data);
+		return this.bridge.sign(slotId, keyId, mechanism, payload);
 	}
 }
 

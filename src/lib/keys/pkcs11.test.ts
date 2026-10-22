@@ -17,8 +17,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanup, render } from '@testing-library/svelte';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { Bytes } from '../asn1';
+import { integerBytes, parseDer, type Bytes } from '../asn1';
 import { certificateSource, PKCS12_SOURCE } from '../certstore';
+import { ecdsaRawToDer } from '../der';
 import Pkcs11Badge from './pkcs11-badge.svelte';
 import {
 	certFilterReason,
@@ -60,6 +61,8 @@ function createProbes(): Probes {
 	const dir = mkdtempSync(join(tmpdir(), 'autofirme-p11-'));
 	openssl(['genrsa', '-traditional', '-out', 'key.pem', '2048'], dir);
 	openssl(['rsa', '-in', 'key.pem', '-pubout', '-out', 'key.pub.pem'], dir);
+	// One EC key as well: the ECDSA path takes a different mechanism and a different payload.
+	openssl(['ecparam', '-name', 'prime256v1', '-genkey', '-noout', '-out', 'ec.pem'], dir);
 
 	const spec: Array<[string, string, string[]]> = [
 		['Signer', 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=codeSigning', ['-days', '3650']],
@@ -328,25 +331,66 @@ describe('signing through the provider', () => {
 		expect(verdict.trim()).toBe('Verified OK');
 	});
 
-	it('names the hashing mechanism per key type, never a raw digest', async () => {
+	it('asks for the raw hashing mechanism per key type, and hashes only for ECDSA', async () => {
 		const sign = vi.fn(async () => new Uint8Array([1, 2, 3]));
 		const provider = new Pkcs11Provider({ modulePath: MODULE_PATH, bridge: signingBridge(sign) });
 		const [cert] = await provider.certificates(0, '1234');
-		await provider.sign(cert, new Uint8Array([9]));
-		expect(sign).toHaveBeenCalledWith(
-			0,
-			probes.keyIds.get('Signer'),
-			SIGNING_MECHANISMS.rsa,
-			new Uint8Array([9])
-		);
-		// An EC key gets the ECDSA mechanism; the rest of the call is identical.
-		await provider.sign({ ...cert, algorithm: { name: 'ECDSA', hash: 'SHA-256' } }, new Uint8Array([9]));
+		const data = new TextEncoder().encode('factura');
+		await provider.sign(cert, data);
+		// RSA: the mechanism hashes internally, so `C_Sign` gets the to-be-signed bytes as they are.
+		expect(sign).toHaveBeenCalledWith(0, probes.keyIds.get('Signer'), SIGNING_MECHANISMS.rsa, data);
+		// EC: `CKM_ECDSA` signs whatever it is handed, so the provider sends the SHA-256 digest —
+		// never the digest as the *data* of a mechanism that would hash it a second time.
+		await provider.sign({ ...cert, algorithm: { name: 'ECDSA', hash: 'SHA-256' } }, data);
 		expect(sign).toHaveBeenLastCalledWith(
 			0,
 			probes.keyIds.get('Signer'),
 			SIGNING_MECHANISMS.ec,
-			new Uint8Array([9])
+			new Uint8Array(await crypto.subtle.digest('SHA-256', data))
 		);
+		// A SHA-384 certificate is refused: the mechanism pair binds SHA-256, and signing under
+		// another hash would produce a signature the CMS digest OID contradicts.
+		await expect(
+			provider.sign({ ...cert, algorithm: { name: 'ECDSA', hash: 'SHA-384' } }, data)
+		).rejects.toMatchObject({ code: 'sign-failed' });
+	});
+
+	it('signs with an EC key over the hash and openssl verifies the token form', async () => {
+		// What a real module does: raw `CKM_ECDSA` over the SHA-256 digest, `r || s` back. openssl
+		// produces the signature here so both the mechanism/payload contract and the returned bytes
+		// have a third-party oracle — the SoftHSM 2.6 answer replayed without the hardware.
+		const sign = vi.fn(async (_slot: number, _key: string, _mechanism: string, digest: Bytes) => {
+			writeFileSync(join(probes.dir, 'ec-payload.bin'), digest);
+			openssl(
+				['pkeyutl', '-sign', '-inkey', 'ec.pem', '-in', 'ec-payload.bin', '-out', 'ec-sig.der'],
+				probes.dir
+			);
+			// DER `SEQUENCE { r, s }` → the token form `r || s`, each coordinate left-padded to 32.
+			const [r, s] = parseDer(new Uint8Array(readFileSync(join(probes.dir, 'ec-sig.der')))).children;
+			const raw = new Uint8Array(64);
+			raw.set(integerBytes(r), 32 - integerBytes(r).length);
+			raw.set(integerBytes(s), 64 - integerBytes(s).length);
+			return raw;
+		});
+		const provider = new Pkcs11Provider({ modulePath: MODULE_PATH, bridge: signingBridge(sign) });
+		const [cert] = await provider.certificates(0, '1234');
+		const data = new TextEncoder().encode('factura 2026-01 — EC');
+		const raw = await provider.sign({ ...cert, algorithm: { name: 'ECDSA', hash: 'SHA-256' } }, data);
+		// Raw `CKM_ECDSA` gets the digest, not the document: 32 bytes for SHA-256.
+		expect(sign.mock.calls[0][2]).toBe(SIGNING_MECHANISMS.ec);
+		expect(sign.mock.calls[0][3]).toEqual(new Uint8Array(await crypto.subtle.digest('SHA-256', data)));
+		expect(raw.length).toBe(64); // P-256: two 32-byte coordinates
+
+		// The token form is `r || s`; X.509/CMS wants `SEQUENCE { r, s }`, and `cms.ts` is the
+		// component that converts. openssl accepts the converted DER over the same data.
+		openssl(['ec', '-in', 'ec.pem', '-pubout', '-out', 'ec.pub.pem'], probes.dir);
+		writeFileSync(join(probes.dir, 'ec-data.bin'), data);
+		writeFileSync(join(probes.dir, 'ec-signature.der'), ecdsaRawToDer(raw, 32));
+		const verdict = openssl(
+			['dgst', '-sha256', '-verify', 'ec.pub.pem', '-signature', 'ec-signature.der', 'ec-data.bin'],
+			probes.dir
+		);
+		expect(verdict.trim()).toBe('Verified OK');
 	});
 
 	it('refuses a certificate that belongs to another module or slot', async () => {
