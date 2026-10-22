@@ -107,6 +107,9 @@ AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', 'mode=explicit', success, erro
 AutoScript.sign(base64, 'SHA256withRSA', 'PAdES', null, success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'AUTO', null, success, error);
 AutoScript.sign(base64, 'SHA1withRSA', 'XAdES', null, success, error);
+// The same signatures under the legacy `MiniApplet` alias:
+MiniApplet.sign(base64, 'SHA256withRSA', 'CAdES', null, success, error);
+MiniApplet.selectCertificate(null, success, error);
 ```
 
 Input must be canonical Base64, at most 4 MiB. Certificate selection does not

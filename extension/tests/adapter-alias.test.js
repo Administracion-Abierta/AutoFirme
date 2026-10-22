@@ -5,6 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { installAdapter } from '../core/adapter.js';
 
 function win() {
@@ -92,4 +93,13 @@ test('a non-configurable global is wrapped in place and the poll catches replace
 	});
 	assert.equal(late, 'c2ln');
 	assert.equal(originals, 0);
+});
+test('the documented interception list names both globals', () => {
+	const doc = readFileSync(new URL('../../docs/CHROME-EXTENSION.md', import.meta.url), 'utf8');
+	const section = doc.slice(doc.indexOf('Initially intercepted calls are'));
+	const fence = /```js\n([\s\S]*?)```/.exec(section);
+	assert.ok(fence, 'the interception list fence is present');
+	assert.match(fence[1], /AutoScript\.sign\(/);
+	assert.match(fence[1], /MiniApplet\.sign\(/,
+		'the interception list must document the MiniApplet alias the adapter wraps');
 });
