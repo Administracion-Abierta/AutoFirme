@@ -1,4 +1,4 @@
-# architecture.md — AutoFirma signing core (reference for the web rewrite)
+# architecture.md — AutoFirma signing core (reference for the AutoFirme rewrite)
 
 Reference map of the signing core of **AutoFirma 1.9** (upstream `afirma-core`), written for the
 AutoFirme rewrite. It was built from a jadx 1.5.6 decompilation of the 1.9 `autofirma.jar`;
@@ -172,7 +172,7 @@ No tri-phase variant is registered.
 
 `signvalidation/` gives format detection + verification independent of signing:
 `SignatureFormatDetector{PadesCades,Xades}.java`, `ValidateBinarySignature`, `ValidatePdfSignature`,
-`ValidateXMLSignature`, orchestrated by `SignValiderFactory`/`SignValider`. The web rewrite needs
+`ValidateXMLSignature`, orchestrated by `SignValiderFactory`/`SignValider`. The rewrite needs
 this whole package (or a JS equivalent) for the "verify" flow.
 
 ## 4. Keystore layer (`es/gob/afirma/keystores/`)
@@ -312,7 +312,7 @@ collapse into `crypto.subtle` calls.
 - Which exact PAdES profile (`PAdES-B-B`/`-B-T`) `AOPDFSigner` targets was not traced to a
   constant; `[INFERENCE]` baseline B-T given `PdfTimestamper`.
 - Deeper: `standalone/ui/preferences/**` (43 classes) and `standalone/plugins/**` govern
-  behaviour/config that the web rewrite will redesign rather than port.
+  behaviour/config that the rewrite will redesign rather than port.
 - Citations are machine-checked: `python3 docs/check-architecture-doc.py` resolves every
   `file:line` citation against the decompiled tree and fails if a range is out of bounds or does
   not contain the identifiers the sentence names. Since #26 the tree is untracked, so on a fresh
