@@ -104,6 +104,37 @@ describe('check-i18n inventory', () => {
 			expect(result.status, svelte).toBe(0);
 		}
 	});
+
+	// Attribute values sit inside a tag, so the text rule above never sees them: whatever the
+	// attribute rule misses is invisible, and whitespace around `=` was enough to miss it. A
+	// value that mixes copy with an interpolation (`"Guardar {t.name}"`) is copy with a hole in
+	// it, and the interpolation is lifted out so the copy still shows.
+	it('catches attribute copy whatever the spacing, and copy mixed with an interpolation', () => {
+		for (const svelte of [
+			'<input placeholder = "Guardar fichero" />',
+			'<input\n\tplaceholder=\n\t\t"Guardar fichero"\n/>',
+			'<button aria-label = "Guardar fichero"></button>',
+			'<input placeholder="Guardar {t.name}" />',
+			"<input title='Guardar {t.name}' />",
+			'<input placeholder = {`Guardar fichero`} />',
+			'<input placeholder = {`Guardar ${t.name}`} />'
+		]) {
+			const result = check(svelte);
+			expect(result.status, svelte).toBe(1);
+			expect(result.stderr, svelte).toContain('hardcoded user-visible text');
+		}
+
+		// Wrapping a lookup in quotes does not turn it into copy: an attribute whose value is
+		// only interpolations still renders fully translated text.
+		for (const svelte of [
+			'<input placeholder="{t.save}" />',
+			'<button aria-label="{t.formatTitle}: {file.name}"></button>',
+			'<button aria-label={t.title}></button>'
+		]) {
+			const result = check(svelte);
+			expect(result.status, svelte).toBe(0);
+		}
+	});
 });
 
 describe('check-i18n Rust embed', () => {

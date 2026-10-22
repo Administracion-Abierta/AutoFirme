@@ -135,17 +135,24 @@ for (const path of literalSources) {
 			.split(/<[^>]*>/g),
 		// Either quote style, but the value must not contain its own delimiter: matching the
 		// quotes independently truncated `title="don't save"` to `don` and let
-		// `placeholder="'Guardar fichero'"` through entirely.
-		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=(?:"([^"{}]*)"|'([^'{}]*)')/g),
-		// The same attributes can carry the value as a brace expression. Only a value that is
-		// *nothing but* one quoted string counts: `aria-label="{t.formatTitle}"` and
-		// `aria-label={t.title}` are lookups, and `class={'grid grid-cols-2'}` is not copy at
-		// all, so widening past the attribute list above would drown the gate in false alarms.
-		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=\{\s*(?:"([^"{}]*)"|'([^'{}]*)'|`([^`{}]*)`)\s*\}/g),
+		// `placeholder="'Guardar fichero'"` through entirely. Whitespace around `=` is valid
+		// markup, and the value never reaches the text rule because it sits inside a tag.
+		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)\s*=\s*(?:"([^"]*)"|'([^']*)')/g),
+		// The same attribute can carry the value as a brace expression, or mix copy with an
+		// interpolation, and the value is unwrapped here rather than at the call site below.
+		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)\s*=\s*\{\s*(?:"([^"]*)"|'([^']*)'|`([^`]*)`)\s*\}/g),
 		// A backtick literal with no interpolation is the same defect as a quoted one: the value
 		// is a string, not a lookup.
 		...markup.matchAll(/>\{\s*(?:"([^"{}]*)"|'([^'{}]*)'|`([^`{}]*)`)\s*\}</g)
-	].map((match) => (typeof match === 'string' ? match : (match[1] ?? match[2] ?? match[3])).trim());
+	].map((match) =>
+		// Quoted values may hold `{…}` of their own, so every value goes through the same
+		// expression-stripping lens: `placeholder="Guardar {t.name}"` still shows "Guardar",
+		// while `aria-label="{t.formatTitle}: {file.name}"` (the shape the app uses) and
+		// `placeholder="{t.save}"` leave nothing behind. `aria-label={t.title}` and
+		// `class={'grid grid-cols-2'}` stay clean: a braced value counts only when it is one
+		// quoted string, and `class` is not an attribute this gate watches.
+		stripExpressions(typeof match === 'string' ? match : (match[1] ?? match[2] ?? match[3])).trim()
+	);
 	for (const literal of literals) {
 		if (!/\p{L}/u.test(literal)) continue;
 		if (LITERAL_ALLOWLIST.has(literal) || EXAMPLE_URL.test(literal)) continue;
