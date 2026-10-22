@@ -1,4 +1,5 @@
 import type { Bytes } from './asn1';
+import { softwareProvider, type KeyProvider } from './keys/provider';
 
 /** Domain types for the sign flow. Signature engines land in #6–#11; this file is the seam. */
 
@@ -57,6 +58,11 @@ export interface SignerCert {
 	/** Legacy portals still request SHA-1; WebCrypto binds the hash to the key. */
 	sha1Key?: CryptoKey | null;
 	algorithm: SigningAlgorithm | null;
+	/**
+	 * Key source that owns this certificate's key. Absent means the key already sits on
+	 * `key` / `sha1Key` / `sha512Key` — the software backend (Refs #97).
+	 */
+	provider?: KeyProvider;
 }
 
 export interface SignerSession {
@@ -77,14 +83,8 @@ export function signingAlgorithmName(cert: SignerCert): string {
 	return `${hash.replace('-', '')}with${name === 'ECDSA' ? 'ECDSA' : 'RSA'}`;
 }
 
-/** The non-extractable key view bound to `hash`, or null when the certificate has none. */
-export function signingKey(cert: SignerCert, hash: SigningAlgorithm['hash']): CryptoKey | null {
-	if (!cert.algorithm) return null;
-	if (hash === cert.algorithm.hash) return cert.key;
-	if (hash === 'SHA-1') return cert.sha1Key ?? null;
-	if (hash === 'SHA-512') return cert.sha512Key ?? null;
-	return null;
-}
+/** Moved onto the seam; re-exported so existing importers keep working. */
+export { signingKey } from './keys/provider';
 
 /** Sign raw bytes with the selected certificate's key. Format wrapping happens in #6–#11. */
 export async function signBytes(
@@ -92,15 +92,7 @@ export async function signBytes(
 	data: Bytes,
 	hash: SigningAlgorithm['hash'] = cert.algorithm?.hash ?? 'SHA-256'
 ): Promise<Bytes> {
-	const key = signingKey(cert, hash);
-	if (!key || !cert.algorithm) {
-		throw new Error(`certificate ${cert.commonName} has no private key`);
-	}
-	const algorithm: AlgorithmIdentifier | EcdsaParams =
-		cert.algorithm.name === 'ECDSA'
-			? { name: 'ECDSA', hash }
-			: { name: 'RSASSA-PKCS1-v1_5' };
-	return new Uint8Array(await crypto.subtle.sign(algorithm, key, data));
+	return (cert.provider ?? softwareProvider).signDigest(cert, data, hash);
 }
 
 export function toSelectedFile(file: File): SelectedFile {
