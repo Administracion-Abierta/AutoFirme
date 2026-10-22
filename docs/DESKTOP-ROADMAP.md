@@ -13,7 +13,7 @@ Status: **approved plan, not started**. No code exists yet. This document supers
 | 4 | Certificate store: **OS keystore + PKCS#11 authoritative; PKCS#12 import kept; IndexedDB demoted to migration-only.** | One-time migration path; every cert shows its source. Divergence between stores becomes a bug class, not a feature. |
 | 5 | **P2P slice 1 = LAN + Tailscale only**, no relays. | Nothing to operate. File-out fallback always present. |
 | 6 | **No hosted presence at all.** No docs site, no landing page, no demo host. | Docs live in the repo. Nothing to deploy, nothing to keep green. |
-| 7 | **Firefox after Windows.** | Firefox `userScripts` (#18) stays `fleet:hold` until the Windows MSI exists. |
+| 7 | **Firefox after Windows.** | Firefox `userScripts` (#117) stays parked until the Windows MSI exists. |
 | 8 | **macOS committed from the start, notarization included.** | Apple Developer Program purchase moves into the P7 budget, not "someday". Keychain provider is mandatory, not optional. |
 | 9 | **GitHub Releases is the only distribution channel.** | No apt/dnf repo, no Forgejo pages, no third-party store as primary. Packages are attached assets + `SHA256SUMS`, minisign signatures. |
 
@@ -118,7 +118,7 @@ of ~45 d. Verify this first, in P1, day 1.
 - Extension treats host absence as normal (`curl`-equivalent probe fails → in-extension
   PKCS#12 path). Version skew handled by `hello.capabilities`, not by version compare.
 - Firefox needs `allowed_extensions` with the add-on ID and its own signed manifest; budget
-  an extra day and treat Firefox as a later deliverable (see issue #18).
+  an extra day and treat Firefox as a later deliverable (see issue #117).
 
 ### 5.4 MCP inside the app (P5)
 
