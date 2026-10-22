@@ -198,14 +198,14 @@ const SIGNING_EKUS: Record<string, true> = {
 	'2.5.29.37.0': true // anyExtendedKeyUsage
 };
 
-function extensionValues(der: Bytes): Map<string, { critical: boolean; value: Bytes }> {
-	const found = new Map<string, { critical: boolean; value: Bytes }>();
+function extensionValues(der: Bytes): Map<string, Bytes> {
+	const found = new Map<string, Bytes>();
 	const tbs = parseDer(der).children[0];
 	const extensions = tbs.children.find((node) => node.tag === 0xa3)?.children[0]?.children ?? [];
 	for (const extension of extensions) {
-		const id = oid(extension.children[0]);
-		const critical = extension.children.length === 3 && extension.children[1].value[0] !== 0;
-		found.set(id, { critical, value: extension.children.at(-1)!.value });
+		// Trailing element: the extnValue, whatever the critical flag says — an unrecognised
+		// extension is not "unused" here, the picker only reads the ones it knows.
+		found.set(oid(extension.children[0]), extension.children.at(-1)!.value);
 	}
 	return found;
 }
@@ -236,7 +236,7 @@ export function certFilterReason(cert: FilterableCert, now = Date.now()): CertFi
 	if (cert.notAfter.getTime() <= now) return 'expired';
 	if (cert.notBefore.getTime() > now) return 'not-yet-valid';
 	if (!cert.key && !cert.tokenRef) return 'no-key';
-	let extensions: Map<string, { critical: boolean; value: Bytes }>;
+	let extensions: Map<string, Bytes>;
 	try {
 		extensions = extensionValues(cert.der);
 	} catch {
@@ -245,7 +245,7 @@ export function certFilterReason(cert: FilterableCert, now = Date.now()): CertFi
 	const basic = extensions.get('2.5.29.19');
 	if (basic) {
 		try {
-			const ca = parseDer(basic.value).children[0];
+			const ca = parseDer(basic).children[0];
 			if (ca?.tag === 0x01 && ca.value[0] !== 0) return 'ca';
 		} catch {
 			return 'unreadable';
@@ -254,7 +254,7 @@ export function certFilterReason(cert: FilterableCert, now = Date.now()): CertFi
 	const usage = extensions.get('2.5.29.15');
 	if (usage) {
 		try {
-			const bits = parseDer(usage.value);
+			const bits = parseDer(usage);
 			// BIT STRING: first content octet is the unused-bits count, then the bits.
 			// digitalSignature(0) | nonRepudiation/contentCommitment(1).
 			if (((bits.value[1] ?? 0) & 0xc0) === 0) return 'key-usage';
@@ -265,7 +265,7 @@ export function certFilterReason(cert: FilterableCert, now = Date.now()): CertFi
 	const eku = extensions.get('2.5.29.37');
 	if (eku) {
 		try {
-			const purposes = parseDer(eku.value).children.map((node) => oid(node));
+			const purposes = parseDer(eku).children.map((node) => oid(node));
 			// An EKU extension with no listed purpose permits nothing.
 			if (!purposes.some((purpose) => SIGNING_EKUS[purpose] === true)) return 'eku';
 		} catch {
@@ -309,8 +309,10 @@ export function objectsToSignerCerts(
 }
 
 /**
- * One token object → one picker certificate, or null when its DER is not a certificate. A
- * broken object is skipped by the caller: one bad blob must not hide the whole token.
+ * One token object → one picker certificate, or null when it cannot be one: DER that is not a
+ * certificate, or a key kind the provider has no mechanism for (DSA, Ed25519, …) — offering
+ * that certificate would only fail at `C_SignInit` after the user picked it. A broken object is
+ * skipped by the caller: one bad blob must not hide the whole token.
  */
 export function objectToSignerCert(
 	object: Pkcs11Object,
@@ -324,6 +326,7 @@ export function objectToSignerCert(
 	} catch {
 		return null;
 	}
+	if (parsed.publicKey.kind === 'other') return null;
 	const now = Date.now();
 	return {
 		// Position-prefixed like the PKCS#12 path: serials are unique per issuer only.
@@ -340,12 +343,10 @@ export function objectToSignerCert(
 		// The private key never leaves the token: no WebCrypto handle. `tokenRef` is
 		// how `sign()` routes back to the right slot object.
 		key: null,
-		// The token's own public key names the algorithm; SHA-256 is what the mechanisms
-		// in `SIGNING_MECHANISMS` bind, so no WebCrypto import happens here.
-		algorithm: {
-			name: parsed.publicKey.kind === 'ec' ? 'ECDSA' : 'RSASSA-PKCS1-v1_5',
-			hash: 'SHA-256'
-		},
+		// The token's own public key names the algorithm — only the two kinds the chosen
+		// mechanisms sign are left; SHA-256 is what those mechanisms bind, so no WebCrypto
+		// import happens here.
+		algorithm: { name: parsed.publicKey.kind === 'ec' ? 'ECDSA' : 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
 		source,
 		tokenRef: { slotId, keyId: object.keyId }
 	};
