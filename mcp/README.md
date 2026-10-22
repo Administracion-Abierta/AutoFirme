@@ -1,6 +1,6 @@
 # autofirme-mcp
 
-An [MCP](https://modelcontextprotocol.io) server that exposes AutoFirma Web's signing engine:
+An [MCP](https://modelcontextprotocol.io) server that exposes AutoFirme's signing engine:
 CAdES-BES signing with an operator-supplied certificate, and verification. It speaks **stdio** for
 an agent on the same machine and **Streamable HTTP** (spec 2025-03-26) for remote ones. The design
 study behind it — alternatives, threat model, key lifecycle — is `../docs/MCP-DESIGN.md`.
