@@ -80,24 +80,34 @@ describe('check-i18n inventory', () => {
 
 	// The text rule used to demand a `<` on both sides of a run, so it only saw copy hugging two
 	// tags. Copy sitting next to a block or inside a text run with an interpolation was invisible:
-	// every expression is lifted out and the rest is split on tags, which covers all of these.
+	// every expression is lifted out and the rest is split on tags, which covers all of these. A
+	// text node whose value is one quoted string is the sibling of the attribute rule below, and
+	// it must not exclude braces of its own: `{"Guardar fichero {t.name}"}` is copy with a hole.
 	it('catches copy delimited by blocks or interpolation, not just by tags', () => {
 		for (const svelte of [
 			'{#if x}\n\tGuardar fichero\n{/if}',
 			'{#each files as f}\n\tGuardar fichero\n{/each}',
 			'<p>Guardar fichero {t.name}</p>',
 			'<p>{t.name} Guardar fichero</p>',
-			'<p>{`Guardar fichero`}</p>'
+			'<p>{`Guardar fichero`}</p>',
+			'<p>{"Guardar fichero {t.name}"}</p>'
 		]) {
 			const result = check(svelte);
 			expect(result.status, svelte).toBe(1);
 			expect(result.stderr, svelte).toContain('hardcoded user-visible text "Guardar fichero"');
 		}
 
+		// A backtick with an interpolation strips to the copy plus the `$` that opened the hole,
+		// which is the same residue the attribute rule leaves for `placeholder={`…${t.name}`}`.
+		const backtick = check('<p>{`Guardar fichero ${t.name}`}</p>');
+		expect(backtick.status).toBe(1);
+		expect(backtick.stderr).toContain('hardcoded user-visible text "Guardar fichero $"');
+
 		for (const svelte of [
 			'{#if x}<p>{t.title}</p>{/if}',
 			'<p>{t.title} {t.name}</p>',
 			'<p>{`${t.title} ${t.name}`}</p>',
+			'<p>{"{t.name}"}</p>',
 			'<button onclick={() => (open = true)}></button>'
 		]) {
 			const result = check(svelte);

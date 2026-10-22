@@ -141,9 +141,10 @@ for (const path of literalSources) {
 		// The same attribute can carry the value as a brace expression, or mix copy with an
 		// interpolation, and the value is unwrapped here rather than at the call site below.
 		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)\s*=\s*\{\s*(?:"([^"]*)"|'([^']*)'|`([^`]*)`)\s*\}/g),
-		// A backtick literal with no interpolation is the same defect as a quoted one: the value
-		// is a string, not a lookup.
-		...markup.matchAll(/>\{\s*(?:"([^"{}]*)"|'([^'{}]*)'|`([^`{}]*)`)\s*\}</g)
+		// The text sibling of the attribute rule above, and the same shape: a value that is one
+		// quoted string is copy whether the quote is ' ` or ", and it may hold `{…}` of its own —
+		// `{"Guardar {t.name}"}` is copy with a hole in it, whereas `{"{t.name}"}` is a lookup.
+		...markup.matchAll(/>\{\s*(?:"([^"]*)"|'([^']*)'|`([^`]*)`)\s*\}</g)
 	].map((match) =>
 		// Quoted values may hold `{…}` of their own, so every value goes through the same
 		// expression-stripping lens: `placeholder="Guardar {t.name}"` still shows "Guardar",
