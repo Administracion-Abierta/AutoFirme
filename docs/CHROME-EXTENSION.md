@@ -13,7 +13,7 @@ extensión están en [LEEME.md](LEEME.md) (sección «Extensión Chrome»).
 
 Use Node 22+ (Node 24 verified), pnpm 11.24.0, and Chrome/Chromium 116+. The
 extension is **Chrome-only for now**; Firefox support is deferred to
-[issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18)
+[issue #117](https://git.eduard3v.com/EduarD3V/AutoFirme/issues/117)
 (`userScripts` API study, tagged `fleet:hold`).
 
 ```sh

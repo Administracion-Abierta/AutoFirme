@@ -8,7 +8,7 @@ Run `pnpm install`, `pnpm check` and `pnpm build:extension` from the repository 
 En español: las funciones de la extensión están en [../docs/LEEME.md](../docs/LEEME.md).
 
 **Chrome only for now.** Firefox support is deferred and studied in
-[issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18): the
+[issue #117](https://git.eduard3v.com/EduarD3V/AutoFirme/issues/117): the
 MAIN-world bridge needs the FF 128+ `userScripts` API instead of Chrome's
 `world: 'MAIN'` content scripts.
 

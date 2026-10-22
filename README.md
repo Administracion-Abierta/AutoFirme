@@ -165,7 +165,7 @@ permiso y exige una confirmación humana antes de firmar.
 ![Ajustes de la extensión](docs/images/extension-ajustes.png)
 
 Requisitos: Chrome/Chromium 116+ y Node 22+ para compilar. Firefox está pendiente
-([issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18)).
+([issue #117](https://git.eduard3v.com/EduarD3V/AutoFirme/issues/117)).
 
 ```bash
 pnpm install --frozen-lockfile

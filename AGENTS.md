@@ -71,7 +71,7 @@ Build/test from the repo root (pnpm is canonical; the lockfile and `Containerfil
 - Branches: `develop` is the integration branch (PRs target it), `main` is what gets
   released; `main` only receives merges from `develop`.
 - Work on branches; `Refs #N` only in commits (never closing keywords).
-- Issues on GitHub (github.com/Administracion-Abierta/AutoFirme) drive the fleet (bullet).
+- Issues on the forge (git.eduard3v.com/EduarD3V/AutoFirme) drive the fleet (bullet).
 - Big problems get split into ≤~400-line deliverables per issue; PRs to `main` need CI green
   (`checks`, `e2e`, `secret-scan`, `dependency-audit`), 1 review, and `CODEOWNERS` sign-off on
   the crypto paths.
