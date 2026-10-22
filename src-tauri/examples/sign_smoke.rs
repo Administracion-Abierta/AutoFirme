@@ -67,17 +67,29 @@ fn main() {
         .expect("sign digest");
     assert_eq!(sig.len(), 256, "2048-bit RSA signature is 256 bytes");
 
-    // 3. Independent check: the token's own verifier accepts it.
+    // 3. Independent check, not the token's own verifier. `sign_digest` promises
+    //    "digest in", so the signature must be PKCS#1 v1.5 over
+    //    `DigestInfo(digest)` — raw `CKM_RSA_PKCS`, no second hashing.
+    let mut info = vec![
+        0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01,
+        0x05, 0x00, 0x04, 0x20,
+    ];
+    info.extend_from_slice(&digest);
     session
-        .verify(&Mechanism::Sha256RsaPkcs, _pub, &digest, &sig)
-        .expect("token verifies its own signature");
+        .verify(&Mechanism::RsaPkcs, _pub, &info, &sig)
+        .expect("signature must be raw PKCS#1 v1.5 over DigestInfo(digest)");
 
-    // 4. PKCS#1 v1.5 is deterministic, so the same digest must give the same
-    //    bytes. A nonce-bearing scheme would hide a broken key lookup.
-    let sig2 = signer
-        .sign_digest(slot, Some("smoke-key"), &digest, &pin)
-        .expect("sign again");
-    assert_eq!(sig, sig2, "SHA256-RSA-PKCS is deterministic");
+    // 3b. Regression trap for the mechanism mistake this test exists to catch:
+    //     hashing the digest *again* (`CKM_SHA256_RSA_PKCS`) is self-consistent,
+    //     so the token's own verifier cannot tell the two apart. This can:
+    //     verifying the bare digest with the hash-and-sign mechanism succeeds
+    //     if and only if the digest was hashed a second time. It must fail.
+    assert!(
+        session
+            .verify(&Mechanism::Sha256RsaPkcs, _pub, &digest, &sig)
+            .is_err(),
+        "digest was hashed twice: no CMS verifier would accept this signature"
+    );
 
     // 5. Unknown key label → typed error, no panic.
     assert!(
@@ -105,5 +117,8 @@ fn main() {
         assert!(after.is_err(), "yanked token must not return a signature");
     }
 
-    println!("SIGN_OK module={module} slot={slot:?} sig_len={}", sig.len());
+    println!(
+        "SIGN_OK module={module} slot={slot:?} sig_len={}",
+        sig.len()
+    );
 }

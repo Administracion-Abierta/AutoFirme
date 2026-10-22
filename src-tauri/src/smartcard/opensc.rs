@@ -12,14 +12,14 @@ use super::error::SmartcardError;
 
 /// Well-known OpenSC module locations, distro order first.
 pub const OPENSC_CANDIDATES: &[&str] = &[
-    "/usr/lib64/pkcs11/opensc-pkcs11.so",         // RHEL/Fedora p11-kit dir
-    "/usr/lib64/opensc-pkcs11.so",                // RHEL/Fedora x86_64
+    "/usr/lib64/pkcs11/opensc-pkcs11.so", // RHEL/Fedora p11-kit dir
+    "/usr/lib64/opensc-pkcs11.so",        // RHEL/Fedora x86_64
     "/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so", // Debian/Ubuntu
-    "/usr/lib/pkcs11/opensc-pkcs11.so",           // Debian p11-kit dir
-    "/usr/lib/opensc-pkcs11.so",                  // fallback prefix
-    "/usr/local/lib/opensc-pkcs11.so",            // source builds
-    "/opt/homebrew/lib/opensc-pkcs11.so",         // macOS arm64
-    "/Library/OpenSC/lib/opensc-pkcs11.so",       // macOS installer
+    "/usr/lib/pkcs11/opensc-pkcs11.so",   // Debian p11-kit dir
+    "/usr/lib/opensc-pkcs11.so",          // fallback prefix
+    "/usr/local/lib/opensc-pkcs11.so",    // source builds
+    "/opt/homebrew/lib/opensc-pkcs11.so", // macOS arm64
+    "/Library/OpenSC/lib/opensc-pkcs11.so", // macOS installer
 ];
 
 /// First existing candidate wins; none → [`SmartcardError::OpenscModuleNotFound`].

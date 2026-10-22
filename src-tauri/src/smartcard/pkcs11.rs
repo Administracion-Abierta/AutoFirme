@@ -42,7 +42,10 @@ impl Pkcs11Signer {
 
     /// Slots holding a card. Empty → [`SmartcardError::CardAbsent`].
     pub fn token_slots(&self) -> Result<Vec<Slot>, SmartcardError> {
-        let slots = self.ctx.get_slots_with_token().map_err(|e| map_pkcs11(&e))?;
+        let slots = self
+            .ctx
+            .get_slots_with_token()
+            .map_err(|e| map_pkcs11(&e))?;
         if slots.is_empty() {
             return Err(SmartcardError::CardAbsent);
         }
@@ -87,14 +90,19 @@ impl Pkcs11Signer {
         if digest.is_empty() {
             return Err(SmartcardError::Transmission("empty digest".into()));
         }
-        let mechanism = mechanism_for_digest(digest.len())?;
+        let mut encoded = Vec::with_capacity(digest.len() + 19);
+        encoded.extend_from_slice(digest_info_prefix(digest.len())?);
+        encoded.extend_from_slice(digest);
+
         let session = self.open_logged_in(slot, pin)?;
 
         let mut template = vec![Attribute::Class(ObjectClass::PRIVATE_KEY)];
         if let Some(label) = key_label {
             template.push(Attribute::Label(label.as_bytes().to_vec()));
         }
-        let keys = session.find_objects(&template).map_err(|e| map_pkcs11(&e))?;
+        let keys = session
+            .find_objects(&template)
+            .map_err(|e| map_pkcs11(&e))?;
         let key = *keys.first().ok_or_else(|| {
             // An empty list is ambiguous: no such key, or the card is gone.
             // Ask the resource layer which one it is before blaming the key.
@@ -111,7 +119,7 @@ impl Pkcs11Signer {
         })?;
 
         session
-            .sign(&mechanism, key, digest)
+            .sign(&Mechanism::RsaPkcs, key, &encoded)
             .map_err(|e| map_pkcs11(&e))
     }
 
@@ -137,13 +145,24 @@ impl Pkcs11Signer {
     }
 }
 
-/// DNIe 3.x signing keys are RSA, so the digest length picks the mechanism.
-/// OpenSC wraps the digest into DigestInfo for the `*_RSA_PKCS` variants.
-fn mechanism_for_digest(len: usize) -> Result<Mechanism<'static>, SmartcardError> {
+/// DigestInfo prefixes (RFC 8017 §9.2 / EMSA-PKCS1-v1_5) for the hashes DNIe
+/// 3.x signs. Signing takes a *digest*, so the DigestInfo wrapper is ours to
+/// build: `CKM_SHA256_RSA_PKCS` would hash the input again and produce a
+/// signature no CMS verifier accepts (the digest is already hashed).
+fn digest_info_prefix(len: usize) -> Result<&'static [u8], SmartcardError> {
     match len {
-        32 => Ok(Mechanism::Sha256RsaPkcs),
-        48 => Ok(Mechanism::Sha384RsaPkcs),
-        64 => Ok(Mechanism::Sha512RsaPkcs),
+        32 => Ok(&[
+            0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+            0x01, 0x05, 0x00, 0x04, 0x20,
+        ]),
+        48 => Ok(&[
+            0x30, 0x41, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+            0x02, 0x05, 0x00, 0x04, 0x30,
+        ]),
+        64 => Ok(&[
+            0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+            0x03, 0x05, 0x00, 0x04, 0x40,
+        ]),
         other => Err(SmartcardError::UnsupportedCard(format!(
             "digest length {other} not supported (expected 32/48/64)"
         ))),
@@ -185,27 +204,58 @@ pub fn map_pkcs11(err: &CkError) -> SmartcardError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cryptoki::mechanism::MechanismType;
+
+    /// Known answer from RFC 8017 §B.1 / FIPS 180-4: `sha256("abc")`, wrapped in
+    /// `DigestInfo`. This is the exact byte string a CMS verifier recomputes, so
+    /// a wrong prefix (or hashing the digest twice) fails here.
+    #[test]
+    fn digest_info_matches_rfc8017_known_answer() {
+        let sha256_abc: [u8; 32] = [
+            0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde, 0x5d, 0xae,
+            0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61,
+            0xf2, 0x00, 0x15, 0xad,
+        ];
+        let expected: &[u8] = &[
+            0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+            0x01, 0x05, 0x00, 0x04, 0x20, 0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41,
+            0x41, 0x40, 0xde, 0x5d, 0xae, 0x22, 0x23, 0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a,
+            0x9c, 0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad,
+        ];
+        let mut encoded = digest_info_prefix(32).unwrap().to_vec();
+        encoded.extend_from_slice(&sha256_abc);
+        assert_eq!(encoded, expected);
+    }
 
     #[test]
-    fn digest_length_selects_mechanism() {
-        let ty = |len| mechanism_for_digest(len).unwrap().mechanism_type();
-        assert_eq!(ty(32), MechanismType::SHA256_RSA_PKCS);
-        assert_eq!(ty(48), MechanismType::SHA384_RSA_PKCS);
-        assert_eq!(ty(64), MechanismType::SHA512_RSA_PKCS);
+    fn digest_info_prefix_lengths_are_consistent() {
+        for len in [32usize, 48, 64] {
+            let prefix = digest_info_prefix(len).unwrap();
+            // DER: SEQUENCE(2) + AlgorithmIdentifier(15) + OCTET STRING header(2).
+            assert_eq!(prefix.len(), 19);
+            assert_eq!(*prefix.last().unwrap() as usize, len);
+            assert_eq!(
+                prefix[1] as usize,
+                prefix.len() - 2 + len,
+                "outer SEQUENCE length must cover the digest"
+            );
+            // Inner SEQUENCE holds AlgorithmIdentifier (11) + NULL (2) = 13.
+            assert_eq!(prefix[3] as usize, prefix.len() - 6, "inner length");
+        }
         assert!(matches!(
-            mechanism_for_digest(20),
+            digest_info_prefix(20),
             Err(SmartcardError::UnsupportedCard(_))
         ));
     }
-
     #[test]
     fn pkcs11_codes_map_to_typed_errors() {
         assert_eq!(
             map_rv(&RvError::DeviceRemoved),
             SmartcardError::CardRemovedMidSession
         );
-        assert_eq!(map_rv(&RvError::TokenNotPresent), SmartcardError::CardAbsent);
+        assert_eq!(
+            map_rv(&RvError::TokenNotPresent),
+            SmartcardError::CardAbsent
+        );
         assert_eq!(map_rv(&RvError::PinLocked), SmartcardError::PinBlocked);
         assert!(matches!(
             map_rv(&RvError::TokenNotRecognized),

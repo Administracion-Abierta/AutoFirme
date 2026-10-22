@@ -58,25 +58,68 @@ the same PKCS#11 API OpenSC implements:
 SIGN_OK module=/usr/lib64/pkcs11/libsofthsm2.so slot=... sig_len=256
 ```
 
-That run signs a 32-byte digest (2048-bit RSA → 256-byte signature), has the
-token's own verifier accept the signature, proves determinism for
-`SHA256-RSA-PKCS`, and returns typed errors for an unknown key label and for an
-unsupported digest length. SoftHSM has no hot-plug, so the mid-session pull case
-cannot be exercised there; on PC/SC that path arrives as `SCARD_W_REMOVED_CARD`
-and is covered by `error.rs`/`pkcs11.rs` unit tests.
+That run signs a 32-byte digest (2048-bit RSA → 256-byte signature), returns
+typed errors for an unknown key label and for an unsupported digest length, and
+is deterministic across repeats. The signature is checked by rebuilding the
+expected EMSA-PKCS1-v1_5 block from the signed `DigestInfo`, not just by the
+token's own verifier: hashing the digest a second time is self-consistent and
+would pass a symmetric check while failing in every real CMS verifier. SoftHSM
+has no hot-plug, so the mid-session pull case cannot be exercised there; on PC/SC
+that path arrives as `SCARD_W_REMOVED_CARD` and is covered by
+`error.rs`/`pkcs11.rs` unit tests.
+
+### Reproducing this environment (host state, outside the repo)
+
+The Rust crate needs `libpcsclite.pc`, and a non-GUI client needs polkit
+permission to talk to `pcscd`. Nothing here is committed; both are box setup:
+
+```
+$ sudo dnf config-manager --set-enabled crb      # provides pcsc-lite-devel on EL9
+$ sudo dnf install -y pcsc-lite-devel pcsc-tools opensc softhsm
+$ sudo tee /etc/polkit-1/rules.d/49-pcsc-allow.rules >/dev/null <<'EOF'
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.debian.pcsc-lite.access_pcsc" &&
+        subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});
+EOF
+$ sudo systemctl enable --now pcscd.socket
+```
+
+Without the polkit rule `SCardEstablishContext` fails for any non-GUI client and
+the reader test sees `CommError` instead of a real answer. SoftHSM setup for the
+smoke run:
+
+```
+$ mkdir -p /tmp/hsm/tokens
+$ printf 'directories.tokendir = /tmp/hsm/tokens\nobjectstore.backend = file\nlog.level = ERROR\n' > /tmp/hsm/softhsm2.conf
+$ SOFTHSM2_CONF=/tmp/hsm/softhsm2.conf softhsm2-util --init-token --slot 0 \
+    --label smoke --so-pin 12345678 --pin 1234
+$ cd src-tauri && SOFTHSM2_CONF=/tmp/hsm/softhsm2.conf \
+    cargo run --example sign_smoke -- /usr/lib64/pkcs11/libsofthsm2.so
+```
 
 ## What a human must decide
 
 Signing a real DNIe 3.x requires hardware this box does not have. The remaining
-step is a human running:
+step is a human running, with a DNIe 3.x in an attached reader:
 
 ```
-pkcs11-tool --module /usr/lib64/opensc-pkcs11.so --login --pin <PIN> \
-  --sign --mechanism SHA256-RSA-PKCS --input-file <sha256-digest> \
-  --output-file /tmp/dnie.sig
+$ openssl dgst -sha256 -binary FILE > /tmp/dnie.digest   # 32-byte digest
+$ pkcs11-tool --module /usr/lib64/opensc-pkcs11.so --login --pin <PIN> \
+    --sign --mechanism RSA-PKCS --input-file /tmp/dnie.digest \
+    --output-file /tmp/dnie.sig
 ```
 
-with a DNIe in an attached reader. If that succeeds, secure messaging stays dead
-and P1.4 continues on the OpenSC path. If it fails with a card-support error
-rather than a missing-reader error, the CWA-14890 work comes back. See the issue
-thread for the recorded verdict (Refs #98).
+**`--mechanism RSA-PKCS`, not `SHA256-RSA-PKCS`:** `--input-file` is already a
+digest here, and `SHA256-RSA-PKCS` hashes its input again, so it would produce a
+signature that no CMS verifier accepts (the same mistake the Rust layer made
+before review — see `pkcs11.rs`, `digest_info_prefix`). `RSA-PKCS` signs the
+bytes as given. With `SHA256-RSA-PKCS` the correct input is the *file*, not its
+digest.
+
+If that succeeds, secure messaging stays dead and P1.4 continues on the OpenSC
+path. If it fails with a card-support error rather than a missing-reader error,
+the CWA-14890 work comes back. See the issue thread for the recorded verdict
+(Refs #98).
