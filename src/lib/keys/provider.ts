@@ -25,8 +25,13 @@ export interface KeyProviderMetadata {
 
 /**
  * Key source seam. `list`/`getCert` expose certificates as metadata-only views;
- * `signDigest` is the only path to a signature. Providers never see documents —
- * the caller hashes first (digest in, raw signature out).
+ * `signDigest` is the only path to a signature.
+ *
+ * The bytes handed to `signDigest` are the ones the backend signs: the software
+ * backend forwards them to WebCrypto, which applies `hash` internally, so for it
+ * they are document bytes and it is the provider — not the caller — that hashes.
+ * A backend that must instead be given a precomputed digest (cards, tokens, OS
+ * stores) hashes at its own boundary before calling into its hardware.
  */
 export interface KeyProvider {
 	metadata: KeyProviderMetadata;
@@ -35,10 +40,10 @@ export interface KeyProvider {
 	/** One certificate by its session-unique `id`, or null when unknown. */
 	getCert(id: string): Promise<SignerCert | null>;
 	/**
-	 * Sign a precomputed digest with the key behind `ref`. The hash is explicit
-	 * (WebCrypto binds it at import); the default follows the certificate.
+	 * Sign `data` with the key behind `ref`. The hash is explicit (WebCrypto binds
+	 * it at import); the default follows the certificate.
 	 */
-	signDigest(ref: SignerCert, digest: Bytes, hash?: SigningAlgorithm['hash']): Promise<Bytes>;
+	signDigest(ref: SignerCert, data: Bytes, hash?: SigningAlgorithm['hash']): Promise<Bytes>;
 }
 
 /**
@@ -56,7 +61,7 @@ export function signingKey(cert: SignerCert, hash: SigningAlgorithm['hash']): Cr
 /** Shared software backend: the exact WebCrypto sign body `signBytes` always used. */
 export async function softwareSignDigest(
 	cert: SignerCert,
-	digest: Bytes,
+	data: Bytes,
 	hash: SigningAlgorithm['hash'] = cert.algorithm?.hash ?? 'SHA-256'
 ): Promise<Bytes> {
 	const key = signingKey(cert, hash);
@@ -65,7 +70,7 @@ export async function softwareSignDigest(
 	}
 	const algorithm: AlgorithmIdentifier | EcdsaParams =
 		cert.algorithm.name === 'ECDSA' ? { name: 'ECDSA', hash } : { name: 'RSASSA-PKCS1-v1_5' };
-	return new Uint8Array(await crypto.subtle.sign(algorithm, key, digest));
+	return new Uint8Array(await crypto.subtle.sign(algorithm, key, data));
 }
 
 /**
