@@ -70,22 +70,22 @@
     "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
   {
-    "n": "09",
-    "name": "PAdES openssl+pdfsig interop (ByteRange CMS, prefix intact)",
-    "status": "PASS",
-    "detail": "openssl OK, prefix intact",
-    "artifacts": [
-      "docs/evidence/raw/pades.interop.log"
-    ],
-    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
-  },
-  {
     "n": "08",
     "name": "PAdES self-verify (verifyArtifact)",
     "status": "PASS",
     "detail": "7 checks, 0 fail",
     "artifacts": [
       "docs/evidence/raw/pades.selfverify.json"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "09",
+    "name": "PAdES openssl+pdfsig interop (ByteRange CMS, prefix intact)",
+    "status": "PASS",
+    "detail": "openssl OK, prefix intact",
+    "artifacts": [
+      "docs/evidence/raw/pades.interop.log"
     ],
     "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
   },
@@ -113,7 +113,7 @@
     "n": "12",
     "name": "Batch smoke (50 CAdES signs, <2 s/file)",
     "status": "PASS",
-    "detail": "1.9 ms/file",
+    "detail": "1.3 ms/file (50 signs in 63 ms, re-run 2026-10-21)",
     "artifacts": [
       "docs/evidence/raw/batch.perf.log"
     ],

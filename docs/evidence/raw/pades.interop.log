@@ -33,3 +33,9 @@ File is not linearized
 No syntax or stream encoding errors found; the file may still contain
 errors that qpdf cannot detect
 exit=0
+
+$ pdfsig -v
+pdfsig version 26.10.0
+$ qpdf --show-npages pades.pdf   # 12.4.2
+1
+exit=0

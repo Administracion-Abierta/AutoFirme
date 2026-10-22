@@ -1,7 +1,15 @@
 # P0 gate evidence — 12-item parity run (Refs #96)
 
 Run date: 2026-10-21. Host: Linux container, worktree `issue-96`.
-Branch head for the engine under test: `aad68324` (this evidence commit adds docs only — no `src/`).
+Engine under test: `5f8c6af2` — the last commit touching `src/`, `extension/` or `scripts/`
+(`git log -1 --format=%H HEAD -- src extension scripts` returns it; every commit after it on this
+branch is docs-only, `git diff 5f8c6af2 HEAD -- src/ extension/ scripts/` is empty). Each run log
+records the host, the tool versions and the exit code it was produced with.
+
+This pack is checked mechanically by [`check-evidence.py`](check-evidence.py) (`python3
+docs/evidence/check-evidence.py`): every `raw/…` path cited here exists, every artifact under
+`raw/` is cited, the 12 rows name real suites, no run log is truncated, and the DSS formats quoted
+are the ones DSS returned.
 
 ## The 12 items are the ones #19 defines
 

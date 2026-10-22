@@ -11,8 +11,13 @@ Endpoint: `POST https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/ser
 `{"signedDocument":{"bytes":"<base64>","name":"<name>"}[,"originalDocuments":[…]]}`.
 
 Reachable from this container (the demo's own UI page returns 200; the REST endpoint answers).
-Requests ran 2026-10-21, HTTP 200 for all three families. Raw responses in
-`raw/dss.<family>.verdict.json` and `raw/dss.<family>.validation-report.xml`.
+Requests ran 2026-10-21, HTTP 200 for all three families. Raw responses, one pair per family, in
+`raw/dss.cades.verdict.json` + `raw/dss.cades.validation-report.xml`,
+`raw/dss.xades.verdict.json` + `raw/dss.xades.validation-report.xml`,
+`raw/dss.pades.verdict.json` + `raw/dss.pades.validation-report.xml`. The `.verdict.json` files are
+the parsed summary (method, URL, HTTP status, date, and the format / intact / valid / indication
+fields the table below quotes); the `.validation-report.xml` files are the untouched
+`validationReportDataHandler` payload DSS returned.
 
 | Document | DSS `SignatureFormat` | `SignatureIntact` | `SignatureValid` | `Indication` / `SubIndication` |
 |---|---|---|---|---|
@@ -53,7 +58,7 @@ forbidden endpoint if you stop there. `POST` with the JSON above is the working 
 
 - **Not available** in this Linux container (no license, no GUI, no Reader install). No verdict
   obtained here; that part of #96's acceptance is unmet and needs a desktop human.
-- Substituted oracles for the PAdES artifact: `pdfsig` (poppler 24.x) reports `Signature #1`,
+- Substituted oracles for the PAdES artifact: `pdfsig` (poppler 26.10.0) reports `Signature #1`,
   signer `CN=Ñandú Prueba`, `SHA-256`, `SubFilter ETSI.CAdES.detached`, `Signed Ranges
   [0 - 1590], [6120 - 6789]`, `Signature is Valid`; `qpdf --check` (12.4.2) exits 0; DSS wraps it in
   the same `PAdES-BES` verdict as above. Three independent parsers agree.
