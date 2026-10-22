@@ -7,7 +7,7 @@ desktop app + extension as the two products and retires the hosted web app. Kept
 **Status:** decisions recorded 2026-10-16 — the desktop app is **discarded for now**, the web app
 stays the primary surface and users who want a standalone app **install the PWA**, and DNIe /
 smartcard support moved to
-[README → Possible improvements](../README.md#possible-improvements). The analysis below stays as
+[README → Alcance actual y limitaciones](../README.md#alcance-actual-y-limitaciones). The analysis below stays as
 the reasoning behind those calls. Every claim cites the repo. En español: el resumen de las
 funciones está en [LEEME.md](LEEME.md).
 
