@@ -4,6 +4,7 @@
  * uses (`demo/lib/registradores.mjs`), so a change to either the page contract or the adapter shows
  * up here without a browser.
  */
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseCall, validateRequest } from '../core/contract.js';
@@ -120,4 +121,13 @@ test('an unsupported page call falls through to desktop AutoFirma unchanged', ()
 		success, failure];
 	api.sign(...args);
 	assert.deepEqual(calls, [args]);
+});
+
+// Protocol 4 in-page (Refs #85): the adapter is method-level interception, so a portal that
+// used AutoFirma's localhost socket / `afirma://` scheme needs no native helper here — and
+// none may be declared, or the in-page guarantee silently stops holding.
+test('protocol-4 portals stay in-page: no native helper is declared', () => {
+	const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
+	assert.equal(manifest.permissions.includes('nativeMessaging'), false,
+		'a native messaging host would put protocol-4 portals back on the desktop helper');
 });

@@ -5,6 +5,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { installAdapter } from '../core/adapter.js';
 
 function win() {
@@ -30,7 +31,7 @@ function win() {
 }
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-test('a distinct MiniApplet global is intercepted like AutoScript', async () => {
+test('a distinct MiniApplet global is intercepted like AutoScript', { timeout: 5_000 }, async () => {
 	const window = win();
 	let originals = 0;
 	window.MiniApplet = { sign(..._args) { void _args; originals++; }, selectCertificate(..._args) { void _args; originals++; } };
@@ -58,7 +59,7 @@ test('MiniApplet aliasing the same AutoScript object wraps exactly once', async 
 	assert.equal(api.calls, 1, 'fallback resumes the original exactly once');
 });
 
-test('a late MiniApplet assignment is wrapped by the setter', async () => {
+test('a late MiniApplet assignment is wrapped by the setter', { timeout: 5_000 }, async () => {
 	const window = win();
 	installAdapter(window, async () => ({ kind: 'result', signature: 'c2ln', certificate: 'Y2VydA==' }));
 	let originals = 0;
@@ -68,4 +69,37 @@ test('a late MiniApplet assignment is wrapped by the setter', async () => {
 	});
 	assert.equal(seen, 'c2ln');
 	assert.equal(originals, 0);
+});
+
+test('a non-configurable global is wrapped in place and the poll catches replacements', { timeout: 5_000 }, async () => {
+	const window = win();
+	let originals = 0;
+	const api = { sign(..._args) { void _args; originals++; } };
+	Object.defineProperty(window, 'AutoScript', { value: api, configurable: false, writable: true, enumerable: true });
+	installAdapter(window, async () => ({ kind: 'result', signature: 'c2ln', certificate: 'Y2VydA==' }));
+	assert.equal(Object.getOwnPropertyDescriptor(window, 'AutoScript')?.set, undefined,
+		'a non-configurable global keeps its plain data descriptor');
+	const seen = await new Promise((resolve, reject) => {
+		window.AutoScript.sign('YQ==', 'SHA256withRSA', 'CAdES', '', (signature) => resolve(signature), reject);
+	});
+	assert.equal(seen, 'c2ln');
+	assert.equal(originals, 0);
+	// A page that swaps the whole object is only caught by the polled re-wrap.
+	const replacement = { sign(..._args) { void _args; originals++; }, selectCertificate(..._args) { void _args; originals++; } };
+	window.AutoScript = replacement;
+	for (const tick of [...window.intervals.values()]) tick();
+	const late = await new Promise((resolve, reject) => {
+		replacement.sign('YQ==', 'SHA256withRSA', 'CAdES', '', (signature) => resolve(signature), reject);
+	});
+	assert.equal(late, 'c2ln');
+	assert.equal(originals, 0);
+});
+test('the documented interception list names both globals', () => {
+	const doc = readFileSync(new URL('../../docs/CHROME-EXTENSION.md', import.meta.url), 'utf8');
+	const section = doc.slice(doc.indexOf('Initially intercepted calls are'));
+	const fence = /```js\n([\s\S]*?)```/.exec(section);
+	assert.ok(fence, 'the interception list fence is present');
+	assert.match(fence[1], /AutoScript\.sign\(/);
+	assert.match(fence[1], /MiniApplet\.sign\(/,
+		'the interception list must document the MiniApplet alias the adapter wraps');
 });
