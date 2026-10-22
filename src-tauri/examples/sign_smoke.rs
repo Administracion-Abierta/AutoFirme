@@ -91,6 +91,14 @@ fn main() {
         "digest was hashed twice: no CMS verifier would accept this signature"
     );
 
+    // 4. PKCS#1 v1.5 is deterministic, so the same digest must give the same
+    //    bytes. A nonce-bearing scheme, or a payload that depends on session
+    //    state, would hide a broken key lookup. (PROBE.md claims this.)
+    let sig2 = signer
+        .sign_digest(slot, Some("smoke-key"), &digest, &pin)
+        .expect("sign again");
+    assert_eq!(sig, sig2, "RSA-PKCS over DigestInfo is deterministic");
+
     // 5. Unknown key label → typed error, no panic.
     assert!(
         matches!(
