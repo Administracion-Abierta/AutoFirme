@@ -15,3 +15,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+# P1.4a smartcard layer (Refs #98): PC/SC reader/session plus the OpenSC PKCS#11
+# sign path, absorbed as the `smartcard` module of the desktop lib.
+cryptoki = "0.12.1"
+pcsc = "2.9"
