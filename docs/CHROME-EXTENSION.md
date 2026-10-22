@@ -62,7 +62,9 @@ the browser side and stdio MCP servers cannot use it. See `docs/MCP-DESIGN.md`.
 
 The extension intercepts every HTTP and HTTPS website from installation: the manifest
 declares `http://*/*` and `https://*/*` as install-time host permissions, so a site's
-AutoScript calls open the chooser on the first request with no prior setup.
+`AutoScript` calls open the chooser on the first request with no prior setup. Older
+integrations that publish the same API as `MiniApplet` are intercepted too; when a page
+assigns the two names the same object it is still wrapped only once.
 
 For a `CAdEStri` call (Aragon's portafirmas), the page's signing server performs the
 pre-sign and post-sign phases: the extension sends the selected certificate and the
