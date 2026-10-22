@@ -32,6 +32,11 @@ $ pkcs11-tool --module /usr/lib64/opensc-pkcs11.so --sign \
     --mechanism SHA256-RSA-PKCS --input-file <digest> --output-file /tmp/probe.sig
 No slots.                       # exit 1, no output file written
 
+# As originally run. `SHA256-RSA-PKCS` over a file that is *already* a digest
+# is the double-hash mistake the Rust sign path made before review; the correct
+# invocation for a digest is `--mechanism RSA-PKCS` (see "What a human must
+# decide" below). `No slots.` is independent of the mechanism.
+
 $ opensc-tool --list-readers
 No smart card readers found.    # exit 0
 
