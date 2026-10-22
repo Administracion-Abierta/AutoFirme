@@ -3,7 +3,7 @@
 Reverse-engineering notes for the AutoFirma 1.9 sample installers distributed for the
 *Computer Basics* reverse-engineering task. Scope: the two Linux installers (Debian `.deb`,
 Fedora `.rpm`). The Windows Inno Setup installer (`Autofirma64.zip`) is **not** analysed — see
-[Limits](#limits-and-unknowns). Nota en español: el resumen de lo que la app actual ya tiene está en [LEEME.md](LEEME.md); este documento describe solo los instaladores 1.9 analizados.
+[Limits](#8-limits-and-unknowns). Nota en español: el resumen de lo que la app actual ya tiene está en [LEEME.md](LEEME.md); este documento describe solo los instaladores 1.9 analizados.
 
 ## 1. Provenance and inputs
 

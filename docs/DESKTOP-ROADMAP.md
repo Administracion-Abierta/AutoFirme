@@ -58,7 +58,7 @@ CAdES/XAdES/PAdES and never learns where the key lives.
 
 | Phase | Features | Effort | Exit criteria |
 |---|---|---|---|
-| **P0** Shell + parity gate | Tauri v2 scaffold, secure-context resolution, 12-item engine smoke, CI `cargo check` + headless smoke, **plus audit fixes §9.1–9.6: delete wrangler/Containerfile/Caddyfile + deploy jobs, pin Node, disable the service worker, add the `mcp` CI job, extend `check-versions`** | 10–14 d | all 12 green on Linux; one signed PDF validates in Acrobat; CI has no deploy job and no untested project |
+| **P0** Shell + parity gate | Tauri v2 scaffold, secure-context resolution, 12-item engine smoke, CI `cargo check` + headless smoke, **plus audit fixes §10.1–10.6: delete wrangler/Containerfile/Caddyfile + deploy jobs, pin Node, disable the service worker, add the `mcp` CI job, extend `check-versions`** | 10–14 d | all 12 green on Linux; one signed PDF validates in Acrobat; CI has no deploy job and no untested project |
 | **P1** Key layer | `KeyProvider` seam, PKCS#11 modules, OS stores, smartcard autodetect + native PIN, hot-plug | 15–20 d | DNIe 3.x signs CAdES with PIN prompted natively, key non-exportable |
 | **P2** Portal + native messaging | `afirma://` registration, local sign server (protocol 3 + 4), native messaging host + manifests, extension optional upgrade | 13–17 d | real sede completes a signature end to end, twice: extension-only, and via desktop |
 | **P3** Format parity | OOXML wired, XAdES-T, FacturaE 3.0/3.1/3.2.2, co-sign/counter-sign, ASiC-S, XAdES detached/enveloping, ODF, XMLDSig | 25–30 d | PARITY P0/P1 rows green |
