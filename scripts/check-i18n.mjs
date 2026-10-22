@@ -99,7 +99,13 @@ for (const path of literalSources) {
 		// Either quote style, but the value must not contain its own delimiter: matching the
 		// quotes independently truncated `title="don't save"` to `don` and let
 		// `placeholder="'Guardar fichero'"` through entirely.
-		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=(?:"([^"{}]*)"|'([^'{}]*)')/g)
+		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=(?:"([^"{}]*)"|'([^'{}]*)')/g),
+		// The same attributes can carry the value as a brace expression. Only a value that is
+		// *nothing but* one quoted string counts: `aria-label="{t.formatTitle}"` and
+		// `aria-label={t.title}` are lookups, and `class={'grid grid-cols-2'}` is not copy at
+		// all, so widening past the attribute list above would drown the gate in false alarms.
+		...markup.matchAll(/\b(?:placeholder|title|aria-label|alt)=\{\s*(?:"([^"{}]*)"|'([^'{}]*)')\s*\}/g),
+		...markup.matchAll(/>\{\s*(?:"([^"{}]*)"|'([^'{}]*)')\s*\}</g)
 	].map((match) => (match[1] ?? match[2]).trim());
 	for (const literal of literals) {
 		if (!/\p{L}/u.test(literal)) continue;
