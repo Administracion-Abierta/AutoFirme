@@ -4,10 +4,12 @@
  * generated on the fly with openssl, so nothing binary is committed and the filter verdicts are
  * cross-checked against the extensions openssl was asked to write.
  *
- * The sign path is proven end to end: the fake bridge signs with the fixture's real RSA key
- * exactly as the token would (hash + sign in one call, which is what the named mechanisms do),
- * and `openssl dgst -verify` checks the bytes the provider returned. No module path is hardcoded
- * in the provider: every test passes one in, and the missing-path case is a typed error.
+ * The provider's sign path is proven end to end: the fake bridge signs with the fixture's real
+ * RSA key exactly as the token would (hash + sign in one call, which is what the named mechanisms
+ * do), and `openssl dgst -verify` checks the bytes the provider returned. That is the provider
+ * boundary, not the app's signing path: `cms.ts`/`sign.ts` still require a WebCrypto `key`, so
+ * vendoring a token key into a signature is a `sign.ts` step (#97). No module path is hardcoded in
+ * the provider: every test passes one in, and the missing-path case is a typed error.
  */
 
 import { execFileSync } from 'node:child_process';
