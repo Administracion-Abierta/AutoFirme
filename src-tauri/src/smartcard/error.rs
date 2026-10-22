@@ -63,7 +63,13 @@ pub fn map_pcsc(code: pcsc::Error) -> Option<SmartcardError> {
     use pcsc::Error as P;
     match code {
         P::NoReadersAvailable => Some(SmartcardError::NoReader),
+        // A reader *name* that does not exist (`SCardConnect` with a stale or
+        // bogus name) is "no such reader", not a transport failure: the issue
+        // names that state explicitly and the UI must not render a raw code.
+        P::UnknownReader => Some(SmartcardError::NoReader),
         P::NoSmartcard => Some(SmartcardError::CardAbsent),
+        // Card inserted but its type is unknown to PC/SC/OpenSC.
+        P::UnknownCard => Some(SmartcardError::UnsupportedCard(format!("{code:?}"))),
         P::RemovedCard => Some(SmartcardError::CardRemovedMidSession),
         // `SCARD_F_COMM_ERROR` is the client<->resource-manager channel, i.e.
         // pcscd itself (down, or refusing this client); card-side removal
@@ -94,6 +100,22 @@ mod tests {
         assert!(SmartcardError::PinAttemptsRemaining(2)
             .to_string()
             .contains('2'));
+    }
+
+    /// Live-verified on this box: `SmartcardSession::connect` with a bogus
+    /// reader name made PC/SC answer `SCARD_E_UNKNOWN_READER`, which used to
+    /// leak as `Transmission("UnknownReader")`. The issue requires the
+    /// "no reader" state to be typed.
+    #[test]
+    fn unknown_reader_and_card_codes_are_typed() {
+        assert_eq!(
+            map_pcsc(pcsc::Error::UnknownReader),
+            Some(SmartcardError::NoReader)
+        );
+        assert!(matches!(
+            map_pcsc(pcsc::Error::UnknownCard),
+            Some(SmartcardError::UnsupportedCard(_))
+        ));
     }
 
     #[test]

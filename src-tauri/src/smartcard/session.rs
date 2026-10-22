@@ -44,3 +44,20 @@ impl SmartcardSession {
         Ok(rapdu.to_vec())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Hardware-free: a reader name that does not exist must come back as the
+    /// typed [`SmartcardError::NoReader`] (or `PcscUnavailable` when `pcscd`
+    /// itself is down), never as a raw PC/SC code in `Transmission`.
+    #[test]
+    fn bogus_reader_name_is_typed() {
+        match SmartcardSession::connect("AutoFirme No Such Reader 00 00") {
+            Err(SmartcardError::NoReader) | Err(SmartcardError::PcscUnavailable) => {}
+            Err(other) => panic!("untyped error leaked: {other}"),
+            Ok(_) => panic!("connecting to a nonexistent reader must fail"),
+        }
+    }
+}
