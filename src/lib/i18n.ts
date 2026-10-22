@@ -266,6 +266,7 @@ export const copy: Record<Lang, Copy> = {
 			certValidity: 'Vigencia del certificado',
 			certChain: 'Cadena de confianza',
 			signingTime: 'Fecha de firma',
+			timestamp: 'Sello de tiempo',
 			unsupported: 'Formato no comprobable en este entorno'
 		},
 		storeTitle: 'Firmas guardadas',
@@ -430,6 +431,7 @@ export const copy: Record<Lang, Copy> = {
 			certValidity: 'Certificate validity',
 			certChain: 'Trust chain',
 			signingTime: 'Signing time',
+			timestamp: 'Timestamp',
 			unsupported: 'Format not checkable in this environment'
 		},
 		storeTitle: 'Saved signatures',

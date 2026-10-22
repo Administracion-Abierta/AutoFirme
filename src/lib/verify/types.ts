@@ -24,6 +24,7 @@ export type CheckId =
 	| 'certValidity'
 	| 'certChain'
 	| 'signingTime'
+	| 'timestamp'
 	/** The artifact is recognised but this runtime cannot inspect it. */
 	| 'unsupported';
 
