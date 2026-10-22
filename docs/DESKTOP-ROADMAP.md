@@ -253,6 +253,10 @@ starts staggered 2 days apart inside it, plus hard `depends-on` edges where sibl
 
 ## 10. Stack audit (2026-10-20, before any code)
 
+> **Superseded:** the A1–A5 audit fixes landed on `bullet-develop`
+> `13c72ebf`. The findings below are kept as the pre-code record; do not
+> re-derive work from them.
+
 Findings from reading the tree at `ef5f92f`, plus a real run of the suites: `pnpm check` clean
 (0 errors, 0 warnings), vitest 244 passed / 1 skipped, node --test 19 + 8 passed. The stack is
 healthy; what follows is drift and plan-breaking coupling, not rot. The first six land in **P0**,
