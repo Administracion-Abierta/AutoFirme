@@ -510,7 +510,6 @@ describe('pre-hashed digest input', () => {
 	});
 });
 
-
 describe('batch CLI directory walk', () => {
 	it('records an unreachable entry as ERROR_PRE and keeps signing the rest', () => {
 		const root = join(fixtures.dir, 'cli-walk');
