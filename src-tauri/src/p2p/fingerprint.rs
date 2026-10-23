@@ -33,8 +33,9 @@ impl Fingerprint {
         Some(Self(bytes))
     }
 
-    /// Short words form for reading over the phone: 8 groups of `word-word`.
-    /// Not BIP-39 (stdlib-free); a fixed 256-word list, 2 words per byte pair.
+    /// Short words form for reading over the phone: 8 groups of 4 words
+    /// (`word-word-word-word`), one word per byte, 4 bytes per group.
+    /// Not BIP-39 (stdlib-free); a fixed 256-word list indexed by byte value.
     pub fn words(&self) -> String {
         self.0
             .chunks(4)
@@ -65,7 +66,7 @@ impl std::fmt::Display for Fingerprint {
 // ponytail: 256 common Spanish/English short words; upgrade path is a real
 // wordlist (e.g. PGP biometrics) when UX asks for it.
 const WORDS: [&str; 256] = [
-    "alba", "actor", "agua", "aire", "ala", "alba2", "altar", "alto", "amigo", "ancla", "andar",
+    "alba", "actor", "agua", "aire", "ala", "albor", "altar", "alto", "amigo", "ancla", "andar",
     "angel", "anillo", "arbol", "arco", "arena", "arte", "atlas", "autor", "ave", "avion", "azul",
     "balsa", "banco", "banda", "barco", "barrio", "base", "bateria", "bend", "blanco", "bloque",
     "boca", "bolsa", "bomba", "borde", "bosque", "boton", "bravo", "brisa", "bronce", "buzon",
@@ -77,7 +78,7 @@ const WORDS: [&str; 256] = [
     "denso", "destino", "diamante", "diario", "dique", "disco", "domo", "dorso", "dragon",
     "dulce", "eco", "eje", "emblema", "encina", "enlace", "escala", "esfera", "espada",
     "espiga", "estela", "etapa", "faro", "fibra", "fiesta", "filtro", "finca", "firma",
-    "flecha", "flora", "foco", "forma", "foro", "frente", "fresa", "fuente", "faro2",
+    "flecha", "flora", "foco", "forma", "foro", "frente", "fresa", "fuente", "farol",
     "galeria", "garaje", "girasol", "globo", "golpe", "gota", "grano", "gruta", "guia",
     "halcon", "harpa", "helada", "hielo", "hierro", "hogar", "hoja", "horizonte", "huella",
     "humo", "isla", "jardin", "junta", "lago", "lampara", "lapiz", "lente", "libro",
@@ -117,10 +118,28 @@ mod tests {
     fn words_stable_and_grouped() {
         let fp = Fingerprint([7u8; 32]);
         let words = fp.words();
-        // 8 groups (32 bytes / 4), each 4 words joined by '-'.
+        // 8 groups (32 bytes / 4 per group), each 4 words joined by '-':
+        // one word per byte, 4 bytes per group.
         assert_eq!(words.split(' ').count(), 8);
         assert!(words.split(' ').all(|g| g.split('-').count() == 4));
         assert_eq!(Fingerprint([7u8; 32]).words(), words);
+        // Spot-check the mapping: byte 7 indexes WORDS[7] in every group.
+        let first_group: Vec<&str> = words.split(' ').next().unwrap().split('-').collect();
+        assert!(first_group.iter().all(|w| *w == WORDS[7]));
+    }
+
+    #[test]
+    fn wordlist_clean_and_unique() {
+        assert_eq!(WORDS.len(), 256);
+        let mut seen = std::collections::HashSet::new();
+        for word in WORDS {
+            assert!(!word.is_empty(), "empty wordlist entry");
+            assert!(
+                word.chars().all(|c| c.is_ascii_lowercase()),
+                "wordlist must be plain lowercase ascii for phone readout: {word}"
+            );
+            assert!(seen.insert(word), "duplicate wordlist entry: {word}");
+        }
     }
 
     #[test]
