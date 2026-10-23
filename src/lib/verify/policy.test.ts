@@ -263,6 +263,17 @@ describe('assessCommitmentClaim', () => {
 		expect(unknown.identifier).toBe('9.9.9.9');
 		expect(assessCommitmentClaim({ kind: null, signed: true, family: 'xades' }).status).toBe('info');
 	});
+
+	it('never accepts an inherited Object key as a commitment kind', () => {
+		for (const kind of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+			for (const family of ['cades', 'xades', 'pades'] as const) {
+				const declared = family === 'xades' ? `http://uri.etsi.org/01903/v1.3.2#${kind}` : kind;
+				const finding = assessCommitmentClaim({ kind: declared, signed: true, family });
+				expect(finding.status).toBe('warn');
+				expect(finding.identifier).toBe(declared);
+			}
+		}
+	});
 });
 
 describe('FacturaE profile', () => {
@@ -300,6 +311,14 @@ describe('FacturaE profile', () => {
 			expect(finding.detail).toContain(capacity);
 		}
 		expect(assessFacturaeRoles(['EMISOR'], true, 'xades').status).toBe('pass');
+	});
+
+	it('never accepts an inherited Object key as a FacturaE role', () => {
+		for (const role of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+			const finding = assessFacturaeRoles([role], true, 'xades');
+			expect(finding.status).toBe('warn');
+			expect(finding.detail).toContain(role);
+		}
 	});
 });
 

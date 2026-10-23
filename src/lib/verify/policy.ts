@@ -192,9 +192,9 @@ export function assessPolicyClaim(claim: PolicyClaim): PolicyFinding {
 function commitmentName(kind: string, family: Family): string | null {
 	if (family === 'xades') {
 		const fragment = kind.split('#')[1] ?? kind;
-		return XADES_COMMITMENTS[fragment] ? fragment : null;
+		return Object.hasOwn(XADES_COMMITMENTS, fragment) ? fragment : null;
 	}
-	return CADES_COMMITMENTS[kind] ?? null;
+	return Object.hasOwn(CADES_COMMITMENTS, kind) ? CADES_COMMITMENTS[kind] : null;
 }
 
 export function assessCommitmentClaim(claim: CommitmentClaim): PolicyFinding {
@@ -264,7 +264,7 @@ export function assessFacturaeRoles(roles: string[], signed: boolean, family: Fa
 	}
 	if (roles.length === 1) {
 		const role = roles[0].trim().toLowerCase();
-		const capacity = FACTURAE_ROLES[role];
+		const capacity = Object.hasOwn(FACTURAE_ROLES, role) ? FACTURAE_ROLES[role] : undefined;
 		if (capacity) {
 			return { area: 'commitment', status: 'pass', detail: `(${family}) FacturaE claimed role ${role} (${capacity})` };
 		}
