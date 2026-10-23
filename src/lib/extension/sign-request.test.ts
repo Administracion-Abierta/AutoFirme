@@ -3,6 +3,7 @@ import { readFileSync, rmSync } from 'node:fs';
 import { createPublicKey, verify } from 'node:crypto';
 import { join } from 'node:path';
 import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRef, PDFStream, PDFString } from 'pdf-lib';
+import { unzipSync, zipSync } from 'fflate';
 import { createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../../test/fixtures';
 import { loadSignerSession } from '../keystore';
 import type { SignerSession } from '../sign';
@@ -113,6 +114,35 @@ describe('format dispatch', () => {
   const font = form.dict.lookup(PDFName.of('Resources'), PDFDict).lookup(PDFName.of('Font'), PDFDict);
   const fontRef = font.get(PDFName.of('F1')) as PDFRef;
   expect(document.context.lookup(fontRef, PDFDict).lookup(PDFName.of('BaseFont'), PDFName).asString()).toBe('/Helvetica-Oblique');
+ });
+
+ it('signs an OOXML package as a new ZIP with the signature part inside', async () => {
+  const documentXml = new TextEncoder().encode(
+   '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>'
+  );
+  const docx = zipSync({
+   '[Content_Types].xml': new TextEncoder().encode(
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+     '<Default Extension="xml" ContentType="application/xml"/></Types>'
+   ),
+   '_rels/.rels': new TextEncoder().encode(
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>'
+   ),
+   'word/document.xml': documentXml
+  });
+  const signed = await signRequest(
+   { ...request, format: 'OOXML', mode: 'implicit', data: Buffer.from(docx).toString('base64') },
+   session.signer,
+   session.certificates
+  );
+  const entries = unzipSync(Uint8Array.from(Buffer.from(signed.signature!, 'base64')));
+  expect(Object.keys(entries)).toEqual(expect.arrayContaining([
+   '[Content_Types].xml', 'word/document.xml', '_xmlsignatures/origin.sigs'
+  ]));
+  expect(Object.keys(entries).some((name) => /^_xmlsignatures\/sig-[\w-]+\.xml$/.test(name))).toBe(true);
+  // The original parts survive untouched: Word only reopens a package it can re-read.
+  expect(Buffer.from(entries['word/document.xml'])).toEqual(Buffer.from(documentXml));
  });
 });
 

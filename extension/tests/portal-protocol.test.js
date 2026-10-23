@@ -59,6 +59,22 @@ test('every format the page offers maps to the documented contract', () => {
 	assert.deepEqual(FORMATS, ['CAdES', 'XAdES', 'PAdES', 'AUTO']);
 });
 
+// OOXML rides AutoScript like the desktop app's `AOOOXMLSigner` entry in `AOSignerFactory`.
+test('an OOXML package signs through the contract, stamped parameters refused', () => {
+	const docx = Buffer.from('PK\x03\x04[Content_Types].xml');
+	const request = sign(docx, 'OOXML', 'mode=implicit');
+
+	assert.deepEqual(request, {
+		operation: 'sign',
+		data: docx.toString('base64'),
+		algorithm: 'SHA256withRSA',
+		format: 'OOXML',
+		mode: 'implicit'
+	});
+	// Visible-signature parameters are PAdES-only in the contract, as in AutoFirma.
+	assert.equal(sign(docx, 'OOXML', 'mode=implicit\nvisibleSignature=want'), null);
+});
+
 test('selectCertificate replays the page call shape', () => {
 	const request = parseCall('selectCertificate', [null, success, failure]);
 	assert.deepEqual(request, { operation: 'selectCertificate' });
