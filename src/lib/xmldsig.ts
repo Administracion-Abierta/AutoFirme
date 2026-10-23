@@ -41,7 +41,6 @@ interface XmldsigCommon {
 	signer?: SignerCert;
 	/** Overrides the certificate's default hash (legacy portals ask for SHA1withRSA). */
 	hash?: SigningAlgorithm['hash'];
-	/** Signing time is not embedded — plain XMLDSig carries no signed properties. */
 	/** Deterministic ids — for golden vectors and reproducible output. */
 	ids?: Partial<XmldsigIds>;
 }
@@ -55,6 +54,9 @@ export type XmldsigReference =
 	 * Detached / externally-detached: the signature is standalone and `uri` locates the data
 	 * (a bare filename for detached, an absolute URI for externally-detached). The digest
 	 * covers the raw octets — no transforms — so any payload works, XML or not.
+	 *
+	 * The string itself decides how a verifier resolves the data: `xmlsec1` resolves a relative
+	 * `uri` against its process cwd (so a bare filename works), while DSS wants an absolute URI.
 	 */
 	| { type: 'detached'; uri: string; data: string | Bytes };
 
@@ -181,11 +183,13 @@ export async function signXmldsig(options: XmldsigSignatureOptions): Promise<str
 ${reference.type === 'enveloping' ? `\t<ds:Object Id="${objectId}"/>\n` : ''}</ds:Signature>`;
 
 	const setDigest = (doc: Document, referenceId: string, value: Bytes) => {
-		byId(doc, referenceId).getElementsByTagNameNS(DS, 'DigestValue')[0].textContent = toBase64(value);
+		const digestValue = byId(doc, referenceId).getElementsByTagNameNS(DS, 'DigestValue')[0];
+		digestValue.textContent = toBase64(value);
 	};
 	const finish = async (doc: Document): Promise<void> => {
 		const signedInfo = byId(doc, ids.signedInfo);
-		const signatureValue = await signBytes(signer, canonicalize(signedInfo, { exclusive: true }), hash);
+		const canonical = canonicalize(signedInfo, { exclusive: true });
+		const signatureValue = await signBytes(signer, canonical, hash);
 		byId(doc, ids.signatureValue).textContent = toBase64(signatureValue);
 	};
 	const serialize = (doc: Document): string => {

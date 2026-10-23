@@ -78,6 +78,10 @@ export type XadesReference =
 	 * Detached / externally-detached: the signature is standalone and `uri` locates the data
 	 * (a bare filename for detached, an absolute URI for externally-detached). The digest
 	 * covers the raw octets — no transforms — so any payload works, XML or not.
+	 *
+	 * The string itself decides how a verifier resolves the data: `xmlsec1` resolves a relative
+	 * `uri` against its process cwd (so a bare filename works), while DSS wants an absolute URI.
+	 * Either form verifies with whichever verifier understands it.
 	 */
 	| { type: 'detached'; uri: string; data: string | Bytes };
 
@@ -289,7 +293,8 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 </ds:Signature>`;
 
 	const setDigest = (doc: Document, referenceId: string, value: Bytes) => {
-		byId(doc, referenceId).getElementsByTagNameNS(DS, 'DigestValue')[0].textContent = toBase64(value);
+		const digestValue = byId(doc, referenceId).getElementsByTagNameNS(DS, 'DigestValue')[0];
+		digestValue.textContent = toBase64(value);
 	};
 	const finish = async (doc: Document): Promise<void> => {
 		setDigest(
@@ -298,7 +303,8 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 			await digest(hash, canonicalize(byId(doc, ids.signedProperties), { exclusive: true }))
 		);
 		const signedInfo = byId(doc, ids.signedInfo);
-		const signatureValue = await signBytes(signer, canonicalize(signedInfo, { exclusive: true }), hash);
+		const canonical = canonicalize(signedInfo, { exclusive: true });
+		const signatureValue = await signBytes(signer, canonical, hash);
 		byId(doc, ids.signatureValue).textContent = toBase64(signatureValue);
 		if (options.timeStamp) {
 			// XAdES-T: the TSA timestamps the canonicalised SignatureValue element, never the
