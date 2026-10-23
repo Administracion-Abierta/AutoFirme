@@ -111,7 +111,12 @@ impl Discovery {
             port,
             props,
         )
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| error.to_string())?
+        // The daemon fills in this host's interface addresses when it
+        // registers the record. Without `addr_auto` the address set stays
+        // empty, no A/AAAA record is ever emitted and the service is
+        // announced to nobody.
+        .enable_addr_auto();
         self.service_fullname = Some(info.get_fullname().to_owned());
         self.daemon
             .register(info)
@@ -237,13 +242,56 @@ mod tests {
         let mut discovery =
             Discovery::new().expect("mDNS daemon (may fail in sandbox)");
         let fp = Fingerprint::of_der(b"loopback-cert");
+        // Watch the daemon itself: an announcement is only emitted once the
+        // record carries at least one interface address. A registered-but-
+        // addressless service reaches no peer, so "announced nothing" is a
+        // failure even when the sandbox has no multicast.
+        let events = discovery.daemon.monitor().expect("monitor");
         match discovery.announce("af-test-peer", &fp, 42424) {
             Ok(()) => {
+                let mut announced = false;
+                let deadline = std::time::Instant::now() + Duration::from_secs(5);
+                while let Some(remaining) =
+                    deadline.checked_duration_since(std::time::Instant::now())
+                {
+                    match events.recv_timeout(remaining) {
+                        Ok(mdns_sd::DaemonEvent::Announce(fullname, addrs)) => {
+                            assert!(
+                                fullname.starts_with("af-test-peer."),
+                                "unexpected announcement: {fullname}"
+                            );
+                            assert!(
+                                !addrs.is_empty(),
+                                "announcement carried no interface addresses"
+                            );
+                            announced = true;
+                            break;
+                        }
+                        Ok(mdns_sd::DaemonEvent::Error(error)) => {
+                            panic!("mDNS daemon error while announcing: {error}");
+                        }
+                        Ok(_) => {}
+                        Err(_) => break,
+                    }
+                }
+                assert!(
+                    announced,
+                    "no announcement within 5s: the service was registered \
+                     without addresses, so no peer could browse it"
+                );
                 let peers = discovery.browse(Duration::from_secs(5));
                 // Either we see ourselves (multicast works) or the list is
                 // empty (sandbox): both are non-error outcomes. What must
-                // hold: any peer found parses with a valid fingerprint.
-                assert!(peers.iter().all(|peer| peer.fingerprint.hex().len() == 64));
+                // hold: every peer found is dialable — valid fingerprint and
+                // at least one address.
+                for peer in &peers {
+                    assert_eq!(peer.fingerprint.hex().len(), 64);
+                    assert!(
+                        !peer.addresses.is_empty(),
+                        "resolved peer has no address: {}",
+                        peer.name
+                    );
+                }
             }
             Err(reason) => {
                 // No multicast in this environment → manual fallback path.
