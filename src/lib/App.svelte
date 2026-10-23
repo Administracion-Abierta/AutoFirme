@@ -10,6 +10,7 @@
 	} from '#lib/batch';
 	import { browserVault } from '#lib/certstore';
 	import { signCadesDetached } from '#lib/cms';
+	import { signOoxmlPackage } from '#lib/ooxml';
 	import { signPdf } from '#lib/pades';
 	import {
 		SIGNATURE_CORNERS,
@@ -26,6 +27,7 @@
 		type SignerCert
 	} from '#lib/sign';
 	import { saveBytes } from '#lib/save-file';
+	import { suggestSignFormat } from '#lib/verify/detect';
 	import { signXades } from '#lib/xades';
 	import BatchQueue from '#lib/components/BatchQueue.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
@@ -203,9 +205,7 @@
 					shared.text.length > 0 ? [new File([shared.text], 'compartido.txt', { type: 'text/plain' })] : [];
 				const picked = [...shared.files, ...textFile];
 				if (picked.length > 0) {
-					files = [...files, ...picked];
-					const pdf = picked.find((file) => file.type === 'application/pdf' || file.name.endsWith('.pdf'));
-					if (pdf) format = 'pades';
+					await adoptFiles(picked);
 					entryNotice = 'shared';
 				}
 			} catch {
@@ -218,7 +218,7 @@
 	).launchQueue;
 	launcher?.setConsumer((launch) => {
 		if (launch.files.length > 0) {
-			files = [...files, ...launch.files];
+			void adoptFiles(launch.files);
 			step = 2;
 		}
 	});
@@ -264,6 +264,26 @@
 	}
 	let format = $state<SignFormat>('cades');
 	let formatOpen = $state(false);
+	/**
+	 * Signing-side auto-detect (#127): the first dropped file decides the batch format when it
+	 * sniffs as something the default cannot sign (OOXML/PDF/XML). Reads only the leading
+	 * bytes; a failure to read leaves the current format untouched.
+	 */
+	async function adoptFiles(picked: File[]): Promise<void> {
+		if (picked.length === 0) return;
+		files = [...files, ...picked];
+		const first = picked[0];
+		let suggestion: ReturnType<typeof suggestSignFormat> | null = null;
+		try {
+			const head = new Uint8Array(await first.slice(0, 72 * 1024).arrayBuffer());
+			suggestion = suggestSignFormat(first.name, head as Uint8Array<ArrayBuffer>);
+		} catch {
+			suggestion = null;
+		}
+		// OOXML is the only new engine in this slice; ODF/ASiC stay manual (rejected loudly at
+		// sign time), and PDF follows the existing deep-link behavior. Refs #127.
+		if (suggestion === 'ooxml' || (suggestion === 'pades' && format === 'cades')) format = suggestion;
+	}
 	// Visible signature block (#45), PAdES only and off by default: an uploaded image plus the
 	// signer's name and the signing date, placed on a page and against a corner.
 	let visibleOn = $state(false);
@@ -327,15 +347,33 @@
 				};
 			}
 			if (kind === 'xades') {
+			return {
+				bytes: new TextEncoder().encode(
+					await signXades({
+						xml: bytes,
+						certificates: chain,
+						signer: certificate,
+						dataObject: { mimeType: file.type || 'application/xml' }
+					})
+				),
+				algorithm
+			};
+		}
+			if (kind === 'ooxml') {
+				// RSA only: the package signature is RSASSA-PKCS1-v1_5; a non-RSA key
+				// surfaces the engine's error on the document, no silent fallback. Refs #127.
+				if (!key) throw new Error('The signing certificate has no private key');
 				return {
-					bytes: new TextEncoder().encode(
-						await signXades({
-							xml: bytes,
-							certificates: chain,
-							signer: certificate,
-							dataObject: { mimeType: file.type || 'application/xml' }
+					bytes: new Uint8Array(
+						await signOoxmlPackage(bytes, {
+							key,
+							certificates: [
+								der as Uint8Array,
+								...chain.filter((entry) => entry !== certificate).map((entry) => entry.der as Uint8Array)
+							],
+							signingTime: new Date()
 						})
-					),
+					) as Uint8Array<ArrayBuffer>,
 					algorithm
 				};
 			}
@@ -440,7 +478,7 @@
 			if (step !== 2) return;
 			event.preventDefault();
 			const dropped = Array.from(event.dataTransfer?.files ?? []);
-			if (dropped.length > 0) files = [...files, ...dropped];
+			if (dropped.length > 0) void adoptFiles(dropped);
 		}}
 	/>
 
@@ -601,7 +639,7 @@
 							</fieldset>
 
 							{#if files.length === 0}
-								<FileDrop copy={t} onselect={(picked) => (files = [...files, ...picked])} />
+								<FileDrop copy={t} onselect={(picked) => void adoptFiles(picked)} />
 							{/if}
 							{#if files.length > 0}
 								<div class="relative min-w-0">
@@ -613,7 +651,7 @@
 									<TableBody>
 										<TableRow class="border-border/50 hover:bg-transparent">
 											<TableCell class="p-0">
-												<FileDrop copy={t} compact onselect={(picked) => (files = [...files, ...picked])} />
+												<FileDrop copy={t} compact onselect={(picked) => void adoptFiles(picked)} />
 											</TableCell>
 										</TableRow>
 										{#each files as file, index (index)}
@@ -1126,7 +1164,7 @@
 			>
 				{#each SIGN_FORMATS as option (option.id)}
 					<label
-						class="hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5 flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-3 transition-colors"
+						class="hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5 flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-3 transition-colors {option.id === 'ooxml' ? 'flex-wrap' : ''}"
 					>
 						<input
 							type="radio"
@@ -1141,6 +1179,9 @@
 						/>
 						<span class="font-medium">{option.label}</span>
 						<span class="text-muted-foreground tnum text-sm">{option.extension}</span>
+						{#if option.id === 'ooxml'}
+							<span class="text-muted-foreground block w-full text-xs">{t.formatOoxmlNoVerify}</span>
+						{/if}
 						{#if !option.implemented}
 							<Badge variant="secondary" class="ms-auto">
 								{t.pendingIssue} #{option.issue}

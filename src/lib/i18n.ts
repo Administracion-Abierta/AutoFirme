@@ -66,6 +66,8 @@ export interface Copy {
 	formatHint: string;
 	/** Label shown next to the chosen format: it applies to the whole batch. */
 	formatAll: string;
+	/** Honest note under the OOXML option: AutoFirma 1.9 never verifies these. Refs #127. */
+	formatOoxmlNoVerify: string;
 	/** Optional RFC 3161 timestamp: the TSA address field of the sign panel. */
 	timeStampTitle: string;
 	timeStampPlaceholder: string;
@@ -211,6 +213,7 @@ export const copy: Record<Lang, Copy> = {
 		formatTitle: 'Formato de firma',
 		formatHint: 'Elige el tipo de firma digital que quieres generar',
 		formatAll: 'para todo el lote — se puede cambiar por archivo',
+		formatOoxmlNoVerify: 'OOXML se firma, no se verifica: la comprobación no está soportada (AutoFirma 1.9).',
 		timeStampTitle: 'Sello de tiempo (TSA)',
 		timeStampPlaceholder: 'https://tu-servidor-tsa/ruta',
 		timeStampHint:
@@ -376,6 +379,7 @@ export const copy: Record<Lang, Copy> = {
 		formatTitle: 'Signature format',
 		formatHint: 'Pick the type of digital signature to generate',
 		formatAll: 'for the whole batch — changeable per file',
+		formatOoxmlNoVerify: 'OOXML signs, it does not verify: checking is unsupported (AutoFirma 1.9).',
 		timeStampTitle: 'Trusted timestamp (TSA)',
 		timeStampPlaceholder: 'https://your-tsa-server/path',
 		timeStampHint:

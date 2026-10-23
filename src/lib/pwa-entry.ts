@@ -8,7 +8,7 @@ import type { SignFormat } from './sign';
  * and confirms inside the app. A portal cannot silently trigger a signature.
  */
 
-const FORMATS: readonly SignFormat[] = ['cades', 'xades', 'pades'];
+const FORMATS: readonly SignFormat[] = ['cades', 'xades', 'pades', 'ooxml'];
 
 /** What a portal may ask for through the deep-link contract. */
 export interface DeepLinkRequest {

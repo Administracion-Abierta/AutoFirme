@@ -1,5 +1,6 @@
 import type { Bytes } from '../asn1';
 import { signCadesDetached } from '../cms';
+import { signOoxmlPackage } from '../ooxml';
 import { signPdf } from '../pades';
 import type { SignerCert } from '../sign';
 import { signXades } from '../xades';
@@ -15,7 +16,7 @@ export class RequestValidationError extends Error {
   this.name = 'RequestValidationError';
  }
 }
-const FORMATS: Record<string, true> = { CAdES: true, PAdES: true, XAdES: true };
+const FORMATS: Record<string, true> = { CAdES: true, PAdES: true, XAdES: true, OOXML: true };
 const FONT_COLORS: Record<string, [number, number, number]> = {
 	black: [0, 0, 0],
 	white: [1, 1, 1],
@@ -135,6 +136,14 @@ export async function signRequest(request: ExtensionRequest, cert: SignerCert, c
    now: signingTime,
   });
   signature = new TextEncoder().encode(xml);
+ } else if (request.format === 'OOXML') {
+  // RSA only, like the App dispatcher: signOoxmlPackage rejects non-RSA keys. Refs #127.
+  if (!cert.key) throw new Error('The signing certificate has no private key');
+  signature = (await signOoxmlPackage(content, {
+   key: cert.key,
+   certificates: [cert.der, ...chain.filter((entry) => entry !== cert).map((entry) => entry.der)],
+   signingTime,
+  })) as Bytes;
  } else {
   signature = await signCadesDetached(cert, content, { attached: request.mode === 'implicit', chain, signingTime });
  }
