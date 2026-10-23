@@ -3,6 +3,10 @@ mod atomic_write;
 // P1.4a PC/SC + OpenSC PKCS#11 layer (Refs #98).
 pub mod smartcard;
 
+// P2.2a loopback sign server, protocol 3 (Refs #104).
+pub mod server;
+pub mod tls;
+
 use tauri_plugin_dialog::DialogExt;
 
 /// Save bytes from the webview to a user-chosen path. The dialog runs off the async
