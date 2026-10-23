@@ -46,11 +46,25 @@ const SCHEMA_BY_VERSION: Record<FacturaeVersion, string> = {
 	'3.2.2': 'http://www.facturae.gob.es/formato/Versiones/Facturaev3_2_2.xml'
 };
 
+// `TotalCost`/`GrossAmount` are `DoubleSixDecimalType` in 3.2, `DoubleTwoDecimalType` in
+// 3.0/3.1 and up to eight decimals in 3.2.1/3.2.2 — one fixture that validates everywhere.
+// The whole file validates against the official XSDs for every version (see the issue report).
+const lineAmount = (version: FacturaeVersion): string => (version === '3.2' ? '100.000000' : '100.00');
+
 const invoice = (version: FacturaeVersion): string => `<?xml version="1.0" encoding="UTF-8"?>
 <fe:Facturae xmlns:fe="${SCHEMA_BY_VERSION[version]}">
 	<FileHeader>
 		<SchemaVersion>${version}</SchemaVersion>
 		<Modality>I</Modality>
+		<InvoiceIssuerType>EM</InvoiceIssuerType>
+		<Batch>
+			<BatchIdentifier>B123456782026-0001</BatchIdentifier>
+			<InvoicesCount>1</InvoicesCount>
+			<TotalInvoicesAmount><TotalAmount>121.00</TotalAmount></TotalInvoicesAmount>
+			<TotalOutstandingAmount><TotalAmount>121.00</TotalAmount></TotalOutstandingAmount>
+			<TotalExecutableAmount><TotalAmount>121.00</TotalAmount></TotalExecutableAmount>
+			<InvoiceCurrencyCode>EUR</InvoiceCurrencyCode>
+		</Batch>
 	</FileHeader>
 	<Parties>
 		<SellerParty>
@@ -61,17 +75,81 @@ const invoice = (version: FacturaeVersion): string => `<?xml version="1.0" encod
 			</TaxIdentification>
 			<LegalEntity>
 				<CorporateName>AutoFirme Prueba S.L.</CorporateName>
+				<AddressInSpain>
+					<Address>Calle Ejemplo 1</Address>
+					<PostCode>28001</PostCode>
+					<Town>Madrid</Town>
+					<Province>Madrid</Province>
+					<CountryCode>ESP</CountryCode>
+				</AddressInSpain>
 			</LegalEntity>
 		</SellerParty>
+		<BuyerParty>
+			<TaxIdentification>
+				<PersonTypeCode>J</PersonTypeCode>
+				<ResidenceTypeCode>R</ResidenceTypeCode>
+				<TaxIdentificationNumber>A87654321</TaxIdentificationNumber>
+			</TaxIdentification>
+			<LegalEntity>
+				<CorporateName>Cliente Ejemplo S.A.</CorporateName>
+				<AddressInSpain>
+					<Address>Calle Ejemplo 2</Address>
+					<PostCode>08001</PostCode>
+					<Town>Barcelona</Town>
+					<Province>Barcelona</Province>
+					<CountryCode>ESP</CountryCode>
+				</AddressInSpain>
+			</LegalEntity>
+		</BuyerParty>
 	</Parties>
 	<Invoices>
 		<Invoice>
 			<InvoiceHeader>
 				<InvoiceNumber>2026-0001</InvoiceNumber>
+				<InvoiceDocumentType>FC</InvoiceDocumentType>
+				<InvoiceClass>OO</InvoiceClass>
 			</InvoiceHeader>
+			<InvoiceIssueData>
+				<IssueDate>2026-10-24</IssueDate>
+				<InvoiceCurrencyCode>EUR</InvoiceCurrencyCode>
+				<TaxCurrencyCode>EUR</TaxCurrencyCode>
+				<LanguageName>es</LanguageName>
+			</InvoiceIssueData>
+			<TaxesOutputs>
+				<Tax>
+					<TaxTypeCode>01</TaxTypeCode>
+					<TaxRate>21.00</TaxRate>
+					<TaxableBase><TotalAmount>100.00</TotalAmount></TaxableBase>
+					<TaxAmount><TotalAmount>21.00</TotalAmount></TaxAmount>
+				</Tax>
+			</TaxesOutputs>
 			<InvoiceTotals>
 				<TotalGrossAmount>100.00</TotalGrossAmount>
+				<TotalGrossAmountBeforeTaxes>100.00</TotalGrossAmountBeforeTaxes>
+				<TotalTaxOutputs>21.00</TotalTaxOutputs>
+				<TotalTaxesWithheld>0.00</TotalTaxesWithheld>
+				<InvoiceTotal>121.00</InvoiceTotal>
+				<TotalOutstandingAmount>121.00</TotalOutstandingAmount>
+				<TotalExecutableAmount>121.00</TotalExecutableAmount>
 			</InvoiceTotals>
+			<Items>
+				<InvoiceLine>
+					<ItemDescription>Servicio de ejemplo</ItemDescription>
+					<Quantity>1.00</Quantity>
+					<UnitOfMeasure>01</UnitOfMeasure>
+					<UnitPriceWithoutTax>100.000000</UnitPriceWithoutTax>
+					<TotalCost>${lineAmount(version)}</TotalCost>
+					<GrossAmount>${lineAmount(version)}</GrossAmount>
+					<TaxesOutputs>
+						<Tax>
+							<TaxTypeCode>01</TaxTypeCode>
+							<TaxRate>21.00</TaxRate>
+							<TaxableBase><TotalAmount>100.00</TotalAmount></TaxableBase>
+							<TaxAmount><TotalAmount>21.00</TotalAmount></TaxAmount>
+						</Tax>
+					</TaxesOutputs>
+				</InvoiceLine>
+			</Items>
 		</Invoice>
 	</Invoices>
 </fe:Facturae>
@@ -104,8 +182,8 @@ describe('facturae presets', () => {
 				ids: IDS
 			});
 			const root = parse(signed).documentElement;
-			// Signing must not rewrite the invoice's root namespace.
-			expect(root.namespaceURI).toBe(parse(invoice(version)).documentElement.namespaceURI);
+			// The invoice's own namespace survives signing (nothing rewrites it).
+			expect(root.namespaceURI).toBe(SCHEMA_BY_VERSION[version]);
 			// Version's policy identifier + SHA-1 digest of it.
 			const preset = FACTURAE_PRESETS[version];
 			const identifiers = [...root.getElementsByTagNameNS(XADES, 'Identifier')].map((node) => node.textContent);
