@@ -11,8 +11,10 @@
  * (unreachable responder, stale response, bad signature) is `unknown`, never `good`.
  * OCSP nonce omitted (ponytail: replay cover only matters for stale responses, which
  * are already rejected on `nextUpdate`; add a nonce when a responder requires it).
- * Response signatures verify against the issuer or an embedded responder cert;
- * delegated responders with unusual auth are out of scope per the issue.
+ * Response signatures verify against the issuer's own key only; delegated responder
+ * certs are ignored (out of scope per #136 — chain validation and the id-kp-OCSPSigning
+ * EKU check do not exist here, so trusting an embedded cert would let any responder
+ * mint `good` for a revoked serial).
  */
 
 import { TAG, at, children, oid, parse, time, wrap, type Der } from './asn1';
