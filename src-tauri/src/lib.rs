@@ -36,7 +36,10 @@ async fn save_file(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![save_file, net::ocsp::fetch_revocation_bytes])
+        .invoke_handler(tauri::generate_handler![
+            save_file,
+            net::ocsp::fetch_revocation_bytes
+        ])
         // P0.6 smoke (#19): with AUTOFIRME_SMOKE set, print the page the webview finished
         // loading and exit. The CI job runs the production build under `xvfb-run` and
         // asserts on the marker, so a webview that cannot boot fails the build. Silent
