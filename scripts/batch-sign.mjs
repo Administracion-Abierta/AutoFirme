@@ -5,15 +5,15 @@
  *   node --import ./scripts/ts-hook.mjs scripts/batch-sign.mjs digest --p12 <cert.p12> --digest <sha256hex> --name <original> --out <sig.csig>
  *
  * The directory walk is sorted (codepoint order, recursive), one file at a time: read, hash,
- * sign, write, release — peak memory is the largest single file, never the whole batch. One bad
- * file records ERROR_PRE and the walk continues; exit code is 1 when any file failed.
+ * sign, write, release — peak memory tracks the runtime (and jsdom, for XML batches) plus one
+ * file, never the batch. One bad file records ERROR_PRE and the walk continues; exit code is 1
+ * when any file failed.
  *
  * The PIN rides in `$P12_PIN` (never in argv, so it stays out of `ps`), like `smoke-real.mjs`.
  * Per-file formats come from `formatForName` unless `--format` overrides; the manifest is built
  * by `buildManifest`, so the CLI cannot drift from the queue's semantics.
  */
 
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -165,13 +165,14 @@ async function main() {
 			const output = `${rel}${extensionOf(format)}`;
 			mkdirSync(dirname(join(outDir, output)), { recursive: true });
 			writeFileSync(join(outDir, output), signed.bytes);
+			// `bytes` stays null: the signed bytes were written to disk already, and holding
+			// them here would keep the whole batch in memory — the one thing this CLI avoids.
 			Object.assign(document, {
 				status: 'signed',
 				result: 'DONE_AND_SAVED',
 				output,
 				timestamp: new Date().toISOString(),
-				algorithm: signed.algorithm,
-				bytes: signed.bytes
+				algorithm: signed.algorithm
 			});
 		} catch (reason) {
 			Object.assign(document, {
