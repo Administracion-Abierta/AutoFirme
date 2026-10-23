@@ -1,8 +1,8 @@
 # Chrome extension
 
-The Chrome extension renders the AutoFirme Svelte webapp. It shares the app,
+The Chrome extension renders the AutoFirme Svelte app. It shares the app,
 certificate store, signing and verification engines, batch queue and stamp controls
-with the ordinary web build.
+with the desktop product's WebView (and with the local dev harness).
 
 See [CHROME-EXTENSION-DESIGN.md](CHROME-EXTENSION-DESIGN.md) for the implementation
 and request protocol, and [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md)
@@ -13,7 +13,7 @@ extensión están en [LEEME.md](LEEME.md) (sección «Extensión Chrome»).
 
 Use Node 24 (`.nvmrc`, `engines.node`), pnpm 11.24.0, and Chrome/Chromium 116+. The
 extension is **Chrome-only for now**; Firefox support is deferred to
-[issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18)
+[issue #117](https://git.eduard3v.com/EduarD3V/AutoFirme/issues/117)
 (`userScripts` API study, tagged `fleet:hold`).
 
 ```sh
@@ -29,22 +29,22 @@ select `dist/extension`. Pin AutoFirme to the toolbar. Clicking it opens the
 responsive full app in a separate resizable window that remains open when focus
 moves to another window. The app also offers an Open in tab action.
 
-The standalone web build remains `pnpm build`, producing `build/`. Extension code
-is bundled locally; this is not a hosted iframe. The extension uses Chrome's
-installation/update system, so PWA install/update buttons are web-only.
+The SvelteKit build (`pnpm build`) still produces `build/`, now the extension's options
+page and the local dev harness — no website ships. Extension code is bundled locally;
+this is not a hosted iframe. The extension uses Chrome's installation/update system.
 
 ## 2. App features
 
 Use the same signing and verification workflows, certificate import and saved
 identities, PDF visible image/text stamps, implemented signature formats, batch
 queue and ZIP downloads, saved outputs, themes and ES/EN language controls as the
-webapp. Files and keys are processed locally. Optional timestamping contacts the
+desktop app. Files and keys are processed locally. Optional timestamping contacts the
 configured TSA when Chrome grants access to its origin.
 
 Identities are sealed in extension-origin IndexedDB using the app's existing
-PIN-protected store. Unlocking uses the certificate container's PIN. The hosted
-webapp and extension are different origins: existing webapp storage does not
-migrate automatically. Import certificates into the extension. The extension does
+PIN-protected store. Unlocking uses the certificate container's PIN. The retired
+hosted web app and the extension are different origins: storage saved under the old
+web app does not migrate automatically. Import certificates into the extension. The extension does
 not provide operating-system certificate-store access or a native helper.
 
 ### MCP bridge
@@ -138,7 +138,7 @@ cannot authorize replay. Worker restarts fail pending requests safely.
 
 Certificate-chain packaging does not establish trust for an administration. The
 extension does not add online revocation checks or OS biometrics. It inherits the
-webapp's format and verification limitations. It has not had an external security
+app's format and verification limitations. It has not had an external security
 audit; real administration sites and physical Windows/macOS Chrome still require
 compatibility testing. Browser external-protocol rules may affect actual AutoFirma
 launch during fallback.

@@ -1,14 +1,18 @@
-# AutoFirme Web
+# AutoFirme — app de escritorio + extensión
 
-Firma electrónica con certificados X.509 **directamente en el navegador**. Sin servidor de firma,
-sin backend para los flujos principales y sin que la clave privada salga del equipo: WebCrypto hace
-el trabajo y los documentos se quedan en el cliente.
+Firma electrónica con certificados X.509 en **dos productos que comparten un motor**:
+**AutoFirme Desktop** (Tauri v2, Linux primero) para firmar con el almacén del sistema,
+DNIe y tarjetas criptográficas, y la **extensión de Chrome/Edge** (MV3) que intercepta las
+llamadas `AutoScript` de las sedes electrónicas. Sin servidor de firma y sin que la clave
+privada salga del equipo. No hay web: no existe una versión alojada ni un enlace de
+instalación web.
 
-Reescritura limpia en TypeScript inspirada en AutoFirma 1.9, no una traducción de su código Java.
-La app es una SPA instalable como PWA, con una extensión de Chrome que intercepta las llamadas
-`AutoScript` de las sedes electrónicas y un servidor MCP opcional para agentes.
+Reescritura limpia en TypeScript (+ Rust en el shell de escritorio) inspirada en AutoFirma 1.9,
+no una traducción de su código Java. Las versiones estables llegan por
+[GitHub Releases](docs/DEPLOY.md): instalador de escritorio por plataforma y ZIP de la
+extensión con `SHA256SUMS` y firmas.
 
-![Pantalla de inicio de AutoFirme Web](docs/images/firmar-inicio.webp)
+![Pantalla de inicio de AutoFirme](docs/images/firmar-inicio.webp)
 
 ## Índice
 
@@ -20,12 +24,12 @@ La app es una SPA instalable como PWA, con una extensión de Chrome que intercep
 - [Lote y descargas](#lote-y-descargas)
 - [Sellos de tiempo](#sellos-de-tiempo)
 - [Idiomas, temas y accesibilidad](#idiomas-temas-y-accesibilidad)
-- [PWA y funcionamiento sin conexión](#pwa-y-funcionamiento-sin-conexión)
+- [App de escritorio](#app-de-escritorio)
 - [Extensión de Chrome](#extensión-de-chrome)
 - [Servidor MCP](#servidor-mcp)
 - [Privacidad y seguridad](#privacidad-y-seguridad)
 - [Empezar en local](#empezar-en-local)
-- [Autoalojamiento](#autoalojamiento)
+- [El directorio `build/`](#el-directorio-build)
 - [Desarrollo y pruebas](#desarrollo-y-pruebas)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Documentación](#documentación)
@@ -40,7 +44,7 @@ La app es una SPA instalable como PWA, con una extensión de Chrome que intercep
   archivo dentro del mismo lote.
 - **Firma visible en PDF**: imagen PNG/JPEG, nombre y fecha, por página y esquina.
 - **Sellos de tiempo RFC 3161** opcionales mediante una TSA configurable.
-- **PWA instalable**, responsive y con la interfaz disponible sin conexión.
+- **App de escritorio instalable**, responsive y con la interfaz disponible sin conexión.
 - **Extensión de Chrome MV3** para webs que llaman a `AutoScript`, con selector de sitio y
   confirmación explícita de cada firma.
 - **Servidor MCP** con transporte stdio y HTTP para que un agente liste certificados, firme y
@@ -137,14 +141,12 @@ eso queda fuera de su alcance actual.
 - Responsive de 320 a 1280 px, navegación por teclado y roles ARIA en pestañas y diálogos.
 - Mensajes de error y estados anunciados con `role="alert"` / `role="status"`.
 
-## PWA y funcionamiento sin conexión
+## App de escritorio
 
-`pnpm build` genera `manifest.webmanifest` y un *service worker*. La cabecera muestra **Instalar app**
-cuando el navegador ofrece la instalación y **Actualizar versión** cuando hay una versión nueva.
-
-La *shell* de la aplicación se precachea, así que **firmar sigue funcionando sin red**. No se cachea
-ningún documento generado: el *service worker* solo sirve `GET` del mismo origen y nunca guarda
-resultados en caché.
+AutoFirme Desktop (Tauri v2, Linux primero) es el producto completo: la misma interfaz y el
+mismo motor, con claves nativas — almacén del sistema, PKCS#11/DNIe —, enlaces `afirma://`,
+servidor local de firma y su propio MCP. Decisiones y fases en
+[`docs/DESKTOP-ROADMAP.md`](docs/DESKTOP-ROADMAP.md).
 
 ## Extensión de Chrome
 
@@ -163,7 +165,7 @@ permiso y exige una confirmación humana antes de firmar.
 ![Ajustes de la extensión](docs/images/extension-ajustes.png)
 
 Requisitos: Chrome/Chromium 116+ y Node 24 para compilar. Firefox está pendiente
-([issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18)).
+([#117](https://git.eduard3v.com/EduarD3V/AutoFirme/issues/117)).
 
 ```bash
 pnpm install --frozen-lockfile
@@ -220,36 +222,26 @@ pnpm install
 pnpm dev
 ```
 
-Abre la URL que imprime Vite (por defecto `http://localhost:5173`). Para probar la instalación PWA
-hace falta **HTTPS** o `localhost`.
+Abre la URL que imprime Vite (por defecto `http://localhost:5173`). Es el arnés de desarrollo de
+la misma interfaz que llevan el escritorio y la página de opciones de la extensión.
 
-## Autoalojamiento
+## El directorio `build/`
 
-El build es estático y no necesita Node en producción:
+`build/` no es una app desplegable: es la página de opciones de la extensión y el arnés de
+desarrollo local. No hay despliegue web — las versiones estables salen por
+[GitHub Releases](docs/DEPLOY.md).
 
 ```bash
 pnpm build          # genera build/
-pnpm preview        # sirve el resultado localmente
+pnpm preview        # sirve el resultado localmente para desarrollo
 ```
-
-Puedes servir `build/` con cualquier nginx, Caddy o alojamiento estático. La app es una SPA con
-entradas profundas (`/?entry=sign`, `/?op=sign…`, `/?shared=1`), así que el host debe reenviar las
-rutas desconocidas a `build/404.html`. Ejemplo mínimo para nginx:
-
-```nginx
-root /srv/autofirme/build;
-location / { try_files $uri $uri/ /404.html; }
-```
-
-Para producción, sirve siempre por **HTTPS**: lo exigen tanto el service worker como la instalación
-como PWA.
 
 ## Desarrollo y pruebas
 
 | Comando | Qué hace |
 |---|---|
 | `pnpm dev` | Servidor de desarrollo con recarga. |
-| `pnpm build` | Build estático de la PWA en `build/`. |
+| `pnpm build` | Build estático en `build/` (opciones de la extensión + arnés local). |
 | `pnpm preview` | Sirve el build estático. |
 | `pnpm check` | `svelte-check` + TypeScript de la app y la extensión. |
 | `pnpm test` | Vitest + pruebas de la extensión y de los artefactos. |
@@ -269,11 +261,13 @@ herramienta independiente. Los detalles y los resultados registrados están en
 ## Estructura del repositorio
 
 ```
-src/lib/             núcleo de la app: firma, formatos, certificados, i18n, componentes
-src/routes/          entrada SvelteKit
+src/lib/             motor de firma: formatos, certificados, i18n, componentes (compartido)
+src/routes/          entrada SvelteKit (webview de escritorio + página de opciones)
+src-tauri/           shell de escritorio (Tauri v2) — claves nativas, deep links, MCP
 extension/           manifiesto MV3, background, content script y puente
 mcp/                 servidor MCP (stdio + Streamable HTTP)
-static/              iconos, manifiesto PWA y theme bootstrap
+static/              iconos y theme bootstrap
+build/               generado: página de opciones + arnés local (`pnpm preview`) — nunca desplegado
 docs/                arquitectura, paridad, extensión, MCP y notas de ingeniería inversa
 scripts/             builds, empaquetado, comprobaciones y pruebas de humo
 test/                fixtures y scripts de verificación cruzada
@@ -287,7 +281,8 @@ demo/                prueba de la extensión contra webs reales
 | [`docs/architecture.md`](docs/architecture.md) | Mapa del núcleo de firma. |
 | [`docs/PARITY.md`](docs/PARITY.md) | Paridad con AutoFirma 1.9 y huecos conocidos. |
 | [`docs/USE-CASES.md`](docs/USE-CASES.md) | Casos de uso cubiertos. |
-| [`docs/PIVOT-STUDY.md`](docs/PIVOT-STUDY.md) | Estudio de superficies y decisiones. |
+| [`docs/PIVOT-STUDY.md`](docs/PIVOT-STUDY.md) | Estudio de superficies (histórico). |
+| [`docs/DESKTOP-ROADMAP.md`](docs/DESKTOP-ROADMAP.md) | Decisiones de producto: escritorio + extensión. |
 | [`docs/CHROME-EXTENSION.md`](docs/CHROME-EXTENSION.md) | Extensión: instalación, protocolo y límites. |
 | [`docs/MCP-DESIGN.md`](docs/MCP-DESIGN.md) | Servidor MCP: transporte, claves y amenazas. |
 | [`docs/REVERSING-NOTES.md`](docs/REVERSING-NOTES.md) | Procedencia del estudio de AutoFirma 1.9. |
@@ -295,10 +290,11 @@ demo/                prueba de la extensión contra webs reales
 
 ## Alcance actual y limitaciones
 
-- **La interfaz web actual se centra en firmar**. El motor de verificación existe y se usa desde el
+- **La interfaz actual se centra en firmar**. El motor de verificación existe y se usa desde el
   servidor MCP; no hay una pestaña «Verificar» en esta versión de la app.
-- **Sin acceso a DNIe, tarjetas criptográficas ni almacenes del sistema.** El navegador no ofrece
-  esas APIs.
+- **DNIe, tarjetas criptográficas y almacenes del sistema llegan con el escritorio.**
+  La extensión firma con PKCS#12 importado; las claves nativas son territorio de la app
+  Tauri (`docs/DESKTOP-ROADMAP.md`).
 - **Sin OCSP/CRL** ni validación de sellos de tiempo recibidos.
 - **XAdES-T y OOXML** tienen motor pero no selector en la interfaz.
 - **Solo Chrome** para la extensión; Firefox está en estudio.

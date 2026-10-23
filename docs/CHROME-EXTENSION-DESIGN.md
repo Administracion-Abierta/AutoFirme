@@ -7,21 +7,21 @@ En español: las funciones de la extensión están en [LEEME.md](LEEME.md).
 
 ## 1. Shared app, separate build target
 
-The web build and extension render the same `src/routes/+page.svelte` and
+The SvelteKit build and the extension render the same `src/routes/+page.svelte` and
 `App.svelte`. Both use the existing certificate store, signing and verification
 engines, batch queue, PDF stamp controls, saved outputs, settings and translations.
 The extension bundles the app locally instead of loading a hosted page or copying
 its engines into a second application.
 
-`pnpm build` produces the ordinary SvelteKit site. `pnpm build:extension` uses a
-standalone Vite entry to produce `dist/extension`. That entry avoids SvelteKit's
-inline bootstrap and the webapp service worker. PWA installation and update
-controls appear only in the web build. Chrome installs and updates the extension.
+`pnpm build` produces the SvelteKit output that serves as the extension's options
+page and the local dev harness. `pnpm build:extension` uses a standalone Vite entry
+to produce `dist/extension`. That entry avoids SvelteKit's inline bootstrap and the
+app service worker. Chrome installs and updates the extension.
 
 The Manifest V3 policy is `script-src 'self'; object-src 'none'`. Scripts, fonts
 and styles ship in the package. The build checker rejects inline executable
 scripts, dynamic code execution, remote bootstrap assets, missing app modules
-and webapp service-worker registration.
+and app service-worker registration.
 
 | Component | Responsibility |
 |---|---|
@@ -58,8 +58,8 @@ mutations also handle disclosure and PIN/import changes when painting is paused.
 Resizing uses the original browser-frame height to avoid viewport feedback loops.
 
 The extension uses the app's PIN-protected identity store in extension-origin
-IndexedDB. Hosted webapp storage belongs to a different origin and does not migrate
-automatically. Private keys and PINs stay in extension-owned contexts. This build
+IndexedDB. Storage from the retired hosted web app belongs to a different origin and
+does not migrate automatically. Private keys and PINs stay in extension-owned contexts. This build
 uses imported PKCS#12 identities and does not access the operating-system store.
 
 ## 3. Website access
@@ -165,5 +165,5 @@ OpenSSL independently verifies generated CAdES and PDF signatures.
 
 See [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md) for the
 recorded results and checks that still need a physical browser or desktop app.
-The extension inherits the webapp's format and trust-verification limits. It does
+The extension inherits the app's format and trust-verification limits. It does
 not add online revocation checks or OS biometrics.

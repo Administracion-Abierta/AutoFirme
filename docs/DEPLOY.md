@@ -1,45 +1,57 @@
-# Deploy (static build, any host)
+# Release & distribution (GitHub Releases is the only channel)
 
-Static build, zero backend. Signing runs in the browser; the host serves files only.
-There is no Worker and no edge code in this repository: `pnpm build` emits `build/` and any
-nginx/Caddy/static host serves it. The only container here is `mcp/Containerfile`, for the
-optional MCP server.
+No hosted product, no deploy. Versions ship as release assets; milestones and
+`release-please` own the numbering. This file describes the release story —
+for the retired Worker deploy, see the note at the bottom.
 
-## What the host must do
+## Channel
 
-- **SPA fallback.** The app has deep entries (`/?entry=sign`, `/?op=sign…`, `/?shared=1`)
-  and they boot from `build/404.html`, which is the app shell. Unknown paths must
-  resolve to it:
+**GitHub Releases is the only distribution channel.** No apt/dnf repo, no docs
+site, no demo host, no third-party store as primary (locked in
+`docs/DESKTOP-ROADMAP.md` §1, decision 9).
 
-  ```nginx
-  root /srv/autofirme/build;
-  location / { try_files $uri $uri/ /404.html; }
-  ```
+## What a release contains
 
-- **HTTPS.** Required for the service worker and for the PWA install prompt.
-- **Caching.** `static/_headers` (shipped into `build/`) sets immutable caching for
-  `/_app/immutable/*` and icons. Do not cache `/`, `service-worker.js` or
-  `manifest.webmanifest` beyond revalidation — installs and updates depend on fresh copies.
-  Translate the file to the host's own syntax if it is not Cloudflare.
+| Asset | Produce | Use |
+|---|---|---|
+| Extension ZIP + `SHA256SUMS` | `pnpm package:extension` | Load unpacked / store install |
+| `autofirme-web-<tag>.tar.gz` | release workflow packs `build/` | Extension options page bundle, archived for reproducibility |
+| Desktop installer per platform (Linux first) | Tauri bundler (see `docs/DESKTOP-ROADMAP.md` phases) | The full product |
+| `SHA256SUMS` over all assets | release workflow | Integrity check before install |
+| Minisign signatures | desktop updater path | Trust without a store |
 
-## Releases
+The release workflow (`.github/workflows/release.yml`) builds the extension
+package **twice from scratch** and diffs the `SHA256SUMS`: a change that breaks
+packaging reproducibility fails the release before upload.
 
-- `main` produces a versioned release through Release Please (`release.yml`); its
-  `artifacts` job uploads the extension zip, `SHA256SUMS` and the site tarball.
-- `develop` publishes a rolling pre-release tagged `dev-<short-sha>` with the extension zip
-  and `SHA256SUMS`, and uploads the built `build/` directory as a workflow artifact
-  (`release-develop.yml`).
-- The desktop shell (`src-tauri/`) is checked by CI but not packaged: the app ships as a
-  web app.
+## Versioning
 
-## After a deploy
+Automatic via Release Please: conventional commits merged into `main` produce a
+release PR that bumps the single product version in `package.json`,
+`extension/manifest.json` (Chrome reads the manifest one),
+`src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and the shell's entry in
+`src-tauri/Cargo.lock`, plus `CHANGELOG.md`. Never edit those versions by hand.
+`pnpm check:versions` (also a CI gate) fails when they drift or when a release
+tag does not match — see `scripts/check-versions.mjs`.
 
-Open the production URL on Chrome Android, confirm the install prompt, share a PDF to the
-app, and check the sign flow opens with the file preloaded.
+## Signing keys
 
-## Limits
+- `SHA256SUMS` ships with every release; verify before installing.
+- Minisign signatures cover the desktop updater path (roadmap: Apple Developer
+  Program purchase rides the P7 budget; Keychain provider mandatory).
+- The extension stays **unsigned**: Chrome needs Developer Mode for a manual
+  install until a store listing exists.
 
-- `share_target` POST bodies never reach the host: the service worker intercepts them and
-  redirects into the sign flow (see `src/service-worker.ts`).
-- Transparent AutoScript interception is extension-only; portals reach the PWA through
-  share, file-open, or the deep-link contract (`docs/PWA-SIGNING.md`).
+## Milestones
+
+Release train follows the roadmap phases (`docs/DESKTOP-ROADMAP.md` §4):
+Linux desktop first, Windows second, macOS last (notarization is the long pole),
+Firefox `userScripts` (#117) after the Windows MSI exists.
+
+## Retired: Cloudflare Worker deploy (P8)
+
+The SPA used to ship as an assets-only Cloudflare Worker (`autofirme`,
+`wrangler.jsonc` → `./build`, `404.html` app shell). That deploy is retired, the
+scaffolding is gone (`wrangler.jsonc`, `Caddyfile`, `Containerfile` were deleted
+by #19): no website is published anymore. Do not re-add hosting config or
+hosting docs (`AGENTS.md` rule 4).
