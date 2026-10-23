@@ -411,7 +411,7 @@ export function extractXadesClaims(document: Document, family: Family = 'xades')
 		const hash = policyId ? xadesFirst(policyId, 'SigPolicyHash') : null;
 		const digestAlgorithm = hash?.getElementsByTagNameNS('*', 'DigestMethod')[0]?.getAttribute('Algorithm') ?? null;
 		let digestValue: Bytes | null = null;
-		const digestText = textOf(hash ? xadesFirst(hash, 'DigestValue') : null);
+		const digestText = textOf(hash?.getElementsByTagNameNS('*', 'DigestValue')[0]);
 		if (digestText) {
 			try {
 				digestValue = fromBase64(digestText);

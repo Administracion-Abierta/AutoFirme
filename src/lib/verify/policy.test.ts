@@ -413,6 +413,24 @@ describe('extractXadesClaims', () => {
 		expect(roles.signed).toBe(true);
 	});
 
+	it('reads the FacturaE hash the XAdES profile puts in the ds namespace, and fails a tampered one', () => {
+		const document = parsePolicyXml(`
+			<xades:SignaturePolicyIdentifier><xades:SignaturePolicyId>
+				<xades:SigPolicyId><xades:Identifier>${FACTURAE_31_URI}</xades:Identifier></xades:SigPolicyId>
+				<xades:SigPolicyHash><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><ds:DigestValue>${facturae.digestBase64}</ds:DigestValue></xades:SigPolicyHash>
+			</xades:SignaturePolicyId></xades:SignaturePolicyIdentifier>`);
+		const { policies } = extractXadesClaims(document);
+		expect(Array.from(policies[0].digestValue!)).toEqual(Array.from(unb64(facturae.digestBase64)));
+		expect(assessPolicyClaim(policies[0]).status).toBe('pass');
+
+		const tampered = parsePolicyXml(`
+			<xades:SignaturePolicyIdentifier><xades:SignaturePolicyId>
+				<xades:SigPolicyId><xades:Identifier>${FACTURAE_31_URI}</xades:Identifier></xades:SigPolicyId>
+				<xades:SigPolicyHash><ds:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/><ds:DigestValue>AAAAAAAAAAAAAAAAAAAAAAAAAAA=</ds:DigestValue></xades:SigPolicyHash>
+			</xades:SignaturePolicyId></xades:SignaturePolicyIdentifier>`);
+		expect(assessPolicyClaim(extractXadesClaims(tampered).policies[0]).status).toBe('fail');
+	});
+
 	it('marks implied policies info and flags unsigned commitments', () => {
 		const document = parsePolicyXml(
 			'<xades:SignaturePolicyIdentifier><xades:SignaturePolicyImplied/></xades:SignaturePolicyIdentifier>'
