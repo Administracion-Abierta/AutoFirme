@@ -130,6 +130,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # P5.1 sidecar (Refs #107): `bundle.externalBin` makes tauri-build abort
+      # `cargo check` when `src-tauri/binaries/autofirme-mcp-<triple>` is missing, and
+      # no other CI step builds it (the 70 MB artifact is gitignored build output).
+      - uses: oven-sh/setup-bun@v2
+      - run: pnpm --filter autofirme-mcp build:binary
       - run: cargo check --locked --manifest-path src-tauri/Cargo.toml
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml
       # P0.6 headless smoke: the production build embeds `build/` and serves it over the
