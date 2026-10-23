@@ -38,7 +38,6 @@ if (args.includes('--help') || args.includes('-h')) {
 	process.exit(0);
 }
 
-
 /** sha256 fingerprint of a DER cert, colon-separated like openssl. */
 export function fingerprintSha256(der) {
 	return createHash('sha256')
@@ -75,6 +74,10 @@ function loadBundleMeta() {
 		meta[key] = m ? m[1] : null;
 	}
 	meta.anchors = [...src.matchAll(/fingerprintSha256:\s*'([^']+)'/g)].map((m) => m[1]);
+	// Each anchor's provenance, so the diff can say where a DROP candidate came from.
+	meta.anchorSources = new Map(
+		[...src.matchAll(/fingerprintSha256:\s*'([^']+)',\s*source:\s*'([^']+)'/g)].map((m) => [m[1], m[2]])
+	);
 	return meta;
 }
 
@@ -101,7 +104,7 @@ export function renderPrBody({ tsl, lotl, meta, now }) {
 	for (const fp of tsl.fps) lines.push(`- ${known.has(fp) ? 'KEEP' : 'ADD '} TSL ${fp}`);
 	for (const fp of lotl.fps) lines.push(`- ${known.has(fp) ? 'KEEP' : 'ADD '} LOTL ${fp}`);
 	for (const fp of meta.anchors) {
-		if (!tsl.fps.has(fp) && !lotl.fps.has(fp)) lines.push(`- DROP (absent from both lists) ${fp}`);
+		if (!tsl.fps.has(fp) && !lotl.fps.has(fp)) lines.push(`- DROP (bundled from ${meta.anchorSources.get(fp) ?? 'unknown source'}, not a TSL/LOTL trust service) ${fp}`);
 	}
 	lines.push('', 'Refs #135');
 	return lines.join('\n');

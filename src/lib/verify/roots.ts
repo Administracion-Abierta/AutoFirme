@@ -1,10 +1,11 @@
 /**
- * Trust anchors bundled at build time from the Spanish TSL and the EU LOTL
- * (Refs #135). The bundle is compiled in: the signing-time path makes zero
- * network requests and resolves chains offline via `trustedRoots()`.
- * `scripts/refresh-tsl.mjs` refreshes it on a schedule; `scripts/fetch-roots.sh`
- * refreshes the FNMT anchor from fnmt.es. Only the PEMs are trust-relevant;
- * the metadata below is provenance for review and for `/diagnostics`.
+ * Trust anchors bundled at build time (Refs #135). Today the bundle holds one
+ * anchor, AC RAIZ FNMT-RCM, fetched from fnmt.es by `scripts/fetch-roots.sh`;
+ * `scripts/refresh-tsl.mjs` diffs the Spanish TSL + EU LOTL against it on a
+ * schedule and proposes the trust-service certs to add. Compiled in: the
+ * signing-time path makes zero network requests and resolves chains offline via
+ * `trustedRoots()`. Only the PEMs are trust-relevant; the metadata below is
+ * provenance for review and for `/diagnostics`.
  */
 import { FNMT_RACM_PEM } from './roots/fnmt-racm';
 import { fromPem } from './asn1';
@@ -44,7 +45,7 @@ export const TRUST_BUNDLE_META: TrustBundleMeta = {
 			subject: 'C=ES, O=FNMT-RCM, OU=AC RAIZ FNMT-RCM',
 			fingerprintSha256:
 				'EB:C5:57:0C:29:01:8C:4D:67:B1:AA:12:7B:AF:12:F7:03:B4:61:1E:BC:17:B7:DA:B5:57:38:94:17:9B:93:FA',
-			source: 'es-tsl'
+			source: 'fnmt.es'
 		}
 	]
 };
