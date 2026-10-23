@@ -21,6 +21,7 @@ cryptoki = "0.12.1"
 pcsc = "2.9"
 # P2.2a loopback sign server, protocol 3 (Refs #104): axum WebSocket on
 # 127.0.0.1:63117 behind rustls; per-install self-signed cert via rcgen.
+axum = { version = "0.8", features = ["ws"] }
 axum-server = { version = "0.8", features = ["tls-rustls"] }
 tokio = { version = "1", features = ["full"] }
 rustls = "0.23"
