@@ -137,9 +137,11 @@ function xadesEvidence(xml: Bytes, checks: Check[]): LevelEvidence {
 }
 
 /**
- * The `N G obj … endobj` bodies up to the last `%%EOF`, with `%` comments removed. A PDF's real
- * structure lives there; a comment or bytes appended after the final `%%EOF` are free text
- * (outside every revision), and matching them would let a plain B-B document claim XL/LTA.
+ * The `N G obj … endobj` dictionary bodies up to the last `%%EOF`, with `%` comments removed and
+ * each body cut at its `stream` keyword. A PDF's markers (`/DSS`, `/Type /DocTimeStamp`) live in
+ * object dictionaries; a comment, a stream payload (arbitrary compressed data) or bytes appended
+ * after the final `%%EOF` are not structure, and matching them would let a plain B-B document
+ * claim XL/LTA.
  */
 function pdfObjectBodies(pdf: Bytes): string {
 	const text = new TextDecoder('utf-8', { fatal: false }).decode(pdf);
@@ -150,7 +152,11 @@ function pdfObjectBodies(pdf: Bytes): string {
 	for (let match = header.exec(document); match; match = header.exec(document)) {
 		const end = document.indexOf('endobj', header.lastIndex);
 		if (end < 0) break; // a truncated tail is not structure: claim nothing from it
-		bodies.push(document.slice(header.lastIndex, end));
+		const body = document.slice(header.lastIndex, end);
+		// Only the dictionary before the `stream` keyword is PDF syntax; the payload after it is
+		// arbitrary data. The lookbehind keeps `endstream` from matching.
+		const stream = /(?<![a-zA-Z])stream\r?\n/.exec(body);
+		bodies.push(stream ? body.slice(0, stream.index) : body);
 		header.lastIndex = end;
 	}
 	// A `%` runs a comment to the end of its line (ISO 32000-1 §7.2.4).

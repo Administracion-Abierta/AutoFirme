@@ -151,4 +151,12 @@ describe('PAdES X-level attestation', () => {
 		);
 		expect(detectLevel('pdf', appended, timestamped)).toBe('T');
 	});
+
+	it('ignores X-level markers inside a stream payload', () => {
+		// A stream's payload is arbitrary data, not syntax: `stream` ends the dictionary that counts.
+		const streamed = enc.encode(
+			'%PDF-1.7\n1 0 obj\n<< /Length 42 >>\nstream\n/Type /DocTimeStamp /DSS 5 0 R\nendstream\nendobj\n%%EOF\n'
+		);
+		expect(detectLevel('pdf', streamed, timestamped)).toBe('T');
+	});
 });
