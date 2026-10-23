@@ -156,6 +156,46 @@ export interface Copy {
 	mcpBridgeUnreachable: string;
 	/** Extension chooser label when the request comes from an MCP agent. */
 	mcpOrigin: string;
+	/** Native surfaces of the Tauri shell: PIN and consent dialogs, save dialog, updater, installer, error toasts. */
+	native: NativeCopy;
+}
+
+/** Strings only the desktop shell shows (`src-tauri/src/i18n.rs` embeds this same block). */
+export interface NativeCopy {
+	pinTitle: string;
+	pinPrompt: string;
+	pinRemember: string;
+	/** `{count}` is replaced by the attempts left before the card locks. */
+	pinAttemptsLeft: string;
+	pinLocked: string;
+	pinWrong: string;
+	pinCancel: string;
+	consentTitle: string;
+	/** `{origin}` is replaced by the requesting website. */
+	consentBody: string;
+	consentOrigin: string;
+	consentDigest: string;
+	consentRemember: string;
+	consentAllow: string;
+	consentDeny: string;
+	saveTitle: string;
+	saveFilterPdf: string;
+	saveFilterAll: string;
+	saveOverwrite: string;
+	updaterAvailable: string;
+	updaterInstall: string;
+	updaterDownloading: string;
+	updaterRestart: string;
+	updaterFailed: string;
+	updaterCurrent: string;
+	installerTitle: string;
+	installerProgress: string;
+	installerDone: string;
+	installerFailed: string;
+	installerRestart: string;
+	toastSaveFailed: string;
+	toastSaveCancelled: string;
+	toastError: string;
 }
 
 export const copy: Record<Lang, Copy> = {
@@ -324,7 +364,41 @@ export const copy: Record<Lang, Copy> = {
 		mcpBridgeNeedsToken: 'Falta el token de acceso.',
 		mcpBridgeBadEndpoint: 'La dirección debe ser http(s)://…/mcp, sin usuario ni contraseña.',
 		mcpBridgeUnreachable: 'No se pudo abrir el puente: ¿está el servidor MCP en marcha y publicado por TLS?',
-		mcpOrigin: 'Agente MCP'
+		mcpOrigin: 'Agente MCP',
+		native: {
+			pinTitle: 'Firma con tarjeta',
+			pinPrompt: 'Introduce el PIN de tu tarjeta para firmar.',
+			pinRemember: 'Recordar el PIN durante esta sesión',
+			pinAttemptsLeft: 'Intentos restantes: {count}',
+			pinLocked: 'La tarjeta está bloqueada. Desbloquéala con el PUK.',
+			pinWrong: 'PIN incorrecto.',
+			pinCancel: 'Cancelar',
+			consentTitle: 'Solicitud de firma',
+			consentBody: 'El sitio {origin} pide firmar. Confirma solo si reconoces la solicitud.',
+			consentOrigin: 'Sitio solicitante',
+			consentDigest: 'Resumen SHA-256',
+			consentRemember: 'Permitir durante esta sesión',
+			consentAllow: 'Firmar',
+			consentDeny: 'Denegar',
+			saveTitle: 'Guardar documento firmado',
+			saveFilterPdf: 'Documento PDF',
+			saveFilterAll: 'Todos los ficheros',
+			saveOverwrite: 'Ya existe un fichero con ese nombre. ¿Quieres reemplazarlo?',
+			updaterAvailable: 'Hay una versión nueva de AutoFirma.',
+			updaterInstall: 'Descargar e instalar',
+			updaterDownloading: 'Descargando la actualización…',
+			updaterRestart: 'Reinicia para aplicar la actualización',
+			updaterFailed: 'No se pudo actualizar. Inténtalo de nuevo más tarde.',
+			updaterCurrent: 'Ya tienes la última versión.',
+			installerTitle: 'Instalación de AutoFirma',
+			installerProgress: 'Instalando…',
+			installerDone: 'Instalación completada.',
+			installerFailed: 'La instalación ha fallado.',
+			installerRestart: 'Cierra la aplicación y vuelve a abrirla.',
+			toastSaveFailed: 'No se ha podido guardar el fichero.',
+			toastSaveCancelled: 'Guardado cancelado.',
+			toastError: 'Se ha producido un error.'
+		}
 	},
 	en: {
 		langLabel: 'Language',
@@ -491,6 +565,40 @@ export const copy: Record<Lang, Copy> = {
 		mcpBridgeNeedsToken: 'The access token is missing.',
 		mcpBridgeBadEndpoint: 'The address must be http(s)://…/mcp, without a user or password.',
 		mcpBridgeUnreachable: 'Could not open the bridge: is the MCP server running and published over TLS?',
-		mcpOrigin: 'MCP agent'
+		mcpOrigin: 'MCP agent',
+		native: {
+			pinTitle: 'Sign with card',
+			pinPrompt: 'Enter your card PIN to sign.',
+			pinRemember: 'Remember the PIN for this session',
+			pinAttemptsLeft: 'Attempts left: {count}',
+			pinLocked: 'The card is locked. Unlock it with the PUK.',
+			pinWrong: 'Wrong PIN.',
+			pinCancel: 'Cancel',
+			consentTitle: 'Signature request',
+			consentBody: '{origin} asks to sign. Confirm only if you recognise the request.',
+			consentOrigin: 'Requesting website',
+			consentDigest: 'SHA-256 digest',
+			consentRemember: 'Allow for this session',
+			consentAllow: 'Sign',
+			consentDeny: 'Deny',
+			saveTitle: 'Save signed document',
+			saveFilterPdf: 'PDF document',
+			saveFilterAll: 'All files',
+			saveOverwrite: 'A file with that name already exists. Replace it?',
+			updaterAvailable: 'A new version of AutoFirma is available.',
+			updaterInstall: 'Download and install',
+			updaterDownloading: 'Downloading the update…',
+			updaterRestart: 'Restart to apply the update',
+			updaterFailed: 'The update failed. Try again later.',
+			updaterCurrent: 'You are on the latest version.',
+			installerTitle: 'AutoFirma installation',
+			installerProgress: 'Installing…',
+			installerDone: 'Installation complete.',
+			installerFailed: 'The installation failed.',
+			installerRestart: 'Close the application and open it again.',
+			toastSaveFailed: 'The file could not be saved.',
+			toastSaveCancelled: 'Save cancelled.',
+			toastError: 'Something went wrong.'
+		}
 	}
 };
