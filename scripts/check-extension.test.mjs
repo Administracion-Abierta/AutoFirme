@@ -29,6 +29,8 @@ for (const entry of [
   ['accepts features in reachable app import', { 'assets/entry.js': 'import "./app.js";', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
   ['accepts features in reachable dynamic import', { 'assets/entry.js': 'import("./app.js");', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
   ['accepts features in re-exported chunk', { 'assets/entry.js': 'export * from "./app.js";', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
+  ['accepts a no-substitution template dynamic import', { 'assets/entry.js': 'import(`./app.js`);', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
+  ['rejects a computed dynamic import', { 'assets/entry.js': 'import(`./${name}.js`);', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, 'nonliteral dynamic module dependency'],
   ['rejects missing reachable chunk', { 'assets/app.js': 'import "./missing.js";' }, 'ENOENT'],
   ['rejects inline bootstrap', { 'index.html': '<script>mountApp()</script>' }, 'inline executable script'],
   ['rejects eval', { 'assets/app.js': 'eval("remote")' }, 'dynamic code execution'],

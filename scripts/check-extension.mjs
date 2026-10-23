@@ -57,6 +57,9 @@ function localModule(specifier, importer) {
   assert.ok(filename.startsWith(`${root}${path.sep}`), 'application module escapes package');
   return filename;
 }
+/** Vite rewrites `import('x')` into `import(\`x\`)` for its preload helper; a substitution-free template is as static as a string. */
+const literalText = (node) => (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) ? node.text : null);
+
 async function visitModule(filename) {
   if (reachable.has(filename)) return;
   const source = await readFile(filename, 'utf8');
@@ -66,11 +69,13 @@ async function visitModule(filename) {
   const imports = [];
   function visit(node) {
     if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier) {
-      assert.ok(ts.isStringLiteral(node.moduleSpecifier), 'nonliteral module dependency');
-      imports.push(node.moduleSpecifier.text);
+      const specifier = literalText(node.moduleSpecifier);
+      assert.ok(specifier !== null, 'nonliteral module dependency');
+      imports.push(specifier);
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-      assert.ok(node.arguments.length > 0 && ts.isStringLiteral(node.arguments[0]), 'nonliteral dynamic module dependency');
-      imports.push(node.arguments[0].text);
+      const specifier = node.arguments.length > 0 ? literalText(node.arguments[0]) : null;
+      assert.ok(specifier !== null, 'nonliteral dynamic module dependency');
+      imports.push(specifier);
     }
     ts.forEachChild(node, visit);
   }
