@@ -16,17 +16,22 @@ implementation must preserve.
 
 Planned: `axum` on `127.0.0.1` with a per-install self-signed cert added to the
 OS trust store at install time; speaks protocol 3 (legacy socket) and protocol 4
-(modern sedes); `demo/registradores.mjs` is the conformance fixture set. Today the
-same portal calls are answered by the extension bridge (`extension/core/`), which
-is the reference implementation of the consent gate below.
+(modern sedes); `demo/registradores.mjs` is the fixture set to grow into protocol
+3/4 conformance (roadmap §5.2). Today the same portal calls are answered by the
+extension bridge (`extension/core/`), the reference implementation of the
+consent gate below.
 
 ### Entry points
 
 - `afirma://` deep-link intents (protocol 3+4 byte format is the contract).
 - TLS loopback socket on `127.0.0.1` (real AutoFirma used port 63117; exact port
   is an implementation detail, the loopback bind is not).
-- `demo/registradores.mjs` payload shapes (`CAdEStri` pre-sign/post-sign with
-  `serverUrl`, `mode=implicit|explicit`).
+- Portal call shapes the extension already answers: `sign` with `mode=implicit`
+  or `mode=explicit` (`extension/core/contract.js`), and the `CAdEStri`
+  pre-sign/post-sign variant with a page-supplied `serverUrl`
+  (`src/lib/extension/triphase.ts`). The demo driver
+  (`demo/registradores.mjs`) exercises plain `AutoScript.sign` with
+  `mode=explicit` against the live registradores test page — not the tri-phase pair.
 
 ### Trust boundary
 
@@ -65,8 +70,10 @@ lateral movement through this surface beyond what each call authorises.
 `RequestState.finish('result')` from `waiting` returns `false`, so no code path
 can produce a signature without passing through `start()` (the confirmation
 click) first. The companion cases pin that `fallback` after signing starts is
-refused (no double signature via replay) and that an unbound sender cannot act
-for the chooser. Existing suites already prove the same gate end to end
+refused (no double signature via replay) and that a completed request stays
+terminal (no second signature from a replayed `begin`). Sender binding is
+covered where the sender exists: `bridge.test.js` — "chooser authorization binds
+exact own URL, request and recorded tab" — and the end-to-end suite
 (`background.test.js`: "begin gates completion…", stale/cached-document
 rejections).
 
@@ -81,8 +88,9 @@ compare; no token configured → the entry refuses to start (fail closed, `503`)
 
 - `POST /mcp` — the only routed path; anything else is `404`.
 - `Upgrade /bridge` (WebSocket, same token in query string, subprotocol
-  `autofirme-bridge.v1`) — the extension bridge; covered in §3 for its consent
-  properties, here as an endpoint that shares the token.
+  `autofirme-bridge.v1`) — the extension bridge; its consent properties are
+  pinned in the consent-gate test below, here it is an endpoint that shares the
+  token.
 - Tools reachable through it: `autofirma_sign`, `autofirma_verify`,
   `autofirma_list_certs` (same registrations as stdio, `mcp/src/surface.ts`).
 
