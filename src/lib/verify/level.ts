@@ -18,8 +18,9 @@
  *   attribute, the XAdES `ArchiveTimeStamp` element, a PAdES `DocTimeStamp`. A lone
  *   signature timestamp never implies LTA.
  *
- * `ponytail:` the XAdES refs/archive tokens are presence-checked, not re-validated —
- * `verifyXades` has no reader for them yet; #142 (P4.8) owns that when it mints X/LTA.
+ * `ponytail:` the XAdES refs/archive elements and the PAdES DSS/DocTimeStamp markers are read
+ * from real structure (parsed infoset, PDF object bodies), but their tokens are presence-checked,
+ * not re-validated — no reader for them exists here yet; #142 (P4.8) owns that when it mints X/LTA.
  */
 
 import { parseCms } from './cms';
@@ -95,25 +96,61 @@ function cadesEvidence(cms: Bytes, checks: Check[]): LevelEvidence {
 	};
 }
 
-/** The long-form XAdES elements that carry X-level validation data or archive evidence. */
-function elementPresent(text: string, localName: string): boolean {
-	return new RegExp(`<(?:[\\w-]+:)?${localName}[\\s>/]`).test(text);
+/** The XAdES namespace every long-form element below must bind to. */
+const XADES_NS = 'http://uri.etsi.org/01903';
+
+/**
+ * The XAdES element names actually parsed out of the document. Reading the text instead
+ * (regex over the raw bytes) also matches markup quoted inside comments, CDATA, signed
+ * `xades:Object` content and attribute values — text anyone can write into a plain
+ * XAdES-BES artifact, which would then be reported XL.
+ */
+function xadesElements(xml: Bytes): string[] {
+	const document = new DOMParser().parseFromString(
+		new TextDecoder('utf-8', { fatal: false }).decode(xml),
+		'application/xml'
+	);
+	if (document.getElementsByTagName('parsererror').length > 0) throw new Error('malformed XML');
+	return Array.from(document.getElementsByTagName('*'))
+		.filter((element) => (element.namespaceURI ?? '').startsWith(XADES_NS))
+		.map((element) => element.localName);
 }
 
 function xadesEvidence(xml: Bytes, checks: Check[]): LevelEvidence {
 	const { signature } = verifiedTimestamps(checks);
-	const text = new TextDecoder('utf-8', { fatal: false }).decode(xml);
-	const completeRefs =
-		elementPresent(text, 'CompleteCertificateRefs') && elementPresent(text, 'CompleteRevocationRefs');
+	const elements = xadesElements(xml);
+	const has = (localName: string): boolean => elements.includes(localName);
+	const completeRefs = has('CompleteCertificateRefs') && has('CompleteRevocationRefs');
 	// The refs timestamp is what turns CAdES-C-shaped data into X Long: presence only, because
 	// no reader for its token exists here yet (see the file header).
-	const refsTimestamp = elementPresent(text, 'SigAndRefsTimeStamp') || elementPresent(text, 'RefsOnlyTimeStamp');
+	const refsTimestamp = has('SigAndRefsTimeStamp') || has('RefsOnlyTimeStamp');
 	return {
 		structureOk: structureOk(checks),
 		signatureTimestampVerified: signature,
 		xLevelAttested: completeRefs && refsTimestamp,
-		archivePresent: elementPresent(text, 'ArchiveTimeStamp')
+		archivePresent: has('ArchiveTimeStamp')
 	};
+}
+
+/**
+ * The `N G obj … endobj` bodies up to the last `%%EOF`, with `%` comments removed. A PDF's real
+ * structure lives there; a comment or bytes appended after the final `%%EOF` are free text
+ * (outside every revision), and matching them would let a plain B-B document claim XL/LTA.
+ */
+function pdfObjectBodies(pdf: Bytes): string {
+	const text = new TextDecoder('utf-8', { fatal: false }).decode(pdf);
+	const eof = text.lastIndexOf('%%EOF');
+	const document = eof < 0 ? text : text.slice(0, eof);
+	const header = /\d+\s+\d+\s+obj(?![a-z])/g;
+	const bodies: string[] = [];
+	for (let match = header.exec(document); match; match = header.exec(document)) {
+		const end = document.indexOf('endobj', header.lastIndex);
+		if (end < 0) break; // a truncated tail is not structure: claim nothing from it
+		bodies.push(document.slice(header.lastIndex, end));
+		header.lastIndex = end;
+	}
+	// A `%` runs a comment to the end of its line (ISO 32000-1 §7.2.4).
+	return bodies.join('\n').replace(/%.*$/gm, '');
 }
 
 function padesEvidence(pdf: Bytes, checks: Check[]): LevelEvidence {
@@ -121,18 +158,17 @@ function padesEvidence(pdf: Bytes, checks: Check[]): LevelEvidence {
 	let cmsRefs = false;
 	let cmsArchive = false;
 	for (const embedded of extractPadesSignatures(pdf)) {
-		// A `/DocTimeStamp` dictionary holds a bare RFC 3161 token, not CMS `SignedData`;
-		// `unsignedOids` returns null for it and the byte scan below sees it instead.
 		const unsigned = unsignedOids(embedded.cms) ?? [];
 		cmsRefs =
 			cmsRefs ||
 			(unsigned.includes(OID_COMPLETE_CERTIFICATE_REFS) && unsigned.includes(OID_COMPLETE_REVOCATION_REFS));
 		cmsArchive = cmsArchive || unsigned.includes(OID_ARCHIVE_TIMESTAMP);
 	}
-	// Lossy decode is fine: every marker below is pure ASCII and survives replacement.
-	const text = new TextDecoder('utf-8', { fatal: false }).decode(pdf);
-	const dss = /\/DSS\s+(\d+\s+\d+\s+R|<<)/.test(text);
-	const docTimestamp = /\/DocTimeStamp|\/ETSI\.RFC3161/.test(text);
+	// A `/Type /DocTimeStamp` dictionary holds a bare RFC 3161 token, not CMS `SignedData`;
+	// `unsignedOids` returns null for that CMS, so the object scan below is its only evidence.
+	const bodies = pdfObjectBodies(pdf);
+	const dss = /\/DSS\s+(\d+\s+\d+\s+R|<<)/.test(bodies);
+	const docTimestamp = /\/Type\s*\/DocTimeStamp(?![a-zA-Z])/.test(bodies);
 	return {
 		structureOk: structureOk(checks),
 		signatureTimestampVerified: signature,

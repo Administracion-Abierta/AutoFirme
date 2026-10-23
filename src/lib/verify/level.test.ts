@@ -54,7 +54,8 @@ describe('detectLevel on shipped fixtures', () => {
 			['pades-b-b-signed.pdf', 'pdf']
 		] as const) {
 			const bytes = read(fixtures, name);
-			// No DOM in this environment is fine: the level input is the bytes, not the report.
+			// The level input is the bytes, not the report; the DOM here is the one `verifyXades`
+			// itself needs to parse XML (a no-DOM environment fails structure first, never guesses).
 			expect(detectLevel(format, bytes, [{ id: 'structure', status: 'pass', detail: '' }])).toBe('B');
 		}
 	});
@@ -84,21 +85,62 @@ describe('detectLevel on shipped fixtures', () => {
 	});
 });
 
+describe('XAdES evidence is element-based, not text-based', () => {
+	const enc = new TextEncoder();
+	const structure: Check[] = [{ id: 'structure', status: 'pass', detail: '' }];
+	const bes = readFileSync(evidence + 'xades-bes.xsig', 'utf8');
+	const refs =
+		'<xades:CompleteCertificateRefs/><xades:CompleteRevocationRefs/><xades:SigAndRefsTimeStamp/>';
+	const inject = (markup: string): Bytes => enc.encode(bes.replace('<documento>', '<documento>' + markup));
+
+	it.each([
+		['a comment', `<!-- ${refs} -->`],
+		['CDATA', `<![CDATA[${refs}]]>`],
+		['a processing instruction', `<?x ${refs} ?>`],
+		['a foreign namespace', `<x:CompleteCertificateRefs xmlns:x="http://example.com/x"/>`]
+	])('ignores X-level markup hidden in %s', (_where, markup) => {
+		expect(detectLevel('xades', inject(markup), structure)).toBe('B');
+	});
+
+	it('still reads XL from real XAdES refs elements', () => {
+		const real = `<xades:UnsignedProperties xmlns:xades="http://uri.etsi.org/01903"><xades:UnsignedSignatureProperties>${refs}</xades:UnsignedSignatureProperties></xades:UnsignedProperties>`;
+		expect(detectLevel('xades', inject(real), structure)).toBe('XL');
+	});
+});
+
 describe('PAdES X-level attestation', () => {
 	const enc = new TextEncoder();
 	const structure: Check[] = [{ id: 'structure', status: 'pass', detail: '' }];
-	const dssPdf = enc.encode('%PDF-1.7\n1 0 obj << /Type /Catalog /DSS 5 0 R >>\n%%EOF\n');
+	const timestamped: Check[] = [
+		...structure,
+		{ id: 'timestamp', status: 'pass', detail: 'covers the signature value' }
+	];
+	const body = (dictionary: string): Bytes =>
+		enc.encode(`%PDF-1.7\n1 0 obj\n<< ${dictionary} >>\nendobj\n%%EOF\n`);
 
 	it('does not read a bare DSS dictionary as XL', () => {
 		// LTV data with nothing attesting it is CAdES-C-shaped, not XL (header rule).
-		expect(detectLevel('pdf', dssPdf, structure)).toBe('B');
+		expect(detectLevel('pdf', body('/Type /Catalog /DSS 5 0 R'), structure)).toBe('B');
 	});
 
 	it('reads XL only once a timestamp attests the DSS', () => {
-		const timestamped: Check[] = [
-			...structure,
-			{ id: 'timestamp', status: 'pass', detail: 'covers the signature value' }
-		];
-		expect(detectLevel('pdf', dssPdf, timestamped)).toBe('XL');
+		expect(detectLevel('pdf', body('/Type /Catalog /DSS 5 0 R'), timestamped)).toBe('XL');
+	});
+
+	it('reads LTA from a real DocTimeStamp dictionary', () => {
+		expect(detectLevel('pdf', body('/Type /DocTimeStamp /SubFilter /ETSI.RFC3161'), timestamped)).toBe('LTA');
+	});
+
+	it('ignores X-level markup that is not PDF structure', () => {
+		// A `%` comment inside an object and bytes appended after the last `%%EOF` are not
+		// structure, so neither may promote the level (pre-fix both forged XL/LTA).
+		const commented = '%PDF-1.7\n1 0 obj\n<< /Type /Catalog % /DSS 5 0 R /DocTimeStamp\n>>\nendobj\n%%EOF\n';
+		// The commented-out markers are gone, leaving the attested signature timestamp: T, not LTA.
+		expect(detectLevel('pdf', enc.encode(commented), timestamped)).toBe('T');
+		// A DocTimeStamp object after the final `%%EOF` sits outside every revision: no archive evidence.
+		const appended = enc.encode(
+			'%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF\n2 0 obj\n<< /Type /DocTimeStamp >>\nendobj\n'
+		);
+		expect(detectLevel('pdf', appended, timestamped)).toBe('T');
 	});
 });
