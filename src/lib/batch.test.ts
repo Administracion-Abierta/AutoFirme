@@ -490,6 +490,35 @@ describe('pre-hashed digest input', () => {
 		expect(verify(signature, contentPath('digest-mode', content), 'digest-mode.csig')).toBeNull();
 	});
 
+	it('produces the same signature as the content path in #lib/cms, so the two cannot drift', async () => {
+		const content = new TextEncoder().encode('mismo documento por las dos vias\n');
+		const digest = await sha256Hex(content);
+		const signingTime = new Date('2026-10-21T00:00:00Z');
+
+		// `signCadesFromDigest` re-assembles the `SignedData` that `#lib/cms` builds, because
+		// `#lib/cms` hashes the content itself and this path only ever has the digest. The two
+		// copies must therefore produce the very same signature: this is the guard that makes a
+		// change in one of them fail loudly instead of silently producing a different structure.
+		const fromDigest = await signCadesFromDigest(certificate, { digest, signingTime });
+		const fromContent = await signCadesDetached(certificate, content, { signingTime });
+
+		expect(
+			fromDigest,
+			'the digest-mode signer has drifted from #lib/cms: the two paths must build the same ' +
+				'SignedData, so whatever changed in #lib/cms has to be mirrored here'
+		).toEqual(fromContent);
+	});
+
+	it('signs a digest with an EC key too (the raw r||s re-encoded as a DER SEQUENCE)', async () => {
+		const { signer } = await loadSignerSession(fixtures.ecP12, FIXTURE_PIN);
+		const content = new TextEncoder().encode('documento con clave EC\n');
+		const digest = await sha256Hex(content);
+		const signature = await signCadesFromDigest(signer, { digest });
+
+		expect(signer.algorithm?.name).toBe('ECDSA');
+		expect(verify(signature, contentPath('digest-mode-ec', content), 'digest-mode-ec.csig')).toBeNull();
+	});
+
 	it('accepts the raw 32-byte digest and rejects a malformed one', async () => {
 		const content = new TextEncoder().encode('otro documento\n');
 		const hex = await sha256Hex(content);
