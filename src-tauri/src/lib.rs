@@ -1,4 +1,5 @@
 mod atomic_write;
+mod net;
 
 // P1.4a PC/SC + OpenSC PKCS#11 layer (Refs #98).
 pub mod smartcard;
@@ -34,8 +35,7 @@ async fn save_file(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![save_file])
+        .invoke_handler(tauri::generate_handler![save_file, net::ocsp::fetch_revocation_bytes])
         // P0.6 smoke (#19): with AUTOFIRME_SMOKE set, print the page the webview finished
         // loading and exit. The CI job runs the production build under `xvfb-run` and
         // asserts on the marker, so a webview that cannot boot fails the build. Silent
