@@ -1,0 +1,54 @@
+{
+	"$comment": [
+		"Known, explained differences between the EU DSS oracle and src/lib/verify (#140).",
+		"An entry is not a skip: the two sides must still differ, and each must sit on the exact",
+		"pair pinned here. Anything else — a new field, a new fixture, a different value on either",
+		"side — fails the job. Regenerate with `node fixtures/dss/oracle.mjs --record`.",
+		"Fields: format, verdict, signedBy, signingTime. Family and verdict vocabularies are",
+		"normalised by the oracle before comparison; DSS-only fields are never compared."
+	],
+	"entries": [
+		{
+			"fixture": "cades-valid.csig",
+			"field": "verdict",
+			"ours": "valid",
+			"dss": "indeterminate",
+			"reason": "Trust anchors differ by construction. The fixture chains to the throwaway test root in test/fixtures/ca, while DSS validates against the EU trusted lists, which have never heard of it, so it stops at INDETERMINATE / NO_CERTIFICATE_CHAIN_FOUND instead of TOTAL_PASSED. DSS reports no cryptographic error for this signature. Same statement as #96 and docs/evidence/issue-125/README.md."
+		},
+		{
+			"fixture": "cades-detached.csig + document.txt",
+			"field": "verdict",
+			"ours": "valid",
+			"dss": "indeterminate",
+			"reason": "Same trust-anchor gap as the attached CAdES fixture: the detached signature is structurally and cryptographically accepted by DSS, only its chain has no EU trusted-list anchor."
+		},
+		{
+			"fixture": "xades-valid.xsig",
+			"field": "verdict",
+			"ours": "valid",
+			"dss": "indeterminate",
+			"reason": "Same trust-anchor gap: DSS reports INDETERMINATE / NO_CERTIFICATE_CHAIN_FOUND because the XAdES signer's chain ends at the repo's test root, not at a list DSS trusts."
+		},
+		{
+			"fixture": "xades-tampered.xsig",
+			"field": "verdict",
+			"ours": "invalid",
+			"dss": "indeterminate",
+			"reason": "Both reject the artifact, for different reasons. We fail the document reference check (the <Importe> text was edited under a stale digest). DSS reports INDETERMINATE / NO_SIGNING_CERTIFICATE_FOUND — the tampering invalidated the SignedProperties digest it needs to identify the signing certificate, so it never reaches a TOTAL_FAILED verdict. Neither verdict is a pass; the disagreement is which check trips first."
+		},
+		{
+			"fixture": "xades-tampered.xsig",
+			"field": "signedBy",
+			"ours": "AutoFirma Web Test Signer",
+			"dss": null,
+			"reason": "Consequence of the entry above: DSS cannot resolve the signing certificate on the tampered XAdES, so it names no signer. We still read the SubjectName out of the SigningCertificate reference and report it. Presentational difference on an artifact both call invalid."
+		},
+		{
+			"fixture": "pades-b-b-signed.pdf",
+			"field": "verdict",
+			"ours": "valid",
+			"dss": "indeterminate",
+			"reason": "Same trust-anchor gap: the PAdES golden's signer is self-signed in the test PKI (it is its own anchor for our tests), so DSS's EU trusted lists cannot anchor it. DSS labels the signature PAdES-BES with no cryptographic error."
+		}
+	]
+}
