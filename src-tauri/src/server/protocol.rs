@@ -226,4 +226,23 @@ mod tests {
         }
         assert!(entries.len() >= 4, "expected at least 4 fixtures");
     }
+
+    #[test]
+    fn malformed_percent_frames_never_panic() {
+        // Regression for commit 11db9df0: the old `&field[index + 1..index + 3]`
+        // str-slice panicked when it ended inside a multibyte char (`%` + one
+        // ASCII byte + `é`); short/trailing `%` must stay panic-free too.
+        for frame in [
+            "afirma://sign?dat=%aé",
+            "afirma://sign?dat=%",
+            "afirma://sign?dat=%zz&v=3",
+            "afirma://sign?dat=é%",
+        ] {
+            let response = handle_frame(frame);
+            assert!(
+                response == "OK" || response.starts_with("SAF_"),
+                "frame {frame:?} gave {response:?}"
+            );
+        }
+    }
 }
