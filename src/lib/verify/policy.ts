@@ -18,6 +18,7 @@
  */
 
 import { children, fromBase64, hex, octets, oid, type Der } from './asn1';
+import { DIGEST_OIDS, DIGEST_URIS } from './digest';
 import type { Bytes } from './types';
 export type Family = 'cades' | 'xades' | 'pades';
 export type PolicyFindingStatus = 'pass' | 'warn' | 'fail' | 'info';
@@ -154,9 +155,21 @@ export function assessPolicyClaim(claim: PolicyClaim): PolicyFinding {
 		} catch {
 			continue;
 		}
-		if (sameBytes(claim.digestValue, expected)) {
-			return { area: 'policy', status: 'pass', detail: `(${claim.family}) policy ${policy.label} — identifier and hash match`, identifier };
+		if (!sameBytes(claim.digestValue, expected)) continue;
+		const declared = claim.digestAlgorithm
+			? (DIGEST_OIDS[claim.digestAlgorithm]?.hash ?? DIGEST_URIS[claim.digestAlgorithm]?.hash ?? claim.digestAlgorithm)
+			: null;
+		const published =
+			DIGEST_OIDS[policy.hashAlgorithm]?.hash ?? DIGEST_URIS[policy.hashAlgorithm]?.hash ?? policy.hashAlgorithm;
+		if (declared !== null && declared !== published) {
+			return {
+				area: 'policy',
+				status: 'warn',
+				detail: `(${claim.family}) policy ${policy.label} digest matches but the declared hash algorithm ${claim.digestAlgorithm} is not the published ${policy.hashAlgorithm} — the claim is inconsistent`,
+				identifier
+			};
 		}
+		return { area: 'policy', status: 'pass', detail: `(${claim.family}) policy ${policy.label} — identifier and hash match`, identifier };
 	}
 	return {
 		area: 'policy',

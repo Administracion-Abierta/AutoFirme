@@ -121,6 +121,31 @@ describe('assessPolicyClaim', () => {
 		expect(assessPolicyClaim({ ...claim, digestValue: nearMiss }).status).toBe('fail');
 	});
 
+	it('warns when the digest matches but the declared algorithm is not the published one', () => {
+		const published = unb64('Ohixl6upD6av8N7pEvDABhEL6hM=');
+		const finding = assessPolicyClaim({
+			identifier: FACTURAE_31_URI,
+			digestAlgorithm: '2.16.840.1.101.3.4.2.1',
+			digestValue: published,
+			implied: false,
+			signed: true,
+			family: 'cades'
+		});
+		expect(finding.status).toBe('warn');
+		expect(finding.identifier).toBe(FACTURAE_31_URI);
+		// XAdES declares the algorithm as a URI; the same digest stays a pass.
+		expect(
+			assessPolicyClaim({
+				identifier: FACTURAE_31_URI,
+				digestAlgorithm: 'http://www.w3.org/2000/09/xmldsig#sha1',
+				digestValue: published,
+				implied: false,
+				signed: true,
+				family: 'xades'
+			}).status
+		).toBe('pass');
+	});
+
 	it('fails a bundled policy whose hash was tampered with', () => {
 		const finding = assessPolicyClaim({
 			identifier: facturae.uri,
