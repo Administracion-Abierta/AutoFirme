@@ -97,7 +97,12 @@ describe('XAdES evidence is element-based, not text-based', () => {
 		['a comment', `<!-- ${refs} -->`],
 		['CDATA', `<![CDATA[${refs}]]>`],
 		['a processing instruction', `<?x ${refs} ?>`],
-		['a foreign namespace', `<x:CompleteCertificateRefs xmlns:x="http://example.com/x"/>`]
+		['a foreign namespace', `<x:CompleteCertificateRefs xmlns:x="http://example.com/x"/>`],
+		// `startsWith` would accept this: the namespace URI must match, not merely be prefixed by it.
+		[
+			'a look-alike namespace',
+			`<xades:UnsignedProperties xmlns:xades="http://uri.etsi.org/01903evil"><xades:UnsignedSignatureProperties>${refs}</xades:UnsignedSignatureProperties></xades:UnsignedProperties>`
+		]
 	])('ignores X-level markup hidden in %s', (_where, markup) => {
 		expect(detectLevel('xades', inject(markup), structure)).toBe('B');
 	});
@@ -105,6 +110,9 @@ describe('XAdES evidence is element-based, not text-based', () => {
 	it('still reads XL from real XAdES refs elements', () => {
 		const real = `<xades:UnsignedProperties xmlns:xades="http://uri.etsi.org/01903"><xades:UnsignedSignatureProperties>${refs}</xades:UnsignedSignatureProperties></xades:UnsignedProperties>`;
 		expect(detectLevel('xades', inject(real), structure)).toBe('XL');
+		// XAdES 1.3.2's namespace URI carries the version; it is the same namespace.
+		const versioned = `<xades:UnsignedProperties xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"><xades:UnsignedSignatureProperties>${refs}</xades:UnsignedSignatureProperties></xades:UnsignedProperties>`;
+		expect(detectLevel('xades', inject(versioned), structure)).toBe('XL');
 	});
 });
 

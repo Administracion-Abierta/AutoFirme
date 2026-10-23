@@ -96,8 +96,12 @@ function cadesEvidence(cms: Bytes, checks: Check[]): LevelEvidence {
 	};
 }
 
-/** The XAdES namespace every long-form element below must bind to. */
-const XADES_NS = 'http://uri.etsi.org/01903';
+/**
+ * The XAdES namespaces (XAdES 1.1.1-1.4.1 carry the version in the URI) every long-form
+ * element below must bind to *exactly*. A prefix test would also accept anyone's
+ * `http://uri.etsi.org/01903evil`, which is not XAdES at all.
+ */
+const XADES_NS = /^http:\/\/uri\.etsi\.org\/01903(?:\/v\d+(?:\.\d+)*)?#?$/;
 
 /**
  * The XAdES element names actually parsed out of the document. Reading the text instead
@@ -112,7 +116,7 @@ function xadesElements(xml: Bytes): string[] {
 	);
 	if (document.getElementsByTagName('parsererror').length > 0) throw new Error('malformed XML');
 	return Array.from(document.getElementsByTagName('*'))
-		.filter((element) => (element.namespaceURI ?? '').startsWith(XADES_NS))
+		.filter((element) => XADES_NS.test(element.namespaceURI ?? ''))
 		.map((element) => element.localName);
 }
 
