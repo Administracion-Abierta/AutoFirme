@@ -20,6 +20,7 @@ use std::time::Duration;
 
 use quinn::{ClientConfig, Endpoint, ServerConfig};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+use rustls::crypto::WebPkiSupportedAlgorithms;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, UnixTime};
 use rustls::{DigitallySignedStruct, DistinguishedName, Error as TlsError, SignatureScheme};
 
@@ -123,6 +124,9 @@ fn server_config(cert_der: &[u8], key_der: &[u8]) -> Result<ServerConfig, Transp
 #[derive(Debug)]
 struct PinVerifier {
     expected: Fingerprint,
+    /// Signature schemes the pin will accept; same set used to verify the
+    /// handshake signature below.
+    supported: WebPkiSupportedAlgorithms,
 }
 
 impl ServerCertVerifier for PinVerifier {
@@ -152,28 +156,20 @@ impl ServerCertVerifier for PinVerifier {
 
     fn verify_tls13_signature(
         &self,
-        _message: &[u8],
-        _cert: &CertificateDer<'_>,
-        _dss: &DigitallySignedStruct,
+        message: &[u8],
+        cert: &CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, TlsError> {
-        // Trust comes from the pin in `verify_server_cert` (sha256 of the
-        // DER), not from this signature. The signature only proves possession
-        // of the private key matching the presented cert; an attacker serving
-        // the victim's cert with their own key never gets here — rustls
-        // rejects the mismatched pair at server-build time with
-        // `InconsistentKeys(KeyMismatch)` (pinned by `mitm_without_key_fails`
-        // below constructing exactly that pair). Accept the bytes as presented.
-        Ok(HandshakeSignatureValid::assertion())
+        // Trust in *who* we talk to comes from the pin above (sha256 of the
+        // DER). The handshake signature is still verified: without it, an
+        // attacker that serves the victim's cert DER with a key of their own
+        // (`CertifiedKey::new` + `with_cert_resolver` skips rustls'
+        // `InconsistentKeys` check) would pass the pin and read the payload.
+        rustls::crypto::verify_tls13_signature(message, cert, dss, &self.supported)
     }
 
     fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
-        vec![
-            SignatureScheme::ECDSA_NISTP256_SHA256,
-            SignatureScheme::ECDSA_NISTP384_SHA384,
-            SignatureScheme::ED25519,
-            SignatureScheme::RSA_PSS_SHA256,
-            SignatureScheme::RSA_PKCS1_SHA256,
-        ]
+        self.supported.supported_schemes()
     }
 
     fn root_hint_subjects(&self) -> Option<&[DistinguishedName]> {
@@ -183,9 +179,13 @@ impl ServerCertVerifier for PinVerifier {
 
 fn client_config(expected: Fingerprint) -> Result<ClientConfig, TransportError> {
     ensure_provider();
+    let supported = rustls::crypto::ring::default_provider().signature_verification_algorithms;
     let mut tls = rustls::ClientConfig::builder()
         .dangerous()
-        .with_custom_certificate_verifier(Arc::new(PinVerifier { expected }))
+        .with_custom_certificate_verifier(Arc::new(PinVerifier {
+            expected,
+            supported,
+        }))
         .with_no_client_auth();
     tls.alpn_protocols = vec![ALPN.to_vec()];
     Ok(ClientConfig::new(Arc::new(
@@ -597,14 +597,83 @@ mod tests {
 
     #[test]
     fn mitm_without_key_fails_at_server_build() {
-        // Attacker serves the victim's cert DER with their own key: rustls
-        // must reject the mismatched pair before any handshake, so the
-        // `verify_tls13_signature` accept-bytes path is unreachable to a
-        // keyless impersonator (review #110).
+        // Attacker serves the victim's cert DER with their own key through
+        // the ordinary `with_single_cert` path: rustls rejects the mismatched
+        // pair before any handshake with `InconsistentKeys(KeyMismatch)`.
+        // The resolver path that bypasses this check is covered by
+        // `cert_resolver_impersonation_rejected_at_handshake` (review #110).
         let victim = Identity::generate("victim").expect("victim");
         let attacker = Identity::generate("attacker").expect("attacker");
         let err = server_config(&victim.cert_der, &attacker.key_der)
             .expect_err("mismatched key must fail");
         assert!(matches!(err, TransportError::Tls(_)), "wrong error kind: {err:?}");
+    }
+
+    #[test]
+    fn cert_resolver_impersonation_rejected_at_handshake() {
+        // `CertifiedKey::new` + `with_cert_resolver` skips rustls'
+        // `InconsistentKeys` check, so an attacker can serve the victim's
+        // cert DER with a key of their own, and the sha256 pin accepts it.
+        // The TLS 1.3 handshake-signature check is what stops the
+        // impersonation (review #110).
+        #[derive(Debug)]
+        struct Evil(Arc<rustls::sign::CertifiedKey>);
+        impl rustls::server::ResolvesServerCert for Evil {
+            fn resolve(
+                &self,
+                _hello: rustls::server::ClientHello<'_>,
+            ) -> Option<Arc<rustls::sign::CertifiedKey>> {
+                Some(self.0.clone())
+            }
+        }
+
+        test_runtime().block_on(async {
+            let victim = Identity::generate("victim").expect("victim");
+            let attacker = Identity::generate("attacker").expect("attacker");
+            let victim_fp = victim.fingerprint;
+
+            let provider = rustls::crypto::ring::default_provider();
+            let _ = provider.clone().install_default();
+            let cert = CertificateDer::from(victim.cert_der.clone());
+            let key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(attacker.key_der.clone()));
+            let signing_key = provider
+                .key_provider
+                .load_private_key(key)
+                .expect("attacker key");
+            let certified = rustls::sign::CertifiedKey::new(vec![cert], signing_key);
+            let mut tls = rustls::ServerConfig::builder_with_provider(Arc::new(provider))
+                .with_safe_default_protocol_versions()
+                .expect("protocol versions")
+                .with_no_client_auth()
+                .with_cert_resolver(Arc::new(Evil(Arc::new(certified))));
+            tls.alpn_protocols = vec![ALPN.to_vec()];
+            let attacker_config = ServerConfig::with_crypto(Arc::new(
+                quinn::crypto::rustls::QuicServerConfig::try_from(tls)
+                    .expect("quic server config"),
+            ));
+            let bind: SocketAddr = "127.0.0.1:0".parse().expect("loopback");
+            let endpoint = Endpoint::server(attacker_config, bind).expect("attacker endpoint");
+            let attacker_addr = endpoint.local_addr().expect("addr");
+            let attacker_task = tokio::spawn(async move {
+                let connecting = endpoint.accept().await.expect("accept");
+                let _ = connecting.await;
+            });
+
+            let client = Transport::bind(bind, &victim).expect("client bind");
+            let sent = client
+                .send(
+                    attacker_addr,
+                    victim_fp,
+                    b"SECRET",
+                    Duration::from_secs(10),
+                    &Cancel::new(),
+                )
+                .await;
+            assert!(
+                sent.is_err(),
+                "impersonation must be rejected, got {sent:?}"
+            );
+            let _ = attacker_task.await;
+        });
     }
 }
