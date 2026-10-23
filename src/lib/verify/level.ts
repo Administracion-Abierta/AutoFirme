@@ -8,11 +8,12 @@
  * Levels come from evidence actually present, never from inference:
  * - `T` needs a timestamp over the signature value that *verified* (CAdES-T token,
  *   XAdES `SignatureTimeStamp` over `ds:SignatureValue`).
- * - `XL` needs the X-level validation data *and* a timestamp attesting it: complete
- *   certificate + revocation refs covered by an X-level timestamp (CAdES), the
- *   `Complete*Refs` elements alongside a `SigAndRefsTimeStamp`/`RefsOnlyTimeStamp`
- *   (XAdES), the document security store (PAdES). Refs present with no attestation is
- *   `CAdES-C`, not `XL` — the #125 `cades-xlong2-oldoid.p7s` control is the proof.
+- `XL` needs the X-level validation data *and* a timestamp attesting it: complete
+  certificate + revocation refs covered by an X-level timestamp (CAdES), the
+  `Complete*Refs` elements alongside a `SigAndRefsTimeStamp`/`RefsOnlyTimeStamp`
+  (XAdES), a PDF document security store (`/DSS`) under a verified signature or
+  document timestamp. Validation data present with no attestation is `CAdES-C`, not
+  `XL` — the #125 `cades-xlong2-oldoid.p7s` control is the proof.
  * - `LTA` needs archive evidence on top of a verified base: the CAdES archive-timestamp
  *   attribute, the XAdES `ArchiveTimeStamp` element, a PAdES `DocTimeStamp`. A lone
  *   signature timestamp never implies LTA.
@@ -135,7 +136,9 @@ function padesEvidence(pdf: Bytes, checks: Check[]): LevelEvidence {
 	return {
 		structureOk: structureOk(checks),
 		signatureTimestampVerified: signature,
-		xLevelAttested: dss || (cmsRefs && refs),
+		// B-LT is cumulative on B-T (EN 319 142-1 §6): a DSS dictionary is LTV *data*, so it only
+		// carries XL when the timestamp beneath it is there too — a bare `/DSS` is CAdES-C-shaped.
+		xLevelAttested: (cmsRefs && refs) || (dss && (signature || docTimestamp)),
 		archivePresent: docTimestamp || cmsArchive
 	};
 }

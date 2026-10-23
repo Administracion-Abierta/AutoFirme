@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { verifyArtifact } from './index';
 import { detectLevel, levelFromEvidence, type LevelEvidence } from './level';
-import type { Bytes } from './types';
+import type { Bytes, Check } from './types';
 
 const fixtures = resolve(process.cwd(), 'test/fixtures') + '/';
 const evidence = resolve(process.cwd(), 'docs/evidence/issue-125') + '/';
@@ -81,5 +81,24 @@ describe('detectLevel on shipped fixtures', () => {
 		// The pre-fix X Long control carries refs DSS could not read as CAdES-X: not XL by refs alone.
 		const oldoid = read(evidence, 'cades-xlong2-oldoid.p7s');
 		expect(detectLevel('cades', oldoid, [{ id: 'timestamp', status: 'fail', detail: 'mismatch' }])).not.toBe('XL');
+	});
+});
+
+describe('PAdES X-level attestation', () => {
+	const enc = new TextEncoder();
+	const structure: Check[] = [{ id: 'structure', status: 'pass', detail: '' }];
+	const dssPdf = enc.encode('%PDF-1.7\n1 0 obj << /Type /Catalog /DSS 5 0 R >>\n%%EOF\n');
+
+	it('does not read a bare DSS dictionary as XL', () => {
+		// LTV data with nothing attesting it is CAdES-C-shaped, not XL (header rule).
+		expect(detectLevel('pdf', dssPdf, structure)).toBe('B');
+	});
+
+	it('reads XL only once a timestamp attests the DSS', () => {
+		const timestamped: Check[] = [
+			...structure,
+			{ id: 'timestamp', status: 'pass', detail: 'covers the signature value' }
+		];
+		expect(detectLevel('pdf', dssPdf, timestamped)).toBe('XL');
 	});
 });
