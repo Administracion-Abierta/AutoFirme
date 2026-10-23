@@ -268,8 +268,7 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 	<ds:KeyInfo Id="${ids.keyInfo}">
 		<ds:X509Data>${chain.map((certificate) => `<ds:X509Certificate>${toBase64(certificate.der)}</ds:X509Certificate>`).join('')}</ds:X509Data>
 	</ds:KeyInfo>
-	${reference.type === 'enveloping' ? `<ds:Object Id="${objectId}"/>` : ''}
-	<ds:Object>
+	${reference.type === 'enveloping' ? `<ds:Object Id="${objectId}"/>\n\t` : ''}<ds:Object>
 		<xades:QualifyingProperties xmlns:xades="${XADES}" Target="#${ids.signature}">
 			<xades:SignedProperties Id="${ids.signedProperties}">
 				<xades:SignedSignatureProperties>

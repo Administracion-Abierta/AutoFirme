@@ -103,6 +103,9 @@ describe('signXmldsig', () => {
 			'http://www.w3.org/2001/10/xml-exc-c14n#'
 		]);
 		expect(root.getElementsByTagNameNS('http://uri.etsi.org/01903/v1.3.2#', 'QualifyingProperties')).toHaveLength(0);
+		// The enveloping-only `ds:Object` slot must leave no whitespace when empty.
+		expect(signed).toContain('</ds:KeyInfo>\n</ds:Signature>');
+
 		const path = writeFixtureFile(fixtures.dir, 'plain-enveloped.xml', encoder.encode(signed));
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
 		verifySignedInfo(signed, 'plain-enveloped');

@@ -114,6 +114,13 @@ describe('signXades', () => {
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('FAIL');
 	});
 
+	it('emits the enveloped body without the enveloping-only slot whitespace', () => {
+		// The enveloping data slot is interpolated before `<ds:Object>`; empty, it used to leave a
+		// stray tab + newline between `ds:KeyInfo` and the QualifyingProperties object.
+		expect(signed).toContain('</ds:KeyInfo>\n\t<ds:Object>');
+		expect(signed).not.toContain('</ds:KeyInfo>\n\t\n');
+	});
+
 	it('signs SHA1withRSA XAdES for legacy portals', async () => {
 		const sha1Signed = await signXades({
 			xml: SAMPLE,

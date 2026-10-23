@@ -178,8 +178,7 @@ export async function signXmldsig(options: XmldsigSignatureOptions): Promise<str
 	<ds:KeyInfo Id="${ids.keyInfo}">
 		<ds:X509Data>${chain.map((certificate) => `<ds:X509Certificate>${toBase64(certificate.der)}</ds:X509Certificate>`).join('')}</ds:X509Data>
 	</ds:KeyInfo>
-	${reference.type === 'enveloping' ? `<ds:Object Id="${objectId}"/>` : ''}
-</ds:Signature>`;
+${reference.type === 'enveloping' ? `\t<ds:Object Id="${objectId}"/>\n` : ''}</ds:Signature>`;
 
 	const setDigest = (doc: Document, referenceId: string, value: Bytes) => {
 		byId(doc, referenceId).getElementsByTagNameNS(DS, 'DigestValue')[0].textContent = toBase64(value);
