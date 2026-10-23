@@ -45,20 +45,36 @@ const usage = (code) => {
 	process.exit(code);
 };
 
-/** Sorted recursive walk: codepoint order at every level, files only, paths relative to `root`. */
+/**
+ * Sorted recursive walk: codepoint order at every level, paths relative to `root`. An entry the walk
+ * cannot reach — a dangling symlink, an unreadable file or directory — is still returned, so the
+ * signing loop records the loss as its row's `ERROR_PRE` instead of the whole batch aborting.
+ */
 function walk(root) {
 	const found = [];
 	const visit = (dir) => {
-		for (const entry of readdirSync(dir).sort()) {
+		let entries;
+		try {
+			entries = readdirSync(dir).sort();
+		} catch {
+			found.push(relative(root, dir));
+			return;
+		}
+		for (const entry of entries) {
 			const path = join(dir, entry);
-			if (statSync(path).isDirectory()) visit(path);
+			let directory = false;
+			try {
+				directory = statSync(path).isDirectory();
+			} catch {
+				// Unreachable entry: keep the name so the loop reports it and the batch carries on.
+			}
+			if (directory) visit(path);
 			else found.push(relative(root, path));
 		}
 	};
 	visit(root);
 	return found;
 }
-
 async function ensureDom() {
 	if (globalThis.DOMParser && globalThis.XMLSerializer) return;
 	// jsdom is already a devDependency (vitest); the XAdES engine needs a DOMParser, which Node
@@ -145,8 +161,6 @@ async function main() {
 		/** @type {import('../src/lib/batch.ts').BatchDocument} */
 		const document = {
 			id: String(index + 1),
-			// Placeholder: never read — the CLI hashes and signs from `bytes` below, one file at
-			// a time, so 500 files never sit in memory together the way queue.set(File[]) would.
 			file: new File([], rel),
 			format,
 			status: 'pending',

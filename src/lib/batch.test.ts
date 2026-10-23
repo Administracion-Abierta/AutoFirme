@@ -5,9 +5,9 @@
  * archive, by Node's independent CRC-32.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { webcrypto } from 'node:crypto';
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { crc32 as nodeCrc32 } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -27,7 +27,7 @@ import { signCadesDetached } from './cms';
 import { loadSignerSession } from './keystore';
 import type { SignerCert } from './sign';
 import { signingAlgorithmName } from './sign';
-import { createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../test/fixtures';
+import { createCadesFixtures, FIXTURE_PIN, writeFixtureFile, type CadesFixtures } from '../test/fixtures';
 
 // jsdom's `crypto` only has getRandomValues; the queue's SHA-256 needs SubtleCrypto — the same API
 // browsers expose.
@@ -507,5 +507,43 @@ describe('pre-hashed digest input', () => {
 		await expect(signCadesFromDigest(certificate, { digest: 'zz' })).rejects.toThrow(
 			/64-hex-char/
 		);
+	});
+});
+
+
+describe('batch CLI directory walk', () => {
+	it('records an unreachable entry as ERROR_PRE and keeps signing the rest', () => {
+		const root = join(fixtures.dir, 'cli-walk');
+		const input = join(root, 'in');
+		const output = join(root, 'out');
+		mkdirSync(input, { recursive: true });
+		writeFixtureFile(input, 'a.txt', new TextEncoder().encode('uno'));
+		writeFixtureFile(input, 'z.txt', new TextEncoder().encode('dos'));
+		// A dangling symlink: `statSync` fails, so the walk cannot even classify the entry.
+		symlinkSync(join(input, 'missing.txt'), join(input, 'dangling.txt'));
+		const p12Path = writeFixtureFile(root, 'cert.p12', fixtures.p12);
+
+		const run = spawnSync(
+			process.execPath,
+			[
+				'--import', './scripts/ts-hook.mjs', 'scripts/batch-sign.mjs',
+				'--p12', p12Path, '--out', output, input
+			],
+			{ cwd: process.cwd(), encoding: 'utf8', env: { ...process.env, P12_PIN: FIXTURE_PIN } }
+		);
+
+		// The unreachable entry is a failure row, not the end of the batch: both good files signed
+		// and the run reports failure through its exit code.
+		expect(run.stdout, run.stderr).toContain('signed 2, failed 1');
+		expect(run.status).toBe(1);
+		const manifest = JSON.parse(readFileSync(join(output, 'manifest.json'), 'utf8'));
+		expect(manifest.singlesigns.map((row: { datareference: string; result: string }) => [
+			row.datareference,
+			row.result
+		])).toEqual([
+			['a.txt', 'DONE_AND_SAVED'],
+			['dangling.txt', 'ERROR_PRE'],
+			['z.txt', 'DONE_AND_SAVED']
+		]);
 	});
 });
