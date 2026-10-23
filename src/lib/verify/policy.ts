@@ -81,8 +81,13 @@ export const CADES_COMMITMENTS: Record<string, string> = {
 	'1.2.840.113549.1.9.16.6.5': 'proofOfApproval',
 	'1.2.840.113549.1.9.16.6.6': 'proofOfCreation'
 };
-
 const XADES_NS = 'http://uri.etsi.org/01903';
+
+/** Attribute shape this module needs; structurally compatible with `cms.ts`. */
+export interface AttrLike {
+	type: string;
+	values: Der[];
+}
 
 export interface PolicyClaim {
 	identifier: string | null;

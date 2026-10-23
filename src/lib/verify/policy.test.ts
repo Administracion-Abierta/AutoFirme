@@ -16,9 +16,9 @@ import {
 	extractXadesClaims,
 	FACTURAE_31_URI,
 	OID_COMMITMENT,
-	OID_SIG_POLICY,
-	type Bytes
+	OID_SIG_POLICY
 } from './policy';
+import type { Bytes } from './types';
 
 const facturae = BUNDLED_POLICIES[0];
 
