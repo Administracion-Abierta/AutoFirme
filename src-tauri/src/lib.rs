@@ -2,6 +2,8 @@ mod atomic_write;
 
 // P1.4a PC/SC + OpenSC PKCS#11 layer (Refs #98).
 pub mod smartcard;
+// P6.2 QUIC transport with mDNS discovery (Refs #110).
+pub mod p2p;
 
 use tauri_plugin_dialog::DialogExt;
 
