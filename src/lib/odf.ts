@@ -23,7 +23,7 @@ const SIGNATURES_NS = 'urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.
 const DC_NS = 'http://purl.org/dc/elements/1.1/';
 const C14N = 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
 const SHA256 = 'http://www.w3.org/2001/04/xmlenc#sha256';
-const RSA_SHA256 = 'http://www.w3.org/2000/09/xmldsig#rsa-sha256';
+const RSA_SHA256 = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
 const XADES_SIGNED_PROPERTIES_TYPE = 'http://uri.etsi.org/01903#SignedProperties';
 const SIGNATURES_PATH = 'META-INF/documentsignatures.xml';
 const MANIFEST_PATH = 'META-INF/manifest.xml';
@@ -142,11 +142,19 @@ export async function signOdfPackage(packageBytes: Uint8Array, options: OdfSignO
 
 	const identity = certificateIdentity(certificates[0]);
 	const references = fullPaths
-		.map(
-			(path) =>
-				`<ds:Reference URI="${escapeXml(path.replace(/ /g, '%20'))}"><ds:DigestMethod Algorithm="${SHA256}"/>` +
+		.map((path) => {
+			// XML parts are digested canonicalized, so the reference must declare the
+			// transform a verifier has to apply; binary parts (mimetype) are raw, no transform.
+			const transforms = CANONICALIZED_PARTS[path]
+				? `<ds:Transforms><ds:Transform Algorithm="${C14N}"/></ds:Transforms>`
+				: '';
+			return (
+				`<ds:Reference URI="${escapeXml(path.replace(/ /g, '%20'))}">` +
+				transforms +
+				`<ds:DigestMethod Algorithm="${SHA256}"/>` +
 				`<ds:DigestValue>${digestValues[path]}</ds:DigestValue></ds:Reference>`
-		)
+			);
+		})
 		.join('');
 	// The dc:date property object: 1.9's only `ds:Object`; DSS ignores it, LO keeps it.
 	const dateObject =

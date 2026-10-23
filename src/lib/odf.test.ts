@@ -187,12 +187,23 @@ describe('signOdfPackage', () => {
 				const canonical = canonicalizeBytes(parse(signed.entries[path]).documentElement);
 				const c14nDigest = toBase64(new Uint8Array(await crypto.subtle.digest('SHA-256', canonical as unknown as ArrayBuffer)));
 				expect(ref.getElementsByTagNameNS(DS_NS, 'DigestValue')[0].textContent).toBe(c14nDigest);
+				// The digest is over canonicalized octets, so the reference must say so:
+				// a verifier that applies no transform computes a different digest.
+				expect(
+					ref
+						.getElementsByTagNameNS(DS_NS, 'Transform')[0]
+						?.getAttribute('Algorithm')
+				).toBe('http://www.w3.org/TR/2001/REC-xml-c14n-20010315');
 				expect(expected).not.toBe(c14nDigest); // canonicalization is not the identity
 			} else {
 				expect(ref.getElementsByTagNameNS(DS_NS, 'DigestValue')[0].textContent).toBe(expected);
 			}
 		}
 		const signedInfo = elements(signature, DS_NS, 'SignedInfo')[0];
+		// Nonstandard URIs here are rejected outright by external verifiers (DSS).
+		expect(
+			elements(signedInfo, DS_NS, 'SignatureMethod')[0].getAttribute('Algorithm')
+		).toBe('http://www.w3.org/2001/04/xmldsig-more#rsa-sha256');
 		const signatureValue = fromBase64(
 			elements(signature, DS_NS, 'SignatureValue')[0].textContent ?? ''
 		);
