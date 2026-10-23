@@ -68,7 +68,7 @@ impl std::fmt::Display for Fingerprint {
 const WORDS: [&str; 256] = [
     "alba", "actor", "agua", "aire", "ala", "albor", "altar", "alto", "amigo", "ancla", "andar",
     "angel", "anillo", "arbol", "arco", "arena", "arte", "atlas", "autor", "ave", "avion", "azul",
-    "balsa", "banco", "banda", "barco", "barrio", "base", "bateria", "bend", "blanco", "bloque",
+    "balsa", "banco", "banda", "barco", "barrio", "base", "bateria", "bodega", "blanco", "bloque",
     "boca", "bolsa", "bomba", "borde", "bosque", "boton", "bravo", "brisa", "bronce", "buzon",
     "cable", "cadena", "caja", "calle", "calma", "campo", "canal", "canto", "caoba", "capitan",
     "cara", "carbon", "carga", "carro", "carta", "casa", "casco", "causa", "cedro", "centro",
@@ -86,7 +86,7 @@ const WORDS: [&str; 256] = [
     "magneto", "mango", "manzana", "mapa", "marco", "marea", "margen", "marfil", "mazorca",
     "medalla", "mercado", "mesa", "metal", "mirador", "mitad", "modelo", "molino",
     "montana", "muro", "museo", "nave", "niebla", "nido", "nieve", "nivel", "norte",
-    "nube", "nucleo", "oasis", "ocaso", "oferta", "olivo", "onda", "orilla", "orko",
+    "nube", "nucleo", "oasis", "ocaso", "oferta", "olivo", "onda", "orilla", "orquidea",
     "oveja", "palma", "panel", "papel", "parque", "paso", "patio", "piedra", "pino",
     "pista", "planeta", "plata", "playa", "plaza", "pluma", "polar", "polea", "portal",
     "prado", "presa", "puente", "puerto", "pulso", "punto", "quinta", "radar", "rama",
