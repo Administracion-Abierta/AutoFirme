@@ -25,7 +25,7 @@ const SIGNATURE_ALGORITHM: Record<SigningAlgorithm['name'], Partial<Record<Signi
 		'SHA-1': 'http://www.w3.org/2000/09/xmldsig#rsa-sha1',
 		'SHA-256': 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
 		'SHA-384': 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha384',
-		'SHA-512': 'http://www.w3.org/2001/04/xmlenc#rsa-sha512'
+		'SHA-512': 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha512'
 	},
 	ECDSA: {
 		'SHA-256': 'http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256',

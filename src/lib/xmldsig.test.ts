@@ -203,4 +203,19 @@ describe('signXmldsig', () => {
 			verifySignedInfo(signed, `plain-shared-${shapes.indexOf(signed)}`);
 		}
 	});
+	it('signs SHA-512 with the xmldsig-more RSA URI and xmlsec1 verifies it', async () => {
+		const signed = await signXmldsig({
+			xml: SAMPLE,
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			hash: 'SHA-512'
+		});
+		const root = parse(signed).documentElement;
+		expect(elements(root, DS, 'SignatureMethod')[0].getAttribute('Algorithm')).toBe(
+			'http://www.w3.org/2001/04/xmldsig-more#rsa-sha512'
+		);
+		const path = writeFixtureFile(fixtures.dir, 'plain-sha512.xml', encoder.encode(signed));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+	});
 });
