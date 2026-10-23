@@ -5,6 +5,11 @@ file, not a directory walk — to the EU DSS demo and compares the verdict again
 `src/lib/verify`, field by field. Any difference that `allowlist.json` does not
 pin fails the run; `.github/workflows/verify.yml` runs it on every push to `main`/`develop`.
 
+`--self-check` also guards the corpus itself, offline: every `*.csig`/`*.xsig` in `test/fixtures/`
+must be posted, and every file `CORPUS` names must exist. A new signature fixture, or a rename,
+fails the push even when the endpoint is down — which is the only way the "every fixture" claim
+stays true.
+
 DSS ships no CLI artifact on Maven Central and publishes no Docker image (checked: the
 `eu.europa.ec.joinup.sd-dss` Maven group has no CLI or standalone module, and hub/ghcr/quay have no
 official DSS image — building one from `esig/dss-demonstrations` needs Maven and a Tomcat WAR). The

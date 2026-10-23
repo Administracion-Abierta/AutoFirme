@@ -21,7 +21,7 @@
  *   node fixtures/dss/oracle.mjs             # compare
  *   node fixtures/dss/oracle.mjs --record    # print observed pairs for every difference
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
 import { verifyArtifact } from '../../src/lib/verify/index.ts';
@@ -163,6 +163,27 @@ export function compare(id, mine, theirs, entries) {
 	return { lines, records, failures };
 }
 
+/**
+ * Offline guard on the corpus itself, so the "hand-picked CORPUS" claim cannot rot: every
+ * signature artifact in `test/fixtures/` must be posted (a new `.csig`/`.xsig` can no longer be
+ * skipped silently), and every file CORPUS names must exist (a rename fails here rather than
+ * passing as "DSS unreachable" on the live half). No network.
+ */
+export function corpusProblems(fixtures, corpus) {
+	const problems = [];
+	const referenced = corpus.flatMap((entry) => [entry.signed, entry.detached, entry.roots].filter(Boolean));
+	for (const name of referenced) {
+		if (!existsSync(fixtures + name)) problems.push(`CORPUS names a missing file: ${name}`);
+	}
+	const posted = new Set(corpus.map((entry) => entry.signed));
+	for (const file of readdirSync(fixtures)) {
+		if (/\.(csig|xsig)$/.test(file) && !posted.has(file)) {
+			problems.push(`${file} lives in test/fixtures/ but CORPUS never posts it to DSS`);
+		}
+	}
+	return problems;
+}
+
 if (process.argv.includes('--self-check')) {
 	// Offline proof that the gate bites: disagreeing verdicts fail unless the allowlist pins the
 	// exact pair, and a pin whose observed values moved fails too. Runs before any network call.
@@ -193,6 +214,15 @@ if (process.argv.includes('--self-check')) {
 		if (actual !== expected) throw new Error(`self-check failed: ${name} (${actual} !== ${expected})`);
 		console.log(`ok     self-check: ${name}`);
 	}
+	const corpus = corpusProblems(FIXTURES, CORPUS);
+	if (corpus.length > 0) throw new Error(`self-check failed: corpus\n - ${corpus.join('\n - ')}`);
+	console.log(`ok     self-check: corpus (${CORPUS.length} entries, every signature fixture posted)`);
+	// Proof the guard itself bites: a corpus entry naming a file that is not there must be caught.
+	const drifted = corpusProblems(FIXTURES, [{ id: 'gone', signed: 'gone.csig', roots: 'ca/test-root.crt' }]);
+	if (!drifted.some((problem) => problem.includes('gone.csig'))) {
+		throw new Error(`self-check failed: corpus guard did not catch a missing fixture (${drifted})`);
+	}
+	console.log('ok     self-check: corpus guard catches a phantom fixture');
 	process.exit(0);
 }
 
