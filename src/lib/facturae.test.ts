@@ -36,12 +36,14 @@ const IDS: Partial<XadesIds> = {
 	propertiesReference: 'Reference-Properties-FacturaE'
 };
 
+// Official XSD targetNamespaces: `facturae.gob.es/formato/versiones-anteriores` (3.0, 3.1) and
+// `facturae.gob.es/formato/ultima-version` (3.2, 3.2.1, 3.2.2).
 const SCHEMA_BY_VERSION: Record<FacturaeVersion, string> = {
-	'3.0': 'http://www.facturae.es/Facturae/2009/v3.0/Facturae',
-	'3.1': 'http://www.facturae.es/Facturae/2012/v3.1/Facturae',
-	'3.2': 'http://www.facturae.org/Facturae/2014/v3.2/Facturae',
+	'3.0': 'http://www.facturae.es/Facturae/2007/v3.0/Facturae',
+	'3.1': 'http://www.facturae.es/Facturae/2007/v3.1/Facturae',
+	'3.2': 'http://www.facturae.es/Facturae/2009/v3.2/Facturae',
 	'3.2.1': 'http://www.facturae.es/Facturae/2014/v3.2.1/Facturae',
-	'3.2.2': 'http://www.facturae.org/Facturae/2014/v3.2.2/Facturae'
+	'3.2.2': 'http://www.facturae.gob.es/formato/Versiones/Facturaev3_2_2.xml'
 };
 
 const invoice = (version: FacturaeVersion): string => `<?xml version="1.0" encoding="UTF-8"?>
@@ -102,6 +104,8 @@ describe('facturae presets', () => {
 				ids: IDS
 			});
 			const root = parse(signed).documentElement;
+			// Signing must not rewrite the invoice's root namespace.
+			expect(root.namespaceURI).toBe(parse(invoice(version)).documentElement.namespaceURI);
 			// Version's policy identifier + SHA-1 digest of it.
 			const preset = FACTURAE_PRESETS[version];
 			const identifiers = [...root.getElementsByTagNameNS(XADES, 'Identifier')].map((node) => node.textContent);
