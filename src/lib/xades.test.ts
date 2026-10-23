@@ -7,9 +7,9 @@
  * of the app.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { rmSync } from 'node:fs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
@@ -316,4 +316,125 @@ describe('signXades', () => {
 			rmSync(tsa.dir, { recursive: true, force: true });
 		}
 	});
+});
+
+describe('signXades reference types', () => {
+	let fixtures: Pkcs12Fixtures;
+	let session: SignerSession;
+
+	beforeAll(async () => {
+		fixtures = createPkcs12Fixtures();
+		session = await loadSignerSession(fixtures.modern, FIXTURE_PIN);
+	});
+
+	function verifySignedInfo(signed: string, name: string): void {
+		const root = parse(signed).documentElement;
+		const signedInfo = canonicalize(elements(root, DS, 'SignedInfo')[0], { exclusive: true });
+		const signature = Buffer.from(elements(root, DS, 'SignatureValue')[0].textContent!, 'base64');
+		const signedInfoPath = writeFixtureFile(fixtures.dir, `${name}.signedinfo`, new Uint8Array(signedInfo));
+		const signaturePath = writeFixtureFile(fixtures.dir, `${name}.sig`, new Uint8Array(signature));
+		const output = execFileSync(
+			'openssl',
+			['dgst', '-sha256', '-verify', join(fixtures.dir, 'leaf.pub.pem'), '-signature', signaturePath, signedInfoPath],
+			{ encoding: 'utf8' }
+		);
+		expect(output).toMatch(/Verified OK/);
+	}
+
+	function xmlsec1VerifyFromDir(signedPath: string, trustAnchor: string): 'OK' | 'FAIL' {
+		// xmlsec1 resolves a relative Reference URI against the process cwd, not the
+		// signature path — so detached signatures verify from their own directory.
+		const { status, stdout, stderr } = spawnSync(
+			'xmlsec1',
+			['--verify', '--enabled-key-data', 'x509', '--trusted-pem', trustAnchor, basename(signedPath)],
+			{ cwd: fixtures.dir, encoding: 'utf8' }
+		);
+		const output = `${stdout}${stderr}`;
+		const verdict =
+			/^(?:Verification )?status:\s*(OK|FAIL|FAILED)/m.exec(output)?.[1] ?? /^(OK|FAIL)$/m.exec(output)?.[1];
+		if (!verdict) throw new Error(`xmlsec1 printed no verdict (exit ${status}): ${output.trim()}`);
+		return verdict === 'OK' ? 'OK' : 'FAIL';
+	}
+
+	it('signs enveloping with URI="#object" and xmlsec1 verifies it', async () => {
+		const signed = await signXades({
+			xml: SAMPLE,
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: { ...IDS, dataObject: 'Object-Test' },
+			now: NOW,
+			reference: { type: 'enveloping', objectId: 'Object-Test' }
+		});
+		const root = parse(signed).documentElement;
+		expect(root.tagName).toBe('ds:Signature');
+		const references = elements(root, DS, 'Reference');
+		expect(references).toHaveLength(2);
+		expect(references[0].getAttribute('URI')).toBe('#Object-Test');
+		expect(elements(references[0], DS, 'Transform').map((transform) => transform.getAttribute('Algorithm'))).toEqual([
+			'http://www.w3.org/2001/10/xml-exc-c14n#'
+		]);
+		expect(byId(root, 'Object-Test').firstElementChild?.tagName).toBe('fe:Facturae');
+		expect(elements(root, DS, 'X509Certificate')).toHaveLength(session.certificates.length);
+		const path = writeFixtureFile(fixtures.dir, 'facturae-enveloping.xsig', encoder.encode(signed));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+		verifySignedInfo(signed, 'enveloping');
+	});
+
+	it('signs detached against a sibling file and xmlsec1 verifies it', async () => {
+		writeFixtureFile(fixtures.dir, 'invoice.xml', encoder.encode(SAMPLE));
+		const signed = await signXades({
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW,
+			reference: { type: 'detached', uri: 'invoice.xml', data: encoder.encode(SAMPLE) }
+		});
+		const root = parse(signed).documentElement;
+		expect(root.tagName).toBe('ds:Signature');
+		const references = elements(root, DS, 'Reference');
+		expect(references).toHaveLength(2);
+		expect(references[0].getAttribute('URI')).toBe('invoice.xml');
+		expect(elements(references[0], DS, 'Transform')).toHaveLength(0);
+		const path = writeFixtureFile(fixtures.dir, 'facturae-detached.xsig', encoder.encode(signed));
+		expect(xmlsec1VerifyFromDir(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+		verifySignedInfo(signed, 'detached');
+	});
+
+	it('signs externally-detached with an absolute URI and xmlsec1 verifies it', async () => {
+		const uri = `file://${join(fixtures.dir, 'external.xml')}`;
+		writeFixtureFile(fixtures.dir, 'external.xml', encoder.encode(SAMPLE));
+		const signed = await signXades({
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW,
+			reference: { type: 'detached', uri, data: encoder.encode(SAMPLE) }
+		});
+		const root = parse(signed).documentElement;
+		expect(elements(root, DS, 'Reference')[0].getAttribute('URI')).toBe(uri);
+		const path = writeFixtureFile(fixtures.dir, 'facturae-external.xsig', encoder.encode(signed));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+		verifySignedInfo(signed, 'externally-detached');
+	});
+
+	it('fails detached verification once the external bytes change', async () => {
+		writeFixtureFile(fixtures.dir, 'mutable.xml', encoder.encode(SAMPLE));
+		const signed = await signXades({
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW,
+			reference: { type: 'detached', uri: 'mutable.xml', data: encoder.encode(SAMPLE) }
+		});
+		const path = writeFixtureFile(fixtures.dir, 'facturae-mutable.xsig', encoder.encode(signed));
+		expect(xmlsec1VerifyFromDir(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+		writeFixtureFile(fixtures.dir, 'mutable.xml', encoder.encode(SAMPLE.replace('100.00', '999.99')));
+		expect(xmlsec1VerifyFromDir(path, join(fixtures.dir, 'leaf.pem'))).toBe('FAIL');
+	});
+
+	function byId(root: Element, id: string): Element {
+		const found = [...root.querySelectorAll('[Id]')].find((element) => element.getAttribute('Id') === id);
+		if (!found) throw new Error(`no element with Id="${id}"`);
+		return found;
+	}
 });
