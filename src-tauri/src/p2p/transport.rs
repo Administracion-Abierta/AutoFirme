@@ -156,9 +156,13 @@ impl ServerCertVerifier for PinVerifier {
         _cert: &CertificateDer<'_>,
         _dss: &DigitallySignedStruct,
     ) -> Result<HandshakeSignatureValid, TlsError> {
-        // Self-signed cert cannot chain-verify the handshake signature
-        // against a root; the pin check in `verify_server_cert` is the trust
-        // decision. Accept the signature bytes as presented.
+        // Trust comes from the pin in `verify_server_cert` (sha256 of the
+        // DER), not from this signature. The signature only proves possession
+        // of the private key matching the presented cert; an attacker serving
+        // the victim's cert with their own key never gets here — rustls
+        // rejects the mismatched pair at server-build time with
+        // `InconsistentKeys(KeyMismatch)` (pinned by `mitm_without_key_fails`
+        // below constructing exactly that pair). Accept the bytes as presented.
         Ok(HandshakeSignatureValid::assertion())
     }
 
@@ -327,18 +331,19 @@ impl Transport {
                 .await
                 .map_err(|error| TransportError::Io(error.to_string()))?;
             let mut remaining = total;
+            // One buffer reused across chunks: no per-64 KiB allocation.
+            let mut buf = vec![0u8; CHUNK];
             use tokio::io::AsyncWriteExt;
             while remaining > 0 {
                 if cancel.is_cancelled() {
                     return Err::<u64, TransportError>(TransportError::Cancelled);
                 }
                 let want = remaining.min(CHUNK as u64) as usize;
-                let mut buf = vec![0u8; want];
                 recv_stream
-                    .read_exact(&mut buf)
+                    .read_exact(&mut buf[..want])
                     .await
                     .map_err(map_read)?;
-                file.write_all(&buf)
+                file.write_all(&buf[..want])
                     .await
                     .map_err(|error| TransportError::Io(error.to_string()))?;
                 remaining -= want as u64;
@@ -355,9 +360,13 @@ impl Transport {
             conn.close(0u32.into(), b"done");
             Ok::<u64, TransportError>(total)
         };
+        // Close the connection on every failure path: dropping `conn` only
+        // implicit-closes when no other handle holds it, so an explicit
+        // close is what promptly tells the peer we are gone (review #110).
         match tokio::time::timeout(timeout, recv).await {
             Ok(Ok(total)) => Ok(total),
             Ok(Err(recv_error)) => {
+                conn.close(0u32.into(), b"error");
                 let _ = tokio::fs::remove_file(&partial).await;
                 Err(match recv_error {
                     TransportError::Cancelled => {
@@ -367,6 +376,7 @@ impl Transport {
                 })
             }
             Err(_) => {
+                conn.close(0u32.into(), b"timeout");
                 let _ = tokio::fs::remove_file(&partial).await;
                 Err(TransportError::Timeout)
             }
@@ -506,5 +516,95 @@ mod tests {
                 .await;
             assert!(result.is_err(), "pin mismatch must fail");
         });
+    }
+
+    #[test]
+    fn odd_size_roundtrip_exact_bytes() {
+        // Non-multiple-of-CHUNK payload: the reused buffer must send/receive
+        // exactly `len` bytes via sliced reads/writes (review #110).
+        test_runtime().block_on(async {
+            let (sender, receiver, _fp_a, fp_b) = loopback_pair();
+            let peer = receiver.local_addr().expect("receiver addr");
+            let data: Vec<u8> = (0..CHUNK as u64 * 2 + 12345)
+                .map(|i| (i % 251) as u8)
+                .collect();
+            let dir = std::env::temp_dir().join(format!("af-p2p-odd-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).expect("temp dir");
+            let dest = dir.join("odd.asics");
+            let _ = std::fs::remove_file(&dest);
+            let recv = tokio::spawn(async move {
+                receiver
+                    .recv_one(&dest, DEFAULT_TIMEOUT, &Cancel::new())
+                    .await
+            });
+            let sent = sender
+                .send(peer, fp_b, &data, DEFAULT_TIMEOUT, &Cancel::new())
+                .await
+                .expect("send ok");
+            let received = recv.await.expect("join").expect("recv ok");
+            assert_eq!(sent, data.len() as u64);
+            assert_eq!(received, data.len() as u64);
+            assert_eq!(std::fs::read(dir.join("odd.asics")).expect("read back"), data);
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
+    #[test]
+    fn timeout_closes_conn_and_removes_partial() {
+        // Sender stalls mid-stream: recv must time out, delete the partial,
+        // and close the connection so the peer observes it (review #110).
+        test_runtime().block_on(async {
+            let id_b = Identity::generate("recv-timeout").expect("identity b");
+            let bind: SocketAddr = "127.0.0.1:0".parse().expect("loopback");
+            let receiver = Transport::bind(bind, &id_b).expect("bind");
+            let peer = receiver.local_addr().expect("receiver addr");
+            let dir = std::env::temp_dir().join(format!("af-p2p-timeout-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).expect("temp dir");
+            let dest = dir.join("stalled.asics");
+            // Spawn recv first so the handshake has a peer, then connect raw:
+            // open a stream, declare 1 MiB, send no body.
+            let recv = tokio::spawn(async move {
+                receiver
+                    .recv_one(&dest, Duration::from_millis(1500), &Cancel::new())
+                    .await
+            });
+            let client_id = Identity::generate("staller").expect("identity a");
+            let client = Transport::bind(bind, &client_id).expect("client bind");
+            let config = client_config(id_b.fingerprint).expect("client config");
+            let connecting = client
+                .endpoint
+                .connect_with(config, peer, "autofirme")
+                .expect("connect");
+            let conn = connecting.await.expect("handshake");
+            let mut send = conn.open_bi().await.expect("open stream").0;
+            send.write_all(&(1024u64 * 1024).to_be_bytes())
+                .await
+                .expect("write len");
+            // Hold the stream open without the body; recv must time out.
+            let result = recv.await.expect("join");
+            assert!(matches!(result, Err(TransportError::Timeout)), "must time out: {result:?}");
+            // Peer sees the close instead of hanging on an idle connection.
+            let closed = tokio::time::timeout(Duration::from_secs(5), send.stopped()).await;
+            assert!(closed.is_ok(), "sender never observed the recv-side close");
+            let entries: Vec<_> = std::fs::read_dir(&dir)
+                .expect("read dir")
+                .filter_map(|entry| entry.ok())
+                .collect();
+            assert!(entries.is_empty(), "timeout must leave no partial: {entries:?}");
+            std::fs::remove_dir_all(&dir).ok();
+        });
+    }
+
+    #[test]
+    fn mitm_without_key_fails_at_server_build() {
+        // Attacker serves the victim's cert DER with their own key: rustls
+        // must reject the mismatched pair before any handshake, so the
+        // `verify_tls13_signature` accept-bytes path is unreachable to a
+        // keyless impersonator (review #110).
+        let victim = Identity::generate("victim").expect("victim");
+        let attacker = Identity::generate("attacker").expect("attacker");
+        let err = server_config(&victim.cert_der, &attacker.key_der)
+            .expect_err("mismatched key must fail");
+        assert!(matches!(err, TransportError::Tls(_)), "wrong error kind: {err:?}");
     }
 }
