@@ -25,6 +25,7 @@
     }
   },
   "bundle": {
-    "active": false
+    "active": false,
+    "externalBin": ["binaries/autofirme-mcp"]
   }
 }

@@ -15,6 +15,14 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+# P5.1 MCP sidecar (Refs #107): shell plugin spawns the bundled `autofirme-mcp`
+# binary (`tauri_plugin_shell::ShellExt::sidecar`); tokio time + log drive the
+# supervisor backoff loop; parking_lot Mutex holds the supervised child handle.
+# All three are already in the lockfile via tauri — no new crates.
+tauri-plugin-shell = "2.5.0"
+tokio = { version = "1.54.0", features = ["time"] }
+log = "0.4"
+parking_lot = "0.12"
 # P1.4a smartcard layer (Refs #98): PC/SC reader/session plus the OpenSC PKCS#11
 # sign path, absorbed as the `smartcard` module of the desktop lib.
 cryptoki = "0.12.1"
