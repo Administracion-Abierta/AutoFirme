@@ -1,13 +1,14 @@
 # EU DSS oracle (#140)
 
-`oracle.mjs` posts every artifact in `test/fixtures/` to the EU DSS demo and compares the verdict
-against our own `src/lib/verify`, field by field. Any difference that `allowlist.json` does not
+`oracle.mjs` posts the signature fixtures in `test/fixtures/` — the hand-picked `CORPUS` list in that
+file, not a directory walk — to the EU DSS demo and compares the verdict against our own
+`src/lib/verify`, field by field. Any difference that `allowlist.json` does not
 pin fails the run; `.github/workflows/verify.yml` runs it on every push to `main`/`develop`.
 
-DSS ships no CLI artifact on Maven Central and publishes no Docker image (checked: the 138
-`eu.europa.ec.joinup.sd-dss` artifacts are all libraries, and hub/ghcr/quay have no official DSS
-image — building one from `esig/dss-demonstrations` needs Maven and a Tomcat WAR). The demo REST
-endpoint is the independent validator: it is the same one #96 and #125 used, and it is reachable.
+DSS ships no CLI artifact on Maven Central and publishes no Docker image (checked: the
+`eu.europa.ec.joinup.sd-dss` Maven group has no CLI or standalone module, and hub/ghcr/quay have no
+official DSS image — building one from `esig/dss-demonstrations` needs Maven and a Tomcat WAR). The
+demo REST endpoint is the independent validator: it is the same one #96 and #125 used.
 
 ```bash
 node --import ./scripts/ts-hook.mjs fixtures/dss/oracle.mjs             # live comparison

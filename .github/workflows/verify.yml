@@ -2,9 +2,9 @@ name: Verify
 
 # The independent-validator gate (#140). Separate from `ci.yml` because it depends on an
 # external service: the EU DSS demo answers most days, but a network oracle must never block a
-# legitimate PR, so this job is its own workflow with its own required-check status.
+# legitimate PR, so this job is its own workflow, kept out of the branch-protection required set.
 #
-# `node fixtures/dss/oracle.mjs` posts every fixture in `test/fixtures/` to DSS, compares four
+# `node fixtures/dss/oracle.mjs` posts the fixture corpus to DSS, compares four
 # fields against `src/lib/verify` (format, verdict, signer CN, signing time), and exits 1 on any
 # difference that `fixtures/dss/allowlist.json` does not pin. When DSS is unreachable the run is
 # a no-op — the same "a network oracle cannot gate a suite" rule `scripts/dss-issue-125.mjs`
