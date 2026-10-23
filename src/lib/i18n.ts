@@ -104,6 +104,23 @@ export interface Copy {
 	entryReturnWait: string;
 	entryReturnReady: string;
 	entryReturnButton: string;
+	/** Desktop shell (`afirma://` deep-links, #103): scheme owner status lines. */
+	afirmaSchemeOurs: string;
+	afirmaSchemeOther: string;
+	afirmaSchemeNone: string;
+	/** Desktop shell: incoming portal request banner + allow-list section. */
+	afirmaTitle: string;
+	afirmaHint: string;
+	afirmaOp: string;
+	afirmaOrigin: string;
+	afirmaNoOrigin: string;
+	afirmaReview: string;
+	afirmaDismiss: string;
+	afirmaRemember: string;
+	afirmaConfirmed: string;
+	afirmaListTitle: string;
+	afirmaListEmpty: string;
+	afirmaRemove: string;
 	checkLabels: Record<CheckId, string>;
 	storeTitle: string;
 	storeHint: string;
@@ -319,7 +336,22 @@ export const copy: Record<Lang, Copy> = {
 		mcpBridgeNeedsToken: 'Falta el token de acceso.',
 		mcpBridgeBadEndpoint: 'La dirección debe ser http(s)://…/mcp, sin usuario ni contraseña.',
 		mcpBridgeUnreachable: 'No se pudo abrir el puente: ¿está el servidor MCP en marcha y publicado por TLS?',
-		mcpOrigin: 'Agente MCP'
+		mcpOrigin: 'Agente MCP',
+		afirmaSchemeOurs: 'Esta app gestiona los enlaces afirma://.',
+		afirmaSchemeOther: 'Otra app gestiona los enlaces afirma://: solo funcionará la extensión.',
+		afirmaSchemeNone: 'Ninguna app gestiona los enlaces afirma://.',
+		afirmaTitle: 'Solicitudes de portales (afirma://)',
+		afirmaHint: 'Cada solicitud se confirma una a una. Solo el dominio de esta solicitud puede recordarse, nunca todos.',
+		afirmaOp: 'Operación',
+		afirmaOrigin: 'Portal',
+		afirmaNoOrigin: 'Sin origen comprobable: se rechaza.',
+		afirmaReview: 'Revisar y firmar',
+		afirmaDismiss: 'Descartar',
+		afirmaRemember: 'Recordar este dominio',
+		afirmaConfirmed: 'Solicitud confirmada: elige certificado y firma.',
+		afirmaListTitle: 'Portales permitidos',
+		afirmaListEmpty: 'Ningún portal permitido todavía.',
+		afirmaRemove: 'Quitar'
 	},
 	en: {
 		langLabel: 'Language',
@@ -484,6 +516,21 @@ export const copy: Record<Lang, Copy> = {
 		mcpBridgeNeedsToken: 'The access token is missing.',
 		mcpBridgeBadEndpoint: 'The address must be http(s)://…/mcp, without a user or password.',
 		mcpBridgeUnreachable: 'Could not open the bridge: is the MCP server running and published over TLS?',
-		mcpOrigin: 'MCP agent'
+		mcpOrigin: 'MCP agent',
+		afirmaSchemeOurs: 'This app handles afirma:// links.',
+		afirmaSchemeOther: 'Another app handles afirma:// links: only the extension will work.',
+		afirmaSchemeNone: 'No app handles afirma:// links.',
+		afirmaTitle: 'Portal requests (afirma://)',
+		afirmaHint: 'Each request is confirmed one by one. Only this request\u2019s domain can be remembered, never all.',
+		afirmaOp: 'Operation',
+		afirmaOrigin: 'Portal',
+		afirmaNoOrigin: 'No verifiable origin: refused.',
+		afirmaReview: 'Review and sign',
+		afirmaDismiss: 'Dismiss',
+		afirmaRemember: 'Remember this domain',
+		afirmaConfirmed: 'Request confirmed: pick a certificate and sign.',
+		afirmaListTitle: 'Allowed portals',
+		afirmaListEmpty: 'No allowed portals yet.',
+		afirmaRemove: 'Remove'
 	}
 };
