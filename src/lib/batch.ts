@@ -20,7 +20,20 @@
 
 import { writable, get, type Readable } from 'svelte/store';
 import { SIGN_FORMATS, type SignFormat } from './sign';
+import {
+	type Bytes,
+	derInteger,
+	explicitTagged,
+	implicitTagged,
+	objectId,
+	octetString,
+	seq,
+	setOf,
+	utcTime
+} from './asn1';
+import { signBytes, type SignerCert } from './sign';
 import { zipStore } from './zip';
+import { certificateIdentity } from './x509';
 
 /** `BatchDataResult.Result` names reachable by a client-side run. */
 export type BatchResult = 'NOT_STARTED' | 'DONE_AND_SAVED' | 'ERROR_PRE';
@@ -316,4 +329,137 @@ export function buildZip(state: BatchState): Uint8Array<ArrayBuffer> {
 		data: new TextEncoder().encode(`${JSON.stringify(buildManifest(state), null, 2)}\n`)
 	});
 	return zipStore(entries);
+}
+
+/** Per-file format for a directory walk: PDFs go to PAdES, XML to XAdES, the rest to CAdES. */
+export function formatForName(name: string): SignFormat {
+	const dot = name.lastIndexOf('.');
+	const extension = dot >= 0 ? name.slice(dot).toLowerCase() : '';
+	if (extension === '.pdf') return 'pades';
+	if (extension === '.xml') return 'xades';
+	return 'cades';
+}
+
+/**
+ * Pre-hashed digest input: the SHA-256 of a document computed elsewhere (streamed off disk,
+ * produced by a portal), plus the metadata the signature binds. The document bytes are never
+ * needed — only their 32-byte digest enters the CMS `messageDigest` attribute.
+ */
+export interface DigestInput {
+	/** SHA-256 of the document, hex or raw. */
+	digest: string | Bytes;
+	/** Fixed so a test can reproduce the signature; defaults to now. */
+	signingTime?: Date;
+}
+
+const OID_SIGNED_DATA = '1.2.840.113549.1.7.2';
+const OID_DATA = '1.2.840.113549.1.7.1';
+const OID_CONTENT_TYPE = '1.2.840.113549.1.9.3';
+const OID_MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
+const OID_SIGNING_TIME = '1.2.840.113549.1.9.5';
+const OID_SIGNING_CERTIFICATE_V2 = '1.2.840.113549.1.9.16.2.47';
+const OID_SHA256 = '2.16.840.1.101.3.4.2.1';
+const OID_RSA_ENCRYPTION = '1.2.840.113549.1.1.1';
+const OID_ECDSA_WITH_SHA256 = '1.2.840.10045.4.3.2';
+const NULL_PARAMS = new Uint8Array([0x05, 0x00]);
+
+/** WebCrypto returns ECDSA as `r || s`; CMS wants a DER `SEQUENCE { r, s }`. */
+function ecdsaSignature(raw: Bytes): Bytes {
+	const half = raw.length / 2;
+	return seq(derInteger(raw.subarray(0, half)), derInteger(raw.subarray(half)));
+}
+
+function digestBytes(digest: string | Bytes): Bytes {
+	if (typeof digest !== 'string') {
+		if (digest.length !== 32) throw new Error(`expected a 32-byte SHA-256 digest, got ${digest.length}`);
+		return digest;
+	}
+	const hex = digest.startsWith('0x') ? digest.slice(2) : digest;
+	if (!/^[0-9a-fA-F]{64}$/.test(hex)) throw new Error('expected a 64-hex-char SHA-256 digest');
+	const out = new Uint8Array(32);
+	for (let i = 0; i < 32; i += 1) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+	return out as Bytes;
+}
+
+/**
+ * CAdES-BES detached signature over a precomputed SHA-256 digest — the same `SignedData` shape
+ * `#lib/cms` builds, but the `messageDigest` attribute carries the supplied digest instead of a
+ * hash computed here, so the document bytes never enter memory. Verifies with
+ * `openssl cms -verify -content <original>`: the attribute commits to the document the digest
+ * was computed over. XAdES/PAdES have no digest mode — both embed or transform the bytes.
+ */
+export async function signCadesFromDigest(
+	cert: SignerCert,
+	input: DigestInput
+): Promise<Bytes> {
+	if (!cert.key || !cert.algorithm) {
+		throw new Error(`certificate ${cert.commonName} has no private key`);
+	}
+	if (cert.algorithm.hash !== 'SHA-256') {
+		throw new Error(`CAdES-BES is SHA-256 here, but the key is bound to ${cert.algorithm.hash}`);
+	}
+	const messageDigest = digestBytes(input.digest);
+	const identity = certificateIdentity(cert.der);
+	const ecdsa = cert.algorithm.name === 'ECDSA';
+	const certHash = new Uint8Array(await crypto.subtle.digest('SHA-256', cert.der));
+	const issuerSerial = seq(seq(explicitTagged(4, identity.issuerDer)), identity.serialDer);
+	const signingCertificateV2 = seq(seq(seq(octetString(certHash), issuerSerial)));
+	const signedAttrs = setOf(
+		seq(objectId(OID_CONTENT_TYPE), setOf(objectId(OID_DATA))),
+		seq(objectId(OID_MESSAGE_DIGEST), setOf(octetString(messageDigest))),
+		seq(objectId(OID_SIGNING_TIME), setOf(utcTime(input.signingTime ?? new Date()))),
+		seq(objectId(OID_SIGNING_CERTIFICATE_V2), setOf(signingCertificateV2))
+	);
+	const raw = await signBytes(cert, signedAttrs);
+	const signature = ecdsa ? ecdsaSignature(raw) : raw;
+	const signerInfos = setOf(
+		seq(
+			derInteger(1),
+			seq(identity.issuerDer, identity.serialDer),
+			seq(objectId(OID_SHA256)),
+			implicitTagged(0, signedAttrs),
+			ecdsa ? seq(objectId(OID_ECDSA_WITH_SHA256)) : seq(objectId(OID_RSA_ENCRYPTION), NULL_PARAMS),
+			octetString(signature)
+		)
+	);
+	const signedData = seq(
+		derInteger(1),
+		setOf(seq(objectId(OID_SHA256))),
+		seq(objectId(OID_DATA)),
+		implicitTagged(0, setOf(cert.der)),
+		signerInfos
+	);
+	return seq(objectId(OID_SIGNED_DATA), explicitTagged(0, signedData));
+}
+
+
+/** One row of the batch summary report: per-file verdict, stable in queue order. */
+export interface BatchVerdict {
+	id: string;
+	name: string;
+	format: string;
+	result: BatchResult;
+	sha256: string;
+	output: string;
+	detail: string;
+}
+
+/** Summary report over a finished run: counts plus one verdict row per document. */
+export function summarizeBatch(state: BatchState): { signed: number; failed: number; rows: BatchVerdict[] } {
+	const labelOf = (id: SignFormat): string =>
+		SIGN_FORMATS.find((option) => option.id === id)?.label ?? id;
+	let signed = 0;
+	const rows = state.documents.map((document) => {
+		if (document.status === 'signed') signed += 1;
+		return {
+			id: document.id,
+			name: document.file.name,
+			format: labelOf(document.format),
+			result: document.result,
+			sha256: document.sha256,
+			output: document.output,
+			detail: document.description
+		};
+	});
+	return { signed, failed: rows.length - signed, rows };
 }
