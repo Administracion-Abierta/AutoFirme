@@ -14,7 +14,7 @@
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -385,11 +385,16 @@ impl Transport {
 }
 
 fn partial_path(dest: &Path) -> PathBuf {
+    // PID alone collides when two `recv_one` calls target the same `dest`
+    // in one process; a per-call sequence keeps each partial distinct
+    // (review #110).
+    static SEQ: AtomicU64 = AtomicU64::new(0);
     let mut name = dest
         .file_name()
         .map(|name| name.to_owned())
         .unwrap_or_default();
-    name.push(format!(".part-{}", std::process::id()));
+    let seq = SEQ.fetch_add(1, Ordering::Relaxed);
+    name.push(format!(".part-{}-{seq}", std::process::id()));
     dest.with_file_name(name)
 }
 
@@ -550,6 +555,21 @@ mod tests {
     }
 
     #[test]
+    fn concurrent_receives_use_distinct_partials() {
+        // Two `recv_one` calls targeting the same `dest` in one process must
+        // not share a temp file: PID alone collided, so the second create
+        // truncated the first receive's partial (review #110).
+        let dest = Path::new("/tmp/af-partial/doc.asics");
+        let first = partial_path(dest);
+        let second = partial_path(dest);
+        assert_ne!(first, second, "each in-flight receive needs its own partial");
+        assert_eq!(first.parent(), dest.parent());
+        assert_eq!(second.parent(), dest.parent());
+        let name = first.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(name.starts_with("doc.asics.part-"), "unexpected name: {name}");
+    }
+
+    #[test]
     fn timeout_closes_conn_and_removes_partial() {
         // Sender stalls mid-stream: recv must time out, delete the partial,
         // and close the connection so the peer observes it (review #110).
@@ -604,9 +624,15 @@ mod tests {
         // `cert_resolver_impersonation_rejected_at_handshake` (review #110).
         let victim = Identity::generate("victim").expect("victim");
         let attacker = Identity::generate("attacker").expect("attacker");
-        let err = server_config(&victim.cert_der, &attacker.key_der)
-            .expect_err("mismatched key must fail");
-        assert!(matches!(err, TransportError::Tls(_)), "wrong error kind: {err:?}");
+        match server_config(&victim.cert_der, &attacker.key_der)
+            .expect_err("mismatched key must fail")
+        {
+            TransportError::Tls(reason) => assert!(
+                reason.contains("KeyMismatch"),
+                "must be rustls' key-mismatch rejection, got: {reason}"
+            ),
+            other => panic!("wrong error kind: {other:?}"),
+        }
     }
 
     #[test]
