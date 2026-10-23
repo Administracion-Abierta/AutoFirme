@@ -104,14 +104,15 @@ AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', 'mode=implicit', success, erro
 AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', 'mode=explicit', success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'PAdES', null, success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'AUTO', null, success, error);
-AutoScript.sign(base64, 'SHA1withRSA', 'XAdES', null, success, error);
+AutoScript.sign(base64, 'SHA256withRSA', 'OOXML', null, success, error);
 ```
 
 Input must be canonical Base64, at most 4 MiB. Certificate selection does not
 honor unsupported filters. Supported signing uses currently valid RSA certificates
 with at least 2048-bit keys and appropriate document-signing usage. `AUTO` sniffs
 the payload the way AutoFirma does: a `%PDF-` header signs as PAdES, XML signs as
-enveloped XAdES when the mode is implicit, and everything else signs as CAdES.
+enveloped XAdES when the mode is implicit, an OOXML package (`[Content_Types].xml`)
+signs as OOXML, and everything else signs as CAdES.
 Legacy portals that still request `SHA1withRSA` are honored only for enveloped
 XAdES; CAdES and PAdES stay SHA-256-only.
 Explicit XAdES needs a detached signature and continues through the original

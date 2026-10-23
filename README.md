@@ -96,7 +96,7 @@ decisión de diseño.
 | **XAdES-T** | No | Falta `SignatureTimeStamp`. |
 | **PAdES B-B** (PDF) | Disponible en la interfaz | Actualización incremental real; `adbe.pkcs7.detached` / `ETSI.CAdES.detached`. |
 | **PAdES B-T** | Disponible | Requiere una TSA configurada. |
-| **OOXML** (`.docx`, `.xlsx`, `.pptx`) | Motor disponible, sin selector en la interfaz | Firma `XAdES v1.3.2` en `origin.sigs`; el resto del ZIP queda idéntico bit a bit. |
+| **OOXML** (`.docx`, `.xlsx`, `.pptx`) | Disponible en la interfaz, auto-detectado al soltar | Firma `XAdES v1.3.2` en `origin.sigs`; el resto del ZIP queda idéntico bit a bit. La verificación sigue sin soportarse (igual que AutoFirma 1.9). |
 | ODF, FacturaE, ASiC-S, cofirma, contrafirma, *detached/enveloping* genéricos | No | Ver [`docs/PARITY.md`](docs/PARITY.md). |
 
 Claves admitidas: **RSA (RSASSA-PKCS1-v1_5)** y **ECDSA P-256/P-384/P-521**. No se firma con SHA-1
@@ -300,7 +300,7 @@ demo/                prueba de la extensión contra webs reales
 - **Sin acceso a DNIe, tarjetas criptográficas ni almacenes del sistema.** El navegador no ofrece
   esas APIs.
 - **Sin OCSP/CRL** ni validación de sellos de tiempo recibidos.
-- **XAdES-T y OOXML** tienen motor pero no selector en la interfaz.
+- **OOXML** sí está disponible en la interfaz (auto-detectado al soltar el archivo); **XAdES-T** tiene motor pero no selector. La verificación de OOXML sigue sin soportarse (igual que 1.9).
 - **Solo Chrome** para la extensión; Firefox está en estudio.
 - La extensión es **no firmada**: Chrome exige Modo desarrollador para instalarla manualmente.
 
