@@ -15,6 +15,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
+tauri-plugin-deep-link = "2.6.2"
+tauri-plugin-single-instance = { version = "2.5.4", features = ["deep-link"] }
 # P1.4a smartcard layer (Refs #98): PC/SC reader/session plus the OpenSC PKCS#11
 # sign path, absorbed as the `smartcard` module of the desktop lib.
 cryptoki = "0.12.1"

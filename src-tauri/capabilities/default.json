@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Minimum the web app needs: core events/windows plus the save dialog. No fs, shell or sidecar permission.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-save"]
+  "permissions": ["core:default", "dialog:allow-save", "dialog:allow-message", "deep-link:allow-get-current"]
 }

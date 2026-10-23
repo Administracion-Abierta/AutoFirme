@@ -26,5 +26,12 @@
   },
   "bundle": {
     "active": false
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["afirma"]
+      }
+    }
   }
 }
