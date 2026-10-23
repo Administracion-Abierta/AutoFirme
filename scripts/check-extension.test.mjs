@@ -29,6 +29,8 @@ for (const entry of [
   ['accepts features in reachable app import', { 'assets/entry.js': 'import "./app.js";', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
   ['accepts features in reachable dynamic import', { 'assets/entry.js': 'import("./app.js");', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
   ['accepts features in re-exported chunk', { 'assets/entry.js': 'export * from "./app.js";', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
+  ['accepts a no-substitution template dynamic import', { 'assets/entry.js': 'import(`./app.js`);', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, null],
+  ['rejects a computed dynamic import', { 'assets/entry.js': 'import(`./${name}.js`);', 'index.html': '<link href="assets/app.css"><script type="module" src="assets/entry.js"></script>' }, 'nonliteral dynamic module dependency'],
   ['rejects missing reachable chunk', { 'assets/app.js': 'import "./missing.js";' }, 'ENOENT'],
   ['rejects inline bootstrap', { 'index.html': '<script>mountApp()</script>' }, 'inline executable script'],
   ['rejects eval', { 'assets/app.js': 'eval("remote")' }, 'dynamic code execution'],
@@ -37,6 +39,7 @@ for (const entry of [
   ['rejects app subset', { 'assets/app.js': '/* CAdES */' }, 'full application feature absent'],
   ['rejects missing shared utility styles', { 'assets/app.css': 'body{}' }, 'shared app Tailwind utilities absent'],
   ['rejects remote assets', { 'index.html': '<script src="https://host/app.js"></script>' }, 'remote bootstrap asset'],
+  ['rejects a manifest icon missing from the package', { 'manifest.json': JSON.stringify({ ...manifest, icons: { '128': 'icon-128.png' } }) }, 'ENOENT'],
   ['rejects Chrome-reserved underscore names', { '_headers': '/*\n  X-Frame-Options: DENY\n' }, 'Chrome reserves names starting with "_"']
 ]) {
   const [name, changes, message] = /** @type {[string, Record<string, string>, (string | null)]} */ (entry);

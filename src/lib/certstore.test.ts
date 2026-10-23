@@ -86,6 +86,22 @@ describe('stored identities', () => {
 		);
 	});
 
+	it('renames a saved signature without touching its sealed container', async () => {
+		const { vault } = vaultOn();
+		const meta = await stored(vault, 'despacho.p12');
+
+		const renamed = await vault.renameIdentity(meta.id, '  Firma personal  ');
+		expect(renamed).toEqual({ ...meta, label: 'Firma personal' });
+		expect((await vault.listIdentities())[0].label).toBe('Firma personal');
+		expect((await vault.unlockIdentity(meta.id, FIXTURE_PIN)).signer.commonName).toBe(
+			LEAF_COMMON_NAME
+		);
+
+		// A blank alias falls back to the certificate name rather than leaving an empty row.
+		expect((await vault.renameIdentity(meta.id, '   ')).label).toBe(LEAF_COMMON_NAME);
+		expect(await codeOf(() => vault.renameIdentity('missing', 'x'))).toBe('missing');
+	});
+
 	it('keeps several signatures, each with its own PIN', async () => {
 		const { vault } = vaultOn();
 		const first = await stored(vault, 'Primera', FIXTURE_PIN);

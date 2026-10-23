@@ -32,4 +32,7 @@ Do not publish this package until its license is resolved: upstream revision
 
 See [the extension guide](../docs/CHROME-EXTENSION.md),
 [design](../docs/CHROME-EXTENSION-DESIGN.md) and
-[verification results](../docs/CHROME-EXTENSION-VERIFICATION.md).
+[verification results](../docs/CHROME-EXTENSION-VERIFICATION.md). Store copy,
+permission justifications and assets are in
+[the listing kit](../docs/STORE-LISTING.md); the privacy statement is
+[PRIVACY.md](../docs/PRIVACY.md).

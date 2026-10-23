@@ -139,6 +139,8 @@ export interface Vault {
 	readonly persistent: boolean;
 	listIdentities(): Promise<IdentityMeta[]>;
 	saveIdentity(input: SaveIdentityInput): Promise<IdentityMeta>;
+	/** Change the user-chosen alias; the sealed container and its PIN are untouched. */
+	renameIdentity(id: string, label: string): Promise<IdentityMeta>;
 	/** Unseal the container with its PIN and import its key. */
 	unlockIdentity(id: string, pin: string): Promise<SignerSession>;
 	removeIdentity(id: string): Promise<void>;
@@ -215,6 +217,26 @@ export function createVault(raw: StoreBackend, persistent: boolean | (() => bool
 			});
 			log(`saved "${meta.label}" (${meta.commonName}), ${input.container.length} bytes sealed`);
 			return meta;
+		},
+
+		async renameIdentity(id, label) {
+			const record = await backend.get('identities', id);
+			if (!record) {
+				log(`rename failed: no identity ${id}`);
+				throw new StoreError('missing', `no stored identity ${id}`);
+			}
+			const current = record.value as IdentityRecord;
+			const next = label.trim() || current.commonName;
+			await backend.put('identities', { id, value: { ...current, label: next } });
+			log(`renamed ${current.commonName} to "${next}"`);
+			return {
+				id: current.id,
+				label: next,
+				commonName: current.commonName,
+				notAfter: current.notAfter,
+				createdAt: current.createdAt,
+				size: current.size
+			};
 		},
 
 		async unlockIdentity(id, pin) {

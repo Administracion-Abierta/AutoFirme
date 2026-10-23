@@ -10,6 +10,7 @@
  let disabled=$state<string[]>([]);
  let granted=$state<string[]>([]);
  let allSites=$state(false);
+ let interceptionError=$state('');
  let origin=$state('');
  let grantOrigin=$state('');
  let tsa=$state('');
@@ -19,8 +20,8 @@
  onMount(()=>{void refresh().catch(report);});
  function report(reason:unknown) {error=errorCopy(lang,reason instanceof Error ? reason.message : String(reason));}
  async function refresh(){
-  const result=await send({type:'sites:list'}) as {disabledOrigins:string[];suggestedOrigin:string|null;grantedOrigins:string[];allSites:boolean};
-  disabled=result.disabledOrigins;granted=result.grantedOrigins;allSites=result.allSites;
+  const result=await send({type:'sites:list'}) as {disabledOrigins:string[];suggestedOrigin:string|null;grantedOrigins:string[];allSites:boolean;scriptsError?:string};
+  disabled=result.disabledOrigins;granted=result.grantedOrigins;allSites=result.allSites;interceptionError=result.scriptsError??'';
   if(!origin)origin=result.suggestedOrigin??'';
  }
  async function setEnabled(value:string,enabled:boolean){
@@ -78,6 +79,7 @@
    <Button id="grant-site" variant="outline" disabled={busy || !grantOrigin} onclick={()=>grant(grantOrigin)}>{t.grantSite}</Button>
   {/if}
  </section>
+ {#if interceptionError}<p role="alert" class="text-destructive break-words text-sm">{t.interceptionFailed} <span class="text-muted-foreground">({interceptionError})</span></p>{/if}
  {#if error}<p role="alert" class="text-destructive break-words text-sm">{error}</p>{/if}
  {#if status}<p role="status" class="text-sm">{status}</p>{/if}
 </div>
