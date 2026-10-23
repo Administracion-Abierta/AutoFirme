@@ -23,7 +23,10 @@ impl Fingerprint {
     }
 
     pub fn parse_hex(hex: &str) -> Option<Self> {
-        if hex.len() != 64 {
+        // Byte length alone is not enough: slicing a multibyte char would
+        // panic. TXT values come from the LAN, so a hostile peer could kill
+        // the browse task with a 64-byte non-ASCII `fp` (review #110).
+        if hex.len() != 64 || !hex.is_ascii() {
             return None;
         }
         let mut bytes = [0u8; 32];
@@ -112,6 +115,15 @@ mod tests {
         assert_eq!(Fingerprint::parse_hex("zz"), None);
         assert_eq!(Fingerprint::parse_hex(&"ab".repeat(31)), None);
         assert_eq!(Fingerprint::parse_hex(&"zz".repeat(32)), None);
+    }
+
+    #[test]
+    fn multibyte_hex_rejected_not_panicking() {
+        // 64 *bytes*, 62 chars: the byte-length check passes, and `€` straddles
+        // a slice boundary. Must reject, not panic (review #110).
+        let hostile = format!("a\u{20ac}{}", "a".repeat(60));
+        assert_eq!(hostile.len(), 64);
+        assert_eq!(Fingerprint::parse_hex(&hostile), None);
     }
 
     #[test]
