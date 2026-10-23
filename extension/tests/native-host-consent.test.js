@@ -14,7 +14,6 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-
 /** Chrome's binding host→extension cap (roadmap §5.3, §6 item 3). */
 const MAX_HOST_MESSAGE = 1024 * 1024;
 
@@ -38,7 +37,7 @@ function createHost({ sign = () => 'c2ln' } = {}) {
 		signDigest(digest) {
 			if (!confirmed.has(digest)) throw Error('signDigest without confirm for this digest');
 			confirmed.delete(digest);
-			return sign(digest);
+			return sign();
 		}
 	};
 }
