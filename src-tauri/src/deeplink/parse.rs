@@ -182,10 +182,7 @@ pub fn parse_afirma_url(raw: &str) -> Result<AfirmaRequest, ParseError> {
     if raw.len() > MAX_URL_LEN {
         return Err(ParseError::TooLong);
     }
-    if raw
-        .bytes()
-        .any(|b| b < 0x20 || b == 0x7f || b == b' ' && false)
-    {
+    if raw.bytes().any(|b| b < 0x20 || b == 0x7f) {
         return Err(ParseError::BadChars);
     }
     // Spaces must be percent-encoded; a literal space means a broken or
