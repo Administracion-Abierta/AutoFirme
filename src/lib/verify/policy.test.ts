@@ -15,6 +15,7 @@ import {
 	extractCadesClaims,
 	extractXadesClaims,
 	FACTURAE_31_URI,
+	FACTURAE_ROLES,
 	OID_COMMITMENT,
 	OID_SIG_POLICY
 } from './policy';
@@ -121,6 +122,19 @@ describe('assessPolicyClaim', () => {
 		expect(assessPolicyClaim({ ...claim, digestValue: nearMiss }).status).toBe('fail');
 	});
 
+	it('warns when a matching policy sits outside the signed attributes', () => {
+		const finding = assessPolicyClaim({
+			identifier: FACTURAE_31_URI,
+			digestAlgorithm: '1.3.14.3.2.26',
+			digestValue: unb64('Ohixl6upD6av8N7pEvDABhEL6hM='),
+			implied: false,
+			signed: false,
+			family: 'cades'
+		});
+		expect(finding.status).toBe('warn');
+		expect(finding.identifier).toBe(FACTURAE_31_URI);
+	});
+
 	it('warns when the digest matches but the declared algorithm is not the published one', () => {
 		const published = unb64('Ohixl6upD6av8N7pEvDABhEL6hM=');
 		const finding = assessPolicyClaim({
@@ -159,7 +173,7 @@ describe('assessPolicyClaim', () => {
 		expect(finding.identifier).toBe(facturae.uri);
 	});
 
-	it('warnss (never fails) on an unknown-but-hashed policy, recording the OID', () => {
+	it('warns (never fails) on an unknown-but-hashed policy, recording the OID', () => {
 		const finding = assessPolicyClaim({
 			identifier: '1.2.3.4.5.6',
 			digestAlgorithm: '2.16.840.1.101.3.4.2.1',
@@ -277,6 +291,15 @@ describe('FacturaE profile', () => {
 		expect(assessFacturaeRoles(['revisor'], true, 'xades').status).toBe('warn');
 		expect(assessFacturaeRoles(['emisor', 'revisor'], true, 'xades').status).toBe('warn');
 		expect(assessFacturaeRoles(['emisor'], false, 'xades').status).toBe('fail');
+	});
+
+	it('accepts every published FacturaE role, in its capacity', () => {
+		for (const [role, capacity] of Object.entries(FACTURAE_ROLES)) {
+			const finding = assessFacturaeRoles([role], true, 'xades');
+			expect(finding.status).toBe('pass');
+			expect(finding.detail).toContain(capacity);
+		}
+		expect(assessFacturaeRoles(['EMISOR'], true, 'xades').status).toBe('pass');
 	});
 });
 

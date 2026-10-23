@@ -10,11 +10,13 @@
  *   hash → `fail`. Unknown identifier *with* a hash → `warn` recording the
  *   identifier (never fail: the cryptography may still hold). Implied/absent →
  *   `info`. Explicit policy with no hash → `warn` (nothing to check it against).
+ *   A matching policy declared outside the signed attributes/properties → `warn`
+ *   (recorded, not covered by the signature).
  * - Commitment: must live where the signature covers it (CAdES signedAttrs,
  *   XAdES `SignedSignatureProperties`); an unsigned commitment → `fail`.
  *   Unknown OID/URI → `warn` with the value. Absent → `info`.
  * - FacturaE profile: the policy URI must be the FacturaE one and the claimed
- *   role must include `emisor`; anything else → `warn`.
+ *   role must be one of {@link FACTURAE_ROLES}; anything else → `warn`.
  */
 
 import { children, fromBase64, hex, octets, oid, type Der } from './asn1';
@@ -169,7 +171,15 @@ export function assessPolicyClaim(claim: PolicyClaim): PolicyFinding {
 				identifier
 			};
 		}
+	if (claim.signed) {
 		return { area: 'policy', status: 'pass', detail: `(${claim.family}) policy ${policy.label} — identifier and hash match`, identifier };
+	}
+	return {
+		area: 'policy',
+		status: 'warn',
+		detail: `(${claim.family}) policy ${policy.label} hash matches but is declared outside the signed attributes/properties — the signature does not cover it`,
+		identifier
+	};
 	}
 	return {
 		area: 'policy',
@@ -229,7 +239,22 @@ export function assessFacturaePolicy(claim: PolicyClaim): PolicyFinding {
 	return finding;
 }
 
-/** FacturaE profile: the signer claims the `emisor` role. */
+/**
+ * FacturaE profile: the signer claims one of the two roles per capacity. The set
+ * is AutoFirma's own whitelist — `emisor|supplier` (Emisor), `receptor|customer`
+ * (Receptor), `tercero|third party` (Tercero)
+ * (`reference/decompile-1.9:decompiled/sources/es/gob/afirma/signers/xades/AOFacturaESigner.java:81-82`,
+ * mapped at `standalone/signdetails/FacturaESignAnalyzer.java:59-65`).
+ */
+export const FACTURAE_ROLES: Record<string, string> = {
+	emisor: 'Emisor',
+	supplier: 'Emisor',
+	receptor: 'Receptor',
+	customer: 'Receptor',
+	tercero: 'Tercero',
+	'third party': 'Tercero'
+};
+
 export function assessFacturaeRoles(roles: string[], signed: boolean, family: Family): PolicyFinding {
 	if (roles.length === 0) {
 		return { area: 'commitment', status: 'info', detail: `(${family}) no claimed signer role` };
@@ -237,13 +262,17 @@ export function assessFacturaeRoles(roles: string[], signed: boolean, family: Fa
 	if (!signed) {
 		return { area: 'commitment', status: 'fail', detail: `(${family}) claimed role(s) ${roles.join(', ')} are declared outside the signed attributes/properties` };
 	}
-	if (roles.some((role) => role.trim().toLowerCase() === 'emisor') && roles.length === 1) {
-		return { area: 'commitment', status: 'pass', detail: `(${family}) FacturaE claimed role emisor` };
+	if (roles.length === 1) {
+		const role = roles[0].trim().toLowerCase();
+		const capacity = FACTURAE_ROLES[role];
+		if (capacity) {
+			return { area: 'commitment', status: 'pass', detail: `(${family}) FacturaE claimed role ${role} (${capacity})` };
+		}
 	}
 	return {
 		area: 'commitment',
 		status: 'warn',
-		detail: `(${family}) FacturaE expects the claimed role emisor, found ${roles.join(', ')}`
+		detail: `(${family}) FacturaE expects one of the roles ${Object.keys(FACTURAE_ROLES).join(', ')}, found ${roles.join(', ')}`
 	};
 }
 
