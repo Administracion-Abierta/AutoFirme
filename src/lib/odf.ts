@@ -54,6 +54,13 @@ function parseXml(text: string): Document {
 	return doc;
 }
 
+/**
+ * Serialize a parsed part back to UTF-8 with a fixed declaration: the DOM round-trip may not
+ * reproduce the original declaration/encoding byte-for-byte. Harmless here because the part is
+ * digested over its canonicalized element (C14N drops the declaration) and the signature file
+ * itself is never digested as a whole — but the bytes we write, not the bytes we read, are what
+ * verifiers see.
+ */
 function serializeXml(doc: Document): Uint8Array {
 	return new TextEncoder().encode(XML_DECLARATION + new XMLSerializer().serializeToString(doc.documentElement));
 }
@@ -156,7 +163,9 @@ export async function signOdfPackage(packageBytes: Uint8Array, options: OdfSignO
 			);
 		})
 		.join('');
-	// The dc:date property object: 1.9's only `ds:Object`; DSS ignores it, LO keeps it.
+	// The dc:date property object: 1.9's only `ds:Object`, kept so 1.9-era readers still find the
+	// signing date; it is bound by the SignedInfo reference to its Id, so it is covered by the RSA
+	// signature. (Whether a given verifier consumes it is not verified here.)
 	const dateObject =
 		`<ds:Object><ds:SignatureProperties><ds:SignatureProperty Id="${propertyId}" Target="#${signatureId}">` +
 		`<dc:date xmlns:dc="${DC_NS}">${signingTime}</dc:date></ds:SignatureProperty></ds:SignatureProperties></ds:Object>`;
