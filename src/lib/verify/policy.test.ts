@@ -80,13 +80,14 @@ function policyDer(uri: string, digest: Bytes): Bytes {
 	);
 }
 
-function commitmentDer(dotted: string): Bytes {
-	return tlv(0x30, tlv(0x30, oidBytes(dotted)));
+/** `CommitmentTypeIndication ::= SEQUENCE { commitmentTypeId OID, qualifiers OPTIONAL }`. */
+function commitmentDer(dotted: string, qualifier?: Bytes): Bytes {
+	return tlv(0x30, concat(qualifier ? [oidBytes(dotted), tlv(0x30, qualifier)] : [oidBytes(dotted)]));
 }
 
-function parsePolicyXml(inner: string): Document {
+function parsePolicyXml(inner: string, signedProperties = 'SignedSignatureProperties'): Document {
 	return new DOMParser().parseFromString(
-		`<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"><ds:Object><xades:QualifyingProperties><xades:SignedProperties><xades:SignedSignatureProperties>${inner}</xades:SignedSignatureProperties></xades:SignedProperties></xades:QualifyingProperties></ds:Object></ds:Signature>`,
+		`<ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xades="http://uri.etsi.org/01903/v1.3.2#"><ds:Object><xades:QualifyingProperties><xades:SignedProperties><xades:${signedProperties}>${inner}</xades:${signedProperties}></xades:SignedProperties></xades:QualifyingProperties></ds:Object></ds:Signature>`,
 		'application/xml'
 	);
 }
@@ -103,6 +104,21 @@ describe('assessPolicyClaim', () => {
 		});
 		expect(finding.area).toBe('policy');
 		expect(finding.status).toBe('pass');
+	});
+
+	it('checks the FacturaE 3.1 digest AutoFirma ships, and rejects a near-miss', () => {
+		const claim = {
+			identifier: FACTURAE_31_URI,
+			digestAlgorithm: '1.3.14.3.2.26',
+			implied: false,
+			signed: true,
+			family: 'cades' as const
+		};
+		const published = unb64('Ohixl6upD6av8N7pEvDABhEL6hM=');
+		expect(assessPolicyClaim({ ...claim, digestValue: published }).status).toBe('pass');
+		const nearMiss = new Uint8Array(published);
+		nearMiss[nearMiss.length - 1] ^= 0xff;
+		expect(assessPolicyClaim({ ...claim, digestValue: nearMiss }).status).toBe('fail');
 	});
 
 	it('fails a bundled policy whose hash was tampered with', () => {
@@ -260,6 +276,26 @@ describe('extractCadesClaims', () => {
 		expect(commitments[1].signed).toBe(false);
 	});
 
+	it('reads a real attribute value, where the value is the indication itself', () => {
+		const withQualifier = commitmentDer(
+			'1.2.840.113549.1.9.16.6.3',
+			tlv(0x30, tlv(0x06, new Uint8Array([0x2a, 0x03, 0x04])))
+		);
+		const { commitments } = extractCadesClaims(
+			[
+				{ type: OID_COMMITMENT, values: [parse(commitmentDer('1.2.840.113549.1.9.16.6.1')).node] },
+				{ type: OID_COMMITMENT, values: [parse(withQualifier).node] }
+			],
+			[],
+			'cades'
+		);
+		expect(commitments.map((claim) => claim.kind)).toEqual([
+			'1.2.840.113549.1.9.16.6.1',
+			'1.2.840.113549.1.9.16.6.3'
+		]);
+		expect(assessCommitmentClaim(commitments[0]).status).toBe('pass');
+	});
+
 	it('labels PAdES claims as pades — same OIDs, different family', () => {
 		const { policies } = extractCadesClaims(
 			[{ type: OID_SIG_POLICY, values: [parse(policyDer('1.9.9', new Uint8Array([7]))).node] }],
@@ -324,5 +360,16 @@ describe('extractXadesClaims', () => {
 		expect(commitments).toHaveLength(1);
 		expect(commitments[0].signed).toBe(false);
 		expect(assessCommitmentClaim(commitments[0]).status).toBe('fail');
+	});
+
+	it('treats a commitment under SignedDataObjectProperties as signed', () => {
+		const document = parsePolicyXml(
+			'<xades:CommitmentTypeIndication><xades:CommitmentTypeId><xades:Identifier>http://uri.etsi.org/01903/v1.3.2#ProofOfOrigin</xades:Identifier></xades:CommitmentTypeId></xades:CommitmentTypeIndication>',
+			'SignedDataObjectProperties'
+		);
+		const { commitments } = extractXadesClaims(document);
+		expect(commitments).toHaveLength(1);
+		expect(commitments[0].signed).toBe(true);
+		expect(assessCommitmentClaim(commitments[0]).status).toBe('pass');
 	});
 });

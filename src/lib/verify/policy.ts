@@ -46,17 +46,18 @@ export const FACTURAE_31_URI =
 	'http://www.facturae.es/politica_de_firma_formato_facturae/politica_de_firma_formato_facturae_v3_1.pdf';
 
 /**
- * Policies checkable offline. Only FacturaE 3.1 is bundled: its URI + SHA-1
- * digest (`Ohixl6upD6av8N7pEvDABhLyVky=`) are the values FacturaE samples carry;
- * there is no generally-published eIDAS policy to bundle (qualified-status
- * determination is out of scope). Everything else takes the unknown-policy path.
+ * Policies checkable offline. Only FacturaE 3.1 is bundled: URI and SHA-1 digest
+ * are the pair AutoFirma itself ships as its `POLICY_FACTURAE_31` constant
+ * (`reference/decompile-1.9:decompiled/sources/es/gob/afirma/signers/xades/AOFacturaESigner.java:26`).
+ * There is no generally-published eIDAS policy to bundle (qualified-status
+ * determination is out of scope), so everything else takes the unknown-policy path.
  */
 export const BUNDLED_POLICIES: BundledPolicy[] = [
 	{
 		label: 'FacturaE 3.1',
 		uri: FACTURAE_31_URI,
 		hashAlgorithm: 'SHA-1',
-		digestBase64: 'Ohixl6upD6av8N7pEvDABhLyVky='
+		digestBase64: 'Ohixl6upD6av8N7pEvDABhEL6hM='
 	}
 ];
 /** XAdES `CommitmentTypeId` fragment names (any `01903` version URI qualifies). */
@@ -265,13 +266,16 @@ function decodeCadesPolicy(value: Der, signed: boolean, family: Family): PolicyC
 	}
 }
 
-/** One `attrValues[0]` of commitment-type-indication → one claim per OID. */
+/**
+ * One `attrValues[0]` of commitment-type-indication → its claim. RFC 5126 §5.11.3
+ * puts one `CommitmentTypeIndication` in each attribute value (`commitmentTypeId`
+ * first, optional qualifiers after), so the value *is* the indication — AutoFirma
+ * emits it that way (`reference/decompile-1.9`:
+ * `decompiled/sources/es/gob/afirma/signers/cades/CAdESUtils.java:153`).
+ */
 function decodeCadesCommitments(value: Der, signed: boolean, family: Family): CommitmentClaim[] {
 	try {
-		return children(value).map((indication) => {
-			const indicationFields = children(indication);
-			return { kind: oid(indicationFields[0]), signed, family };
-		});
+		return [{ kind: oid(children(value)[0]), signed, family }];
 	} catch {
 		return [{ kind: null, signed, family }];
 	}
@@ -320,10 +324,16 @@ function xadesDescendants(root: Element, localName: string): Element[] {
 	);
 }
 
+/**
+ * Covered by the signature when the ancestor chain reaches `xades:SignedProperties`.
+ * Both of its children count: `SignedSignatureProperties` (policy, signer role) and
+ * `SignedDataObjectProperties`, where a real `CommitmentTypeIndication` lives.
+ * Anything under `UnsignedProperties` (or outside `QualifyingProperties`) does not.
+ */
 function isSignedXades(element: Element): boolean {
 	let node: Element | null = element;
 	while (node) {
-		if (node.localName === 'SignedSignatureProperties' && (node.namespaceURI ?? '').startsWith(XADES_NS)) return true;
+		if (node.localName === 'SignedProperties' && (node.namespaceURI ?? '').startsWith(XADES_NS)) return true;
 		node = node.parentElement;
 	}
 	return false;
@@ -336,7 +346,7 @@ function textOf(element: Element | null | undefined): string | null {
 
 /**
  * XAdES claims from a parsed `ds:Signature` document. Location decides `signed`:
- * only claims inside `SignedSignatureProperties` are covered by the signature.
+ * only claims inside `xades:SignedProperties` are covered by the signature.
  */
 export function extractXadesClaims(document: Document, family: Family = 'xades'): {
 	policies: PolicyClaim[];
