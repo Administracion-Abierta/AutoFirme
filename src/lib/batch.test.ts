@@ -16,7 +16,10 @@ import {
 	buildManifest,
 	buildZip,
 	createBatchQueue,
+	formatForName,
 	sha256Hex,
+	signCadesFromDigest,
+	summarizeBatch,
 	type BatchSigner,
 	type SignedDocument
 } from './batch';
@@ -413,5 +416,96 @@ describe('per-document format', () => {
 
 		// The override was a no-op: the run kept the format the batch started with.
 		expect(state.documents.map((document) => document.format)).toEqual(['cades', 'cades']);
+	});
+});
+
+describe('directory walk helpers', () => {
+	it('picks the format from the file name: PDFs to PAdES, XML to XAdES, the rest to CAdES', () => {
+		expect(formatForName('contrato.pdf')).toBe('pades');
+		expect(formatForName('CONTRATO.PDF')).toBe('pades');
+		expect(formatForName('factura.xml')).toBe('xades');
+		expect(formatForName('nota.txt')).toBe('cades');
+		expect(formatForName('sin-extension')).toBe('cades');
+	});
+
+	it('summarizes a mixed run as one verdict row per document', async () => {
+		const queue = createBatchQueue();
+		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos')], 'cades');
+		const state = await queue.run(async (document, bytes) =>
+			document.name === 'b.txt' ? cadesEngine(keyless)(document, bytes) : cadesEngine()(document, bytes)
+		);
+		const report = summarizeBatch(state);
+		expect(report.signed).toBe(1);
+		expect(report.failed).toBe(1);
+		expect(report.rows.map((row) => [row.name, row.result])).toEqual([
+			['a.txt', 'DONE_AND_SAVED'],
+			['b.txt', 'ERROR_PRE']
+		]);
+		expect(report.rows[1].detail).toMatch(/no private key/);
+	});
+
+	it('signs 500 files with a per-file verdict table and retries only the failure', async () => {
+		const files = Array.from({ length: 500 }, (_, index) =>
+			file(`document-${String(index + 1).padStart(3, '0')}.txt`, `document ${index + 1}\n`)
+		);
+		const queue = createBatchQueue();
+		queue.set(files, 'cades');
+		// Bulk rows use a stub signer: 500 real signatures prove nothing the 1-3-file
+		// openssl tests do not already prove, and would make the suite crypto-bound.
+		const stub: Engine = async (document) => ({
+			bytes: new TextEncoder().encode(`stub:${document.name}`),
+			algorithm: 'stub'
+		});
+		const tried = new Set<string>();
+		const seen: string[] = [];
+		const state = await queue.run(async (document, bytes) => {
+			seen.push(document.name);
+			if (document.name === 'document-250.txt' && !tried.has(document.name)) {
+				tried.add(document.name);
+				throw new Error('injected failure');
+			}
+			return stub(document, bytes);
+		});
+		const report = summarizeBatch(state);
+		expect(report.rows).toHaveLength(500);
+		expect(report.signed).toBe(499);
+		expect(report.failed).toBe(1);
+		expect(seen).toHaveLength(500);
+		// A rerun retries only the failure: the second run touches one document.
+		const second: string[] = [];
+		const retried = await queue.run(async (document, bytes) => {
+			second.push(document.name);
+			return stub(document, bytes);
+		});
+		expect(summarizeBatch(retried).failed).toBe(0);
+		expect(second).toEqual(['document-250.txt']);
+	});
+});
+
+describe('pre-hashed digest input', () => {
+	it('signs a digest computed elsewhere; openssl verifies it against the original file', async () => {
+		const content = new TextEncoder().encode('documento con digest externo\n');
+		const digest = await sha256Hex(content);
+		const signature = await signCadesFromDigest(certificate, { digest });
+		expect(verify(signature, contentPath('digest-mode', content), 'digest-mode.csig')).toBeNull();
+	});
+
+	it('accepts the raw 32-byte digest and rejects a malformed one', async () => {
+		const content = new TextEncoder().encode('otro documento\n');
+		const hex = await sha256Hex(content);
+		const raw = new Uint8Array(32);
+		for (let i = 0; i < 32; i += 1) raw[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+		const fromRaw = await signCadesFromDigest(certificate, {
+			digest: raw,
+			signingTime: new Date('2026-10-21T00:00:00Z')
+		});
+		const fromHex = await signCadesFromDigest(certificate, {
+			digest: hex,
+			signingTime: new Date('2026-10-21T00:00:00Z')
+		});
+		expect(fromRaw).toEqual(fromHex);
+		await expect(signCadesFromDigest(certificate, { digest: 'zz' })).rejects.toThrow(
+			/64-hex-char/
+		);
 	});
 });
