@@ -115,12 +115,14 @@ fn decode(field: &str) -> String {
                 out.push(' ');
                 index += 1;
             }
-            b'%' if index + 2 < bytes.len() => match u8::from_str_radix(&field[index + 1..index + 3], 16) {
-                Ok(byte) => {
+            b'%' if index + 2 < bytes.len() => match std::str::from_utf8(&bytes[index + 1..index + 3])
+                .ok()
+                .and_then(|hex| u8::from_str_radix(hex, 16).ok()) {
+                Some(byte) => {
                     out.push(byte as char);
                     index += 3;
                 }
-                Err(_) => {
+                None => {
                     out.push('%');
                     index += 1;
                 }

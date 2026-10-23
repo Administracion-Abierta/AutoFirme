@@ -24,7 +24,8 @@ pub fn loopback_addr() -> SocketAddr {
     SocketAddr::from(([127, 0, 0, 1], protocol::DEFAULT_WEBSOCKET_PORT))
 }
 
-fn router() -> Router {
+/// The single-route router (`/` upgrades to the protocol-3 WebSocket loop).
+pub fn router() -> Router {
     Router::new().route("/", get(ws_handler))
 }
 
@@ -45,7 +46,8 @@ async fn ws_handler(ws: WebSocketUpgrade) -> Response {
     })
 }
 
-fn rustls_config(
+/// TLS config for the loopback listener, from an install identity.
+pub fn rustls_config(
     identity: &crate::tls::TlsIdentity,
 ) -> std::io::Result<axum_server::tls_rustls::RustlsConfig> {
     let mut config = crate::tls::server_config(identity)
