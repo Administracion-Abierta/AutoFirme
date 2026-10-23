@@ -7,7 +7,7 @@ import { verifyXades } from './xades';
 import type { Bytes, VerificationReport, VerifyOptions } from './types';
 
 export type { Bytes, Check, CheckId, CheckStatus, Signer, VerificationReport, VerificationStatus, ArtifactFormat, VerifyOptions } from './types';
-export { detectFormat } from './detect';
+export { detectFormat, suggestSignFormat, type SignSuggestion } from './detect';
 export { extractPadesSignatures, verifyPades } from './pades';
 
 export async function verifyArtifact(bytes: Bytes, options: VerifyOptions = {}): Promise<VerificationReport> {
