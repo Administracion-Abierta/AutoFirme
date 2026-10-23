@@ -156,8 +156,69 @@ export interface Copy {
 	mcpBridgeUnreachable: string;
 	/** Extension chooser label when the request comes from an MCP agent. */
 	mcpOrigin: string;
+	/** Copy of the in-app diagnostics page (#167): the WebCrypto probe, the parity table and the
+	 *  PAdES budget run. Nested so the page reads `t.diagnostics.title`. */
+	diagnostics: DiagnosticsCopy;
 	/** Native surfaces of the Tauri shell: PIN and consent dialogs, save dialog, updater, installer, error toasts. */
 	native: NativeCopy;
+}
+
+/** Copy of the in-app diagnostics page (#167). */
+export interface DiagnosticsCopy {
+	/** Browser tab title of the diagnostics page. */
+	title: string;
+	/** Page heading. */
+	heading: string;
+	/** Sentence introducing the WebCrypto secure-context probe. */
+	secureContext: string;
+	/** Heading of the WebCrypto probe block. */
+	webCryptoTitle: string;
+	/** Probe state while the probes run. */
+	probesRunning: string;
+	/** Probe state when every probe passed. */
+	probeOk: string;
+	/** Probe state when a probe failed. */
+	probeFail: string;
+	/** Heading of the 12-item parity gate block. */
+	parityTitle: string;
+	/** Sentence explaining that each item is proven by the suite named next to it. */
+	parityHint: string;
+	/** The command that runs the suites, e.g. `pnpm test`. */
+	parityCommand: string;
+	/** Heading of the PAdES budget block. */
+	budgetTitle: string;
+	/** Sentence describing what the budget run does. */
+	budgetHint: string;
+	/** Placeholder of the PIN field. */
+	pinPlaceholder: string;
+	/** Label of the button that starts the budget run. */
+	runBudget: string;
+	/** Label of the button while the budget run is in flight. */
+	running: string;
+	/** Prefix of the progress line. */
+	phase: string;
+	/** Row label of the signing time. */
+	signRow: string;
+	/** Row label of the verification time. */
+	verifyRow: string;
+	/** Row label of the signed size. */
+	signedRow: string;
+	/** Row label of the verification verdict. */
+	verifiedRow: string;
+	/** Row label of the pass/fail verdict. */
+	verdictRow: string;
+	/** Value of the verification verdict when it held. */
+	verifiedYes: string;
+	/** Value of the verification verdict when it did not hold. */
+	verifiedNo: string;
+	/** Value of the pass/fail verdict when the run passed. */
+	verdictPass: string;
+	/** Value of the pass/fail verdict when the run failed. */
+	verdictFail: string;
+	/** The run's time against its budget, e.g. `671 ms (budget 30000 ms)`. */
+	msBudget: string;
+	/** The signed size in bytes, e.g. `52432788 bytes`. */
+	bytes: string;
 }
 
 /** Strings only the desktop shell shows (`src-tauri/src/i18n.rs` embeds this same block). */
@@ -365,6 +426,37 @@ export const copy: Record<Lang, Copy> = {
 		mcpBridgeBadEndpoint: 'La dirección debe ser http(s)://…/mcp, sin usuario ni contraseña.',
 		mcpBridgeUnreachable: 'No se pudo abrir el puente: ¿está el servidor MCP en marcha y publicado por TLS?',
 		mcpOrigin: 'Agente MCP',
+		diagnostics: {
+			title: 'Diagnóstico · AutoFirma',
+			heading: 'Diagnóstico',
+			secureContext: 'WebCrypto en este contexto:',
+			webCryptoTitle: 'WebCrypto',
+			probesRunning: 'Ejecutando…',
+			probeOk: 'ok',
+			probeFail: 'falla',
+			parityTitle: 'Puerta de paridad de 12 puntos',
+			parityHint:
+				'Cada punto lo demuestra la suite que se nombra a su lado; ejecútalas con',
+			parityCommand: 'pnpm test',
+			budgetTitle: 'Diagnóstico · presupuesto PAdES',
+			budgetHint:
+				'Firma un PDF sintético en un Web Worker y lo verifica. El progreso de abajo demuestra que la interfaz sigue viva.',
+			pinPlaceholder: 'PIN',
+			runBudget: 'Ejecutar presupuesto',
+			running: 'Ejecutando…',
+			phase: 'Fase:',
+			signRow: 'Firma',
+			verifyRow: 'Verificación',
+			signedRow: 'Firmado',
+			verifiedRow: 'Verificado',
+			verdictRow: 'Resultado',
+			verifiedYes: 'sí',
+			verifiedNo: 'NO',
+			verdictPass: 'CORRECTO',
+			verdictFail: 'FALLO',
+			msBudget: '{ms} ms (presupuesto {budget})',
+			bytes: '{bytes} bytes'
+		},
 		native: {
 			pinTitle: 'Firma con tarjeta',
 			pinPrompt: 'Introduce el PIN de tu tarjeta para firmar.',
@@ -566,6 +658,36 @@ export const copy: Record<Lang, Copy> = {
 		mcpBridgeBadEndpoint: 'The address must be http(s)://…/mcp, without a user or password.',
 		mcpBridgeUnreachable: 'Could not open the bridge: is the MCP server running and published over TLS?',
 		mcpOrigin: 'MCP agent',
+		diagnostics: {
+			title: 'Diagnostics · AutoFirma',
+			heading: 'Diagnostics',
+			secureContext: 'WebCrypto under this context:',
+			webCryptoTitle: 'WebCrypto',
+			probesRunning: 'Running…',
+			probeOk: 'ok',
+			probeFail: 'fails',
+			parityTitle: '12-item parity gate',
+			parityHint: 'Each item is proven by the suite named next to it; run them with',
+			parityCommand: 'pnpm test',
+			budgetTitle: 'Diagnostics · PAdES budget',
+			budgetHint:
+				'Signs a synthetic PDF in a Web Worker, then verifies it. Progress below proves the UI stays alive.',
+			pinPlaceholder: 'PIN',
+			runBudget: 'Run budget',
+			running: 'Running…',
+			phase: 'Phase:',
+			signRow: 'Sign',
+			verifyRow: 'Verify',
+			signedRow: 'Signed',
+			verifiedRow: 'Verified',
+			verdictRow: 'Verdict',
+			verifiedYes: 'yes',
+			verifiedNo: 'NO',
+			verdictPass: 'PASS',
+			verdictFail: 'FAIL',
+			msBudget: '{ms} ms (budget {budget})',
+			bytes: '{bytes} bytes'
+		},
 		native: {
 			pinTitle: 'Sign with card',
 			pinPrompt: 'Enter your card PIN to sign.',

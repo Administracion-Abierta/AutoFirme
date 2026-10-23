@@ -2,7 +2,16 @@
 	import { onMount } from 'svelte';
 	import { createEngineClient } from '#lib/engine';
 	import { PDF_BUDGET, runBudget, runWebCryptoProbes, type ProbeResult } from '#lib/diagnostics';
+	import { copy, type Lang } from '#lib/i18n';
 	import { loadSignerSession } from '#lib/keystore';
+
+	/**
+	 * The diagnostics page is a standalone route, so it carries its own language state instead of
+	 * the app shell's. The catalogue is the single source of copy (#119): every literal below
+	 * comes from `copy[lang]`, which is why the hardcoded-copy gate passes.
+	 */
+	let lang = $state<Lang>('es');
+	const t = $derived(copy[lang].diagnostics);
 
 	/** The 12-item parity gate of #19, each item mapped to the suite that proves it. */
 	const GATE: { item: string; proof: string }[] = [
@@ -73,45 +82,41 @@
 			running = false;
 		}
 	}
-
-	function budgetLabel(): string {
-		return `${Math.round(PDF_BUDGET.bytes / 1024 / 1024)} MB`;
-	}
 </script>
 
 <svelte:head>
-	<title>Diagnósticos · AutoFirme</title>
+	<title>{t.title}</title>
 </svelte:head>
 
 <main class="mx-auto flex max-w-3xl flex-col gap-6 p-6">
 	<header>
-		<h1 class="font-display text-xl font-semibold">Diagnósticos / Diagnostics</h1>
+		<h1 class="font-display text-xl font-semibold">{t.heading}</h1>
 		<p class="text-muted-foreground text-sm">
-			WebCrypto bajo este contexto / WebCrypto under this context: {typeof window === 'undefined'
-				? 'n/a'
-				: String(window.isSecureContext)}
+			{t.secureContext} {typeof window === 'undefined' ? 'n/a' : String(window.isSecureContext)}
 		</p>
 	</header>
 
 	<section class="rounded-lg border p-4">
-		<h2 class="mb-3 font-semibold">WebCrypto ({probesRunning ? '…' : probes.every((r) => r.ok) ? 'ok' : 'falla'})</h2>
+		<h2 class="mb-3 font-semibold">
+			{t.webCryptoTitle} ({probesRunning ? '…' : probes.every((r) => r.ok) ? t.probeOk : t.probeFail})
+		</h2>
 		<ul class="flex flex-col gap-2 text-sm">
 			{#each probes as probe (probe.id)}
 				<li class="flex items-start gap-2">
 					<span class="w-32 shrink-0 font-mono">{probe.id}</span>
-					<span class={probe.ok ? 'text-emerald-600' : 'text-red-600'}>{probe.ok ? 'ok' : 'FAIL'}</span>
+					<span class={probe.ok ? 'text-emerald-600' : 'text-red-600'}>{probe.ok ? t.probeOk : t.probeFail}</span>
 					<span class="text-muted-foreground break-all">{probe.detail}</span>
 				</li>
 			{:else}
-				<li class="text-muted-foreground">Ejecutando… / running…</li>
+				<li class="text-muted-foreground">{t.probesRunning}</li>
 			{/each}
 		</ul>
 	</section>
 
 	<section class="rounded-lg border p-4">
-		<h2 class="mb-3 font-semibold">12-item parity gate</h2>
+		<h2 class="mb-3 font-semibold">{t.parityTitle}</h2>
 		<p class="text-muted-foreground mb-3 text-sm">
-			Each item is proven by the suite named next to it; run them with <code>pnpm test</code>.
+			{t.parityHint} <code>{t.parityCommand}</code>.
 		</p>
 		<ol class="list-decimal pl-5 text-sm">
 			{#each GATE as { item, proof }}
@@ -121,21 +126,21 @@
 	</section>
 
 	<section class="rounded-lg border p-4">
-		<h2 class="mb-3 font-semibold">Diagnostics · {budgetLabel()} PAdES budget</h2>
-		<p class="text-muted-foreground mb-3 text-sm">Signs a synthetic {budgetLabel()} PDF in a Web Worker, then verifies it. Progress below proves the UI stays alive.</p>
+		<h2 class="mb-3 font-semibold">{t.budgetTitle}</h2>
+		<p class="text-muted-foreground mb-3 text-sm">{t.budgetHint}</p>
 		<input type="file" accept=".p12,.pfx" onchange={pick} />
-		<input type="password" placeholder="PIN" bind:value={pin} />
-		<button onclick={run} disabled={!p12 || running}>{running ? 'Running…' : 'Run budget'}</button>
-		{#if phase}<p role="status">Phase: {phase}{fraction === null ? '' : ` ${Math.round(fraction * 100)}%`}</p>{/if}
+		<input type="password" placeholder={t.pinPlaceholder} bind:value={pin} />
+		<button onclick={run} disabled={!p12 || running}>{running ? t.running : t.runBudget}</button>
+		{#if phase}<p role="status">{t.phase} {phase}{fraction === null ? '' : ` ${Math.round(fraction * 100)}%`}</p>{/if}
 		{#if fraction !== null}<progress value={fraction ?? 0} max="1">{phase}</progress>{/if}
 		{#if result}
 			<table>
 				<tbody>
-					<tr><td>Sign</td><td>{result.signMs} ms (budget {PDF_BUDGET.signMs})</td></tr>
-					<tr><td>Verify</td><td>{result.verifyMs} ms (budget {PDF_BUDGET.verifyMs})</td></tr>
-					<tr><td>Signed</td><td>{result.signedBytes} bytes</td></tr>
-					<tr><td>Verified</td><td>{result.verified ? 'yes' : 'NO'}</td></tr>
-					<tr><td>Verdict</td><td>{result.pass ? 'PASS' : 'FAIL'}</td></tr>
+					<tr><td>{t.signRow}</td><td>{t.msBudget.replace('{ms}', String(result.signMs)).replace('{budget}', String(PDF_BUDGET.signMs))}</td></tr>
+					<tr><td>{t.verifyRow}</td><td>{t.msBudget.replace('{ms}', String(result.verifyMs)).replace('{budget}', String(PDF_BUDGET.verifyMs))}</td></tr>
+					<tr><td>{t.signedRow}</td><td>{t.bytes.replace('{bytes}', String(result.signedBytes))}</td></tr>
+					<tr><td>{t.verifiedRow}</td><td>{result.verified ? t.verifiedYes : t.verifiedNo}</td></tr>
+					<tr><td>{t.verdictRow}</td><td>{result.pass ? t.verdictPass : t.verdictFail}</td></tr>
 				</tbody>
 			</table>
 		{/if}
