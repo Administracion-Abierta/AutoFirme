@@ -1,0 +1,13 @@
+# batch + ZIP leg (gate item 8): unzip CRC + sha256 manifest recompute (Refs #96)
+# date: 2026-10-21T21:25:42Z · host: Linux 5.14.0-687.15.1.el9_8.x86_64 x86_64 · node v26.7.0 · unzip 6.00
+# $ node scripts/verify-batch-zip.mjs
+Archive:  /tmp/autofirme-batch-H5wu1r/lote.zip
+    testing: contrato.txt.csig        OK
+    testing: factura.txt.csig         OK
+    testing: manifest.json            OK
+No errors detected in compressed data of /tmp/autofirme-batch-H5wu1r/lote.zip.
+contrato.txt.csig: sha256sum matches the manifest digest (78e4ac949ca1…)
+factura.txt.csig: sha256sum matches the manifest digest (bb6b552d7af0…)
+OK — 1171 bytes, 3 entries, verified by unzip + sha256sum
+archive kept at /tmp/autofirme-batch-H5wu1r/lote.zip
+exit=0

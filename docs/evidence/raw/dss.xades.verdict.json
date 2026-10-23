@@ -1,0 +1,33 @@
+{
+  "source": "https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/services/rest/validation/validateSignature",
+  "request_date": "2026-10-21",
+  "http_status": 200,
+  "method": "POST application/json {signedDocument:{bytes,name}[,originalDocuments]}",
+  "document": "xades.xml",
+  "validation_policy": "QES AES/QC AES TL based",
+  "signatures_count": 1,
+  "valid_signatures_count": 0,
+  "signature": {
+    "format": "XAdES-BASELINE-B",
+    "signed_by": "\u00d1and\u00fa Prueba",
+    "claimed_signing_time": "2026-10-21T16:59:50Z",
+    "digest_algorithm": "SHA256",
+    "encryption_algorithm": "RSA",
+    "key_length": "2048",
+    "signature_intact": true,
+    "signature_valid": true,
+    "signature_scope": [
+      {
+        "value": "The full XML file with transformations.",
+        "Id": "D-E0AA918451017E3495D5BDD1DB9F2CED69F0CF92289789CE17D87D1884D749AD",
+        "name": "Full XML File",
+        "scope": "FULL"
+      }
+    ],
+    "indication": "INDETERMINATE",
+    "sub_indication": "NO_CERTIFICATE_CHAIN_FOUND",
+    "errors": [
+      "BBB_XCV_CCCBB_SIG_ANS"
+    ]
+  }
+}

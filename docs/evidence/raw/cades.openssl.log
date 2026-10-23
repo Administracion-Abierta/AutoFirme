@@ -1,0 +1,6 @@
+$ openssl cms -verify -in cades.p7s -inform DER -content cades.content.bin -CAfile chain.pem -binary
+# OpenSSL 4.0.3 29 Sep 2026 (Library: OpenSSL 4.0.3 29 Sep 2026); -binary required: content has UTF-8 and no trailing newline
+
+CMS Verification successful
+AutoFirma Web — gate-12 parity document
+exit=0

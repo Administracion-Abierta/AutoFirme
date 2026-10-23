@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<ns3:ValidationReport xmlns="http://uri.etsi.org/01903/v1.3.2#" xmlns:ns2="http://www.w3.org/2000/09/xmldsig#" xmlns:ns3="http://uri.etsi.org/19102/v1.4.1#" xmlns:ns4="http://uri.etsi.org/02231/v2#">
+    <ns3:SignatureValidationReport>
+        <ns3:SignatureIdentifier id="S-1A6A65A0F62AADE15D6704C280ED8A56F398A295F90DA53F859714DB6547F91E">
+            <ns3:DigestAlgAndValue>
+                <ns2:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                <ns2:DigestValue>3iRwruSa8afdCuXM/84LBdnoh99lvKnvZwMcSCWVtWI=</ns2:DigestValue>
+            </ns3:DigestAlgAndValue>
+            <ns2:SignatureValue>NPA/dNAfX7eJIwXOx6ydgFCJXL76RLCDStZCqW7LMyXfwn5Oub99Mj44iOB+BE1JabTCyyTCQRNkulifxsLWCmQ9SOd1ojKM2dxzGMGMrvpZ+Qk+TiY6ih9TyhqfQ4wY6hlQzPJTM796e7aYyoKupNNOL26l/U+zqfmDIatPAnWlnuWk+xsxOfzGplrGRjx+ba4KmFsB3v9kYck6GT9RhGP1SJAagYnp8DQqHyZ4ll5Bp+xeQ4V3rBU52V3ZupchhmAm+QnsV8Zxo/JecPmwp2sKupJVDnp9YqdGqir+BJ+7Gaq1pQc+xc5uOf7vY0Sc2f91yKD+JTmcTCcIioF0Jg==</ns2:SignatureValue>
+            <ns3:HashOnly>false</ns3:HashOnly>
+            <ns3:DocHashOnly>false</ns3:DocHashOnly>
+            <ns3:DAIdentifier>Signature-0bd98b10f79323fe</ns3:DAIdentifier>
+        </ns3:SignatureIdentifier>
+        <ns3:ValidationConstraintsEvaluationReport>
+            <ns3:ValidationConstraint>
+                <ns3:ValidationConstraintIdentifier>urn:cef:dss:bbb:formatChecking</ns3:ValidationConstraintIdentifier>
+                <ns3:ConstraintStatus>
+                    <ns3:Status>urn:etsi:019102:constraintStatus:applied</ns3:Status>
+                </ns3:ConstraintStatus>
+                <ns3:ValidationStatus>
+                    <ns3:MainIndication>urn:etsi:019102:mainindication:passed</ns3:MainIndication>
+                </ns3:ValidationStatus>
+            </ns3:ValidationConstraint>
+            <ns3:ValidationConstraint>
+                <ns3:ValidationConstraintIdentifier>urn:cef:dss:bbb:identificationOfTheSigningCertificate</ns3:ValidationConstraintIdentifier>
+                <ns3:ConstraintStatus>
+                    <ns3:Status>urn:etsi:019102:constraintStatus:applied</ns3:Status>
+                </ns3:ConstraintStatus>
+                <ns3:ValidationStatus>
+                    <ns3:MainIndication>urn:etsi:019102:mainindication:passed</ns3:MainIndication>
+                </ns3:ValidationStatus>
+            </ns3:ValidationConstraint>
+            <ns3:ValidationConstraint>
+                <ns3:ValidationConstraintIdentifier>urn:cef:dss:bbb:validationContextInitialization</ns3:ValidationConstraintIdentifier>
+                <ns3:ConstraintStatus>
+                    <ns3:Status>urn:etsi:019102:constraintStatus:applied</ns3:Status>
+                </ns3:ConstraintStatus>
+                <ns3:ValidationStatus>
+                    <ns3:MainIndication>urn:etsi:019102:mainindication:passed</ns3:MainIndication>
+                </ns3:ValidationStatus>
+            </ns3:ValidationConstraint>
+            <ns3:ValidationConstraint>
+                <ns3:ValidationConstraintIdentifier>urn:cef:dss:bbb:cryptographicVerification</ns3:ValidationConstraintIdentifier>
+                <ns3:ConstraintStatus>
+                    <ns3:Status>urn:etsi:019102:constraintStatus:applied</ns3:Status>
+                </ns3:ConstraintStatus>
+                <ns3:ValidationStatus>
+                    <ns3:MainIndication>urn:etsi:019102:mainindication:passed</ns3:MainIndication>
+                </ns3:ValidationStatus>
+            </ns3:ValidationConstraint>
+            <ns3:ValidationConstraint>
+                <ns3:ValidationConstraintIdentifier>urn:cef:dss:bbb:signatureAcceptanceValidation</ns3:ValidationConstraintIdentifier>
+                <ns3:ConstraintStatus>
+                    <ns3:Status>urn:etsi:019102:constraintStatus:applied</ns3:Status>
+                </ns3:ConstraintStatus>
+                <ns3:ValidationStatus>
+                    <ns3:MainIndication>urn:etsi:019102:mainindication:passed</ns3:MainIndication>
+                    <ns3:AssociatedValidationReportData>
+                        <ns3:AdditionalValidationReportData>
+                            <ns3:ReportData>
+                                <ns3:Type>urn:cef:dss:message:warning</ns3:Type>
+                                <ns3:Value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">The signed attribute: 'signing-certificate' is present more than once!</ns3:Value>
+                            </ns3:ReportData>
+                            <ns3:ReportData>
+                                <ns3:Type>urn:cef:dss:message:warning</ns3:Type>
+                                <ns3:Value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">The 'Signing Certificate' attribute contains references to other certificates than those present in the certificate chain!</ns3:Value>
+                            </ns3:ReportData>
+                        </ns3:AdditionalValidationReportData>
+                    </ns3:AssociatedValidationReportData>
+                </ns3:ValidationStatus>
+            </ns3:ValidationConstraint>
+            <ns3:ValidationConstraint>
+                <ns3:ValidationConstraintIdentifier>urn:cef:dss:bbb:x509CertificateValidation</ns3:ValidationConstraintIdentifier>
+                <ns3:ConstraintStatus>
+                    <ns3:Status>urn:etsi:019102:constraintStatus:applied</ns3:Status>
+                </ns3:ConstraintStatus>
+                <ns3:ValidationStatus>
+                    <ns3:MainIndication>urn:etsi:019102:mainindication:indeterminate</ns3:MainIndication>
+                    <ns3:SubIndication>urn:etsi:019102:subindication:NO_CERTIFICATE_CHAIN_FOUND</ns3:SubIndication>
+                    <ns3:AssociatedValidationReportData>
+                        <ns3:AdditionalValidationReportData>
+                            <ns3:ReportData>
+                                <ns3:Type>urn:cef:dss:message:error</ns3:Type>
+                                <ns3:Value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">The certificate chain for signature is not trusted, it does not contain a trust anchor.</ns3:Value>
+                            </ns3:ReportData>
+                        </ns3:AdditionalValidationReportData>
+                    </ns3:AssociatedValidationReportData>
+                </ns3:ValidationStatus>
+            </ns3:ValidationConstraint>
+            <ns3:ValidationConstraint>
+                <ns3:ValidationConstraintIdentifier>urn:cef:dss:bbb:pastSignatureValidation</ns3:ValidationConstraintIdentifier>
+                <ns3:ConstraintStatus>
+                    <ns3:Status>urn:etsi:019102:constraintStatus:disabled</ns3:Status>
+                </ns3:ConstraintStatus>
+            </ns3:ValidationConstraint>
+            <ns3:ValidationConstraint>
+                <ns3:ValidationConstraintIdentifier>urn:cef:dss:bbb:pastCertificateValidation</ns3:ValidationConstraintIdentifier>
+                <ns3:ConstraintStatus>
+                    <ns3:Status>urn:etsi:019102:constraintStatus:disabled</ns3:Status>
+                </ns3:ConstraintStatus>
+            </ns3:ValidationConstraint>
+            <ns3:ValidationConstraint>
+                <ns3:ValidationConstraintIdentifier>urn:cef:dss:bbb:validationTimeSliding</ns3:ValidationConstraintIdentifier>
+                <ns3:ConstraintStatus>
+                    <ns3:Status>urn:etsi:019102:constraintStatus:disabled</ns3:Status>
+                </ns3:ConstraintStatus>
+            </ns3:ValidationConstraint>
+        </ns3:ValidationConstraintsEvaluationReport>
+        <ns3:ValidationTimeInfo>
+            <ns3:ValidationTime>2026-10-21T21:03:49Z</ns3:ValidationTime>
+            <ns3:BestSignatureTime>
+                <ns3:POETime>2026-10-21T21:03:49Z</ns3:POETime>
+                <ns3:TypeOfProof>urn:etsi:019102:poetype:validation</ns3:TypeOfProof>
+            </ns3:BestSignatureTime>
+        </ns3:ValidationTimeInfo>
+        <ns3:SignersDocument>
+            <ns3:DigestAlgAndValue>
+                <ns2:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                <ns2:DigestValue>O0+p33HKOE3JGkX0TW86I8GfuwwyegUuK5DhYk0SaQg=</ns2:DigestValue>
+            </ns3:DigestAlgAndValue>
+            <ns3:SignersDocumentRepresentation VOReference="D-E0AA918451017E3495D5BDD1DB9F2CED69F0CF92289789CE17D87D1884D749AD"/>
+        </ns3:SignersDocument>
+        <ns3:SignatureAttributes>
+            <ns3:SigningTime Signed="true">
+                <ns3:Time>2026-10-21T16:59:50Z</ns3:Time>
+            </ns3:SigningTime>
+            <ns3:SigningCertificate Signed="true">
+                <ns3:AttributeObject VOReference="C-7687B1BBA766C2C9D82298DC95CC808F51BE09C41112EDA75A2392511B12EF1F C-D747D2A7D6CB53B52AE899A3D9F6AD4EE046222497FFD9F1F642166E34335CA7"/>
+            </ns3:SigningCertificate>
+            <ns3:DataObjectFormat Signed="true">
+                <ns3:MimeType>application/xml</ns3:MimeType>
+            </ns3:DataObjectFormat>
+        </ns3:SignatureAttributes>
+        <ns3:SignerInformation>
+            <ns3:SignerCertificate VOReference="C-7687B1BBA766C2C9D82298DC95CC808F51BE09C41112EDA75A2392511B12EF1F"/>
+            <ns3:Signer>Ñandú Prueba</ns3:Signer>
+        </ns3:SignerInformation>
+        <ns3:SignatureQuality>
+            <ns3:SignatureQualityInformation>urn:cef:dss:signatureQualification:notApplicable</ns3:SignatureQualityInformation>
+        </ns3:SignatureQuality>
+        <ns3:SignatureValidationProcess>
+            <ns3:SignatureValidationProcessID>urn:etsi:019102:validationprocess:LTA</ns3:SignatureValidationProcessID>
+        </ns3:SignatureValidationProcess>
+        <ns3:SignatureValidationStatus>
+            <ns3:MainIndication>urn:etsi:019102:mainindication:indeterminate</ns3:MainIndication>
+            <ns3:SubIndication>urn:etsi:019102:subindication:NO_CERTIFICATE_CHAIN_FOUND</ns3:SubIndication>
+            <ns3:AssociatedValidationReportData>
+                <ns3:CertificateChain>
+                    <ns3:SigningCertificate VOReference="C-7687B1BBA766C2C9D82298DC95CC808F51BE09C41112EDA75A2392511B12EF1F"/>
+                </ns3:CertificateChain>
+                <ns3:CryptoInformation>
+                    <ns3:ValidationObjectId VOReference="S-1A6A65A0F62AADE15D6704C280ED8A56F398A295F90DA53F859714DB6547F91E"/>
+                    <ns3:Algorithm>http://www.w3.org/2001/04/xmldsig-more#rsa-sha256</ns3:Algorithm>
+                    <ns3:SecureAlgorithm>true</ns3:SecureAlgorithm>
+                    <ns3:NotAfter>2027-01-01T00:00:00Z</ns3:NotAfter>
+                </ns3:CryptoInformation>
+                <ns3:AdditionalValidationReportData>
+                    <ns3:ReportData>
+                        <ns3:Type>urn:cef:dss:message:error</ns3:Type>
+                        <ns3:Value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">The certificate chain for signature is not trusted, it does not contain a trust anchor.</ns3:Value>
+                    </ns3:ReportData>
+                    <ns3:ReportData>
+                        <ns3:Type>urn:cef:dss:message:warning</ns3:Type>
+                        <ns3:Value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">The signed attribute: 'signing-certificate' is present more than once!</ns3:Value>
+                    </ns3:ReportData>
+                    <ns3:ReportData>
+                        <ns3:Type>urn:cef:dss:message:warning</ns3:Type>
+                        <ns3:Value xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xsi:type="xs:string">The 'Signing Certificate' attribute contains references to other certificates than those present in the certificate chain!</ns3:Value>
+                    </ns3:ReportData>
+                </ns3:AdditionalValidationReportData>
+            </ns3:AssociatedValidationReportData>
+        </ns3:SignatureValidationStatus>
+    </ns3:SignatureValidationReport>
+    <ns3:SignatureValidationObjects>
+        <ns3:ValidationObject id="C-7687B1BBA766C2C9D82298DC95CC808F51BE09C41112EDA75A2392511B12EF1F">
+            <ns3:ObjectType>urn:etsi:019102:validationObject:certificate</ns3:ObjectType>
+            <ns3:ValidationObjectRepresentation>
+                <ns3:DigestAlgAndValue>
+                    <ns2:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                    <ns2:DigestValue>doexu6dmwsnYIpjclcyAj1G+CcQREu2nWiOSURsS7x8=</ns2:DigestValue>
+                </ns3:DigestAlgAndValue>
+            </ns3:ValidationObjectRepresentation>
+            <ns3:POE>
+                <ns3:POETime>2026-10-21T21:03:49Z</ns3:POETime>
+                <ns3:TypeOfProof>urn:etsi:019102:poetype:validation</ns3:TypeOfProof>
+            </ns3:POE>
+        </ns3:ValidationObject>
+        <ns3:ValidationObject id="C-D747D2A7D6CB53B52AE899A3D9F6AD4EE046222497FFD9F1F642166E34335CA7">
+            <ns3:ObjectType>urn:etsi:019102:validationObject:certificate</ns3:ObjectType>
+            <ns3:ValidationObjectRepresentation>
+                <ns3:DigestAlgAndValue>
+                    <ns2:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                    <ns2:DigestValue>10fSp9bLU7Uq6Jmj2fatTuBGIiSX/9nx9kIWbjQzXKc=</ns2:DigestValue>
+                </ns3:DigestAlgAndValue>
+            </ns3:ValidationObjectRepresentation>
+            <ns3:POE>
+                <ns3:POETime>2026-10-21T21:03:49Z</ns3:POETime>
+                <ns3:TypeOfProof>urn:etsi:019102:poetype:validation</ns3:TypeOfProof>
+            </ns3:POE>
+        </ns3:ValidationObject>
+        <ns3:ValidationObject id="D-E0AA918451017E3495D5BDD1DB9F2CED69F0CF92289789CE17D87D1884D749AD">
+            <ns3:ObjectType>urn:etsi:019102:validationObject:signedData</ns3:ObjectType>
+            <ns3:ValidationObjectRepresentation>
+                <ns3:DigestAlgAndValue>
+                    <ns2:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+                    <ns2:DigestValue>O0+p33HKOE3JGkX0TW86I8GfuwwyegUuK5DhYk0SaQg=</ns2:DigestValue>
+                </ns3:DigestAlgAndValue>
+            </ns3:ValidationObjectRepresentation>
+            <ns3:POE>
+                <ns3:POETime>2026-10-21T21:03:49Z</ns3:POETime>
+                <ns3:TypeOfProof>urn:etsi:019102:poetype:validation</ns3:TypeOfProof>
+            </ns3:POE>
+        </ns3:ValidationObject>
+    </ns3:SignatureValidationObjects>
+</ns3:ValidationReport>
