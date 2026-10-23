@@ -432,7 +432,6 @@ export async function signCadesFromDigest(
 	return seq(objectId(OID_SIGNED_DATA), explicitTagged(0, signedData));
 }
 
-
 /** One row of the batch summary report: per-file verdict, stable in queue order. */
 export interface BatchVerdict {
 	id: string;
