@@ -113,6 +113,10 @@ describe('facturae presets', () => {
 			expect(roles).toEqual(['emisor']);
 			const path = writeFixtureFile(fixtures.dir, `facturae-${version}.xsig`, encoder.encode(signed));
 			expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+			// XAdES 1.3.2 `SignedSignaturePropertiesType` is a sequence: policy before role.
+			const policyNode = root.getElementsByTagNameNS(XADES, 'SignaturePolicyIdentifier')[0];
+			const roleNode = root.getElementsByTagNameNS(XADES, 'SignerRole')[0];
+			expect(policyNode.compareDocumentPosition(roleNode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 		});
 	}
 

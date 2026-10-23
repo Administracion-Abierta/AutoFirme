@@ -238,8 +238,8 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 				<xades:SignedSignatureProperties>
 					<xades:SigningTime>${signingTime}</xades:SigningTime>
 					<xades:SigningCertificate>${certificatesXml(chain, certificateDigests, hash)}</xades:SigningCertificate>
-					${signerRoleXml(options.claimedRoles)}
 					${policyXml(options.policy)}
+					${signerRoleXml(options.claimedRoles)}
 				</xades:SignedSignatureProperties>
 				<xades:SignedDataObjectProperties>
 					<xades:DataObjectFormat ObjectReference="#${ids.documentReference}">
