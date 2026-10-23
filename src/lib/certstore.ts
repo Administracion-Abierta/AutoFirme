@@ -255,7 +255,9 @@ export function createVault(raw: StoreBackend, persistent: boolean | (() => bool
 				commonName: current.commonName,
 				notAfter: current.notAfter,
 				createdAt: current.createdAt,
-				size: current.size
+				size: current.size,
+				// Preserved through a rename: the alias is the only thing this call may change.
+				source: certificateSource(current.source)
 			};
 		},
 
