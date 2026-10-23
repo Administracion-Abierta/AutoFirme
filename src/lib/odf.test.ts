@@ -1,19 +1,21 @@
 /**
  * ODF signing: a minimal ODT is built here, signed, and the package re-read so
  * every digest, the RSA signature, the manifest entry and the ZIP layout are
- * asserted — plus `openssl dgst -verify` (independent RSA), xmllint C14N
+ * asserted — plus `xmlsec1` (the XMLDSig engine LibreOffice links) over the
+ * unpacked package, `openssl dgst -verify` (independent RSA), an xmllint C14N
  * cross-check and a LibreOffice convert round-trip where the binaries exist.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { webcrypto } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { unzipSync, zipSync } from 'fflate';
 import { canonicalizeBytes } from './c14n';
 import { certificateIdentity } from './ooxml';
+import { xmlsec1Verify } from '../test/fixtures';
 import { signOdfPackage } from './odf';
 
 if (!globalThis.crypto?.subtle) Object.defineProperty(globalThis, 'crypto', { value: webcrypto });
@@ -35,6 +37,18 @@ function has(binary: string): boolean {
 const hasOpenssl = has('openssl');
 const hasXmllint = has('xmllint');
 const hasSoffice = has('soffice');
+
+/**
+ * Unpack a signed package into a directory, as an ODF consumer sees it: xmlsec1 and LibreOffice
+ * both resolve the signature's package-relative URIs against the unpacked layout.
+ */
+function writePackage(bytes: Uint8Array, root: string): void {
+	for (const [name, content] of Object.entries(unzipSync(bytes))) {
+		const path = join(root, name);
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, content);
+	}
+}
 
 let signingKey: CryptoKey;
 let publicKey: CryptoKey;
@@ -252,9 +266,26 @@ describe('signOdfPackage', () => {
 		);
 	});
 
-	// NOTE: no xmlsec1 test — xmlsec1 1.3.12 fails even on a trivial self-made
-	// enveloped signature in this env (OpenSSL 3 provider issue), so it proves
-	// nothing here. openssl dgst + WebCrypto + xmllint cover the same ground.
+	it.runIf(has('xmlsec1'))(
+		'is verified by xmlsec1 — the XMLDSig engine LibreOffice links — and fails once tampered',
+		async () => {
+			const { bytes } = await sign();
+			const root = join(artifacts, 'xmlsec1');
+			writePackage(bytes, root);
+
+			// xmlsec1 resolves the package-relative reference URIs against its cwd, so it has to
+			// run from the unpacked package root; the signature file is passed by path.
+			const signatures = join(root, 'META-INF', 'documentsignatures.xml');
+			expect(xmlsec1Verify(signatures, certPath, root)).toBe('OK');
+
+			// Negative control: the packager's own digest is what the reference checks, so editing
+			// a digested part must flip the verdict. Without this the test would pass on a
+			// verifier that never read the references.
+			const contentPath = join(root, 'content.xml');
+			writeFileSync(contentPath, DECODER.decode(readFileSync(contentPath)).replace('Hola', 'Hola!'));
+			expect(xmlsec1Verify(signatures, certPath, root)).toBe('FAIL');
+		}
+	);
 
 	it.runIf(hasSoffice)('stays a readable package: LibreOffice converts the signed odt', async () => {
 		const { bytes } = await sign();
