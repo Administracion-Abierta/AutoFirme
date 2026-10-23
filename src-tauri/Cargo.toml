@@ -18,10 +18,16 @@ tauri-plugin-dialog = "2"
 # P5.1 MCP sidecar (Refs #107): shell plugin spawns the bundled `autofirme-mcp`
 # binary (`tauri_plugin_shell::ShellExt::sidecar`); tokio time + log drive the
 # supervisor backoff loop; parking_lot Mutex holds the supervised child handle.
-# All three are already in the lockfile via tauri — no new crates.
+# tokio, log and parking_lot were already in the lockfile via tauri; only the
+# plugin itself and its deps (open, os_pipe, shared_child, …) are new here.
 tauri-plugin-shell = "2.5.0"
 tokio = { version = "1.54.0", features = ["time"] }
 log = "0.4"
+# P5.1 log capture (Refs #107): the app's only logger, so the supervisor's `log`
+# calls (sidecar stderr included) reach stderr; `RUST_LOG` overrides `info`.
+# ponytail: stdout/stderr only — swap in a `tauri-plugin-log` file target when a
+# settings UI grows a log viewer.
+env_logger = "0.11"
 parking_lot = "0.12"
 # P1.4a smartcard layer (Refs #98): PC/SC reader/session plus the OpenSC PKCS#11
 # sign path, absorbed as the `smartcard` module of the desktop lib.

@@ -88,15 +88,13 @@ pub async fn run<R: Runtime>(app: AppHandle<R>) {
         *state.child.lock() = Some(child);
 
         let exit = pump_events(events, &state).await;
-        // Whoever killed the child (crash or shutdown hook) left the slot filled;
-        // take it so a stale handle never lingers. On the shutdown path the hook may
-        // have fired before this spawn, so a live child can still be here: kill it,
-        // otherwise quitting during a backoff would orphan the fresh child.
-        let taken = state.child.lock().take();
-        if exit == ChildExit::Stopped {
-            if let Some(child) = taken {
-                let _ = child.kill();
-            }
+        // Take the slot so a stale handle never lingers, then kill whatever was in
+        // it: `pump_events` can end before `Terminated` (event error, closed
+        // channel) with the child still running, and a child spawned after the
+        // shutdown hook fired lands here too. Killing an already-exited child is a
+        // no-op, so the crash paths buy the no-orphan guarantee the same way.
+        if let Some(child) = state.child.lock().take() {
+            let _ = child.kill();
         }
 
         if window_start.elapsed().as_secs() > policy::RESTART_WINDOW_SECS {

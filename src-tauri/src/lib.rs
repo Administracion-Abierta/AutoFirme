@@ -6,7 +6,6 @@ pub mod smartcard;
 // P5.1 MCP sidecar supervisor (Refs #107).
 pub mod supervisor;
 
-
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
@@ -38,6 +37,9 @@ async fn save_file(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // P5.1 log capture (Refs #107): install the logger behind the supervisor's
+    // `log` calls; without one every record is dropped. `RUST_LOG` overrides `info`.
+    // ponytail: stderr only — file target comes with a log viewer.
     tauri::Builder::default()
         .manage(supervisor::SupervisorState::default())
         .plugin(tauri_plugin_dialog::init())
