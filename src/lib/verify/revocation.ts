@@ -52,7 +52,10 @@ const OID_BASIC_OCSP = '1.3.6.1.5.5.7.48.1.1';
 const OID_SHA1 = '1.3.14.3.2.26';
 const TAG_UTF8_GENERAL = 0x86; // uniformResourceIdentifier [6] IMPLICIT
 const TAG_CONTEXT_0 = 0xa0;
-const TAG_CONTEXT_1 = 0xa1;
+// CertStatus ::= CHOICE { good [0] IMPLICIT NULL, revoked [1] IMPLICIT RevokedInfo, unknown [2] IMPLICIT UnknownInfo }
+// IMPLICIT keeps the underlying type's form: good/unknown are primitive (0x80/0x82), revoked is a SEQUENCE (0xa1).
+const TAG_STATUS_GOOD = 0x80;
+const TAG_STATUS_REVOKED = 0xa1;
 const SKEW_MS = 5 * 60_000;
 const DAY_MS = 24 * 3600_000;
 
@@ -182,7 +185,7 @@ function parseSingleResponse(node: Der): ParsedSingle {
 	const certId = children(fields[0]);
 	const statusNode = fields[1];
 	let revocationTime: string | null = null;
-	if (statusNode.tag === TAG_CONTEXT_1) {
+	if (statusNode.tag === TAG_STATUS_REVOKED) {
 		const revokedInfo = children(statusNode);
 		if (revokedInfo.length > 0) revocationTime = time(revokedInfo[0]);
 	}
@@ -247,23 +250,12 @@ async function parseOcspResponseInner(
 	const tbs = basic[0];
 	const algorithm = algorithmForOid(oid(at(basic[1], 0)));
 	const signature = basic[2].tag === TAG.BIT_STRING ? basic[2].content.subarray(1) : basic[2].content;
-	const embedded: Certificate[] = [];
-	const certsNode = find(basic, TAG_CONTEXT_0);
-	if (certsNode) {
-		for (const raw of children(certsNode)) {
-			try {
-				embedded.push(parseCertificate(raw.raw));
-			} catch {
-				// Unreadable embedded cert; the issuer remains a candidate signer.
-			}
-		}
-	}
+	// Trust only the issuer's own signature. Embedded responder certs are ignored: chain
+	// validation and the id-kp-OCSPSigning EKU check are out of scope (#136), and accepting
+	// a self-asserted cert would let any responder mint `good`.
 	let signed = false;
 	if (algorithm) {
-		for (const candidate of [issuer, ...embedded]) {
-			signed = await verifySignature(candidate, algorithm, tbs.raw, signature).catch(() => false);
-			if (signed) break;
-		}
+		signed = await verifySignature(issuer, algorithm, tbs.raw, signature).catch(() => false);
 	}
 	if (!signed) {
 		return { status: 'unknown', via: 'ocsp', detail: 'OCSP response signature not verifiable (not trusted)' };
@@ -280,10 +272,10 @@ async function parseOcspResponseInner(
 	if (stale) return { status: 'unknown', via: 'ocsp', detail: `OCSP ${stale}` };
 	const validUntil =
 		match.nextUpdate ?? new Date(Date.parse(producedAt) + DAY_MS).toISOString();
-	if (match.statusTag === TAG_CONTEXT_0) {
+	if (match.statusTag === TAG_STATUS_GOOD) {
 		return { status: 'good', via: 'ocsp', detail: `OCSP good (thisUpdate ${match.thisUpdate})`, responderTime: producedAt, validUntil };
 	}
-	if (match.statusTag === TAG_CONTEXT_1) {
+	if (match.statusTag === TAG_STATUS_REVOKED) {
 		return {
 			status: 'revoked',
 			via: 'ocsp',
