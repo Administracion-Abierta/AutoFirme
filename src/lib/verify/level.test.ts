@@ -159,4 +159,19 @@ describe('PAdES X-level attestation', () => {
 		);
 		expect(detectLevel('pdf', streamed, timestamped)).toBe('T');
 	});
+
+	it('ignores object-shaped markers written as PDF data, not syntax', () => {
+		// A fake `N G obj` header inside a comment, a literal string or a stream payload is data, not
+		// structure: reading it as an object promoted a plain B-B document to LTA.
+		const fake = '7 7 obj << /DSS 5 0 R /Type /DocTimeStamp >> endobj';
+		expect(
+			detectLevel('pdf', enc.encode(`%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n% ${fake}\n%%EOF\n`), timestamped)
+		).toBe('T');
+		expect(
+			detectLevel('pdf', enc.encode(`%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Keywords (${fake}) >>\nendobj\n%%EOF\n`), timestamped)
+		).toBe('T');
+		expect(
+			detectLevel('pdf', enc.encode(`%PDF-1.7\n1 0 obj\n<< /Length 64 >>\nstream\n${fake}\nendstream\nendobj\n%%EOF\n`), timestamped)
+		).toBe('T');
+	});
 });

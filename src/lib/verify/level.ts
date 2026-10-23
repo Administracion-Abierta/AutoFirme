@@ -137,30 +137,33 @@ function xadesEvidence(xml: Bytes, checks: Check[]): LevelEvidence {
 }
 
 /**
- * The `N G obj … endobj` dictionary bodies up to the last `%%EOF`, with `%` comments removed and
- * each body cut at its `stream` keyword. A PDF's markers (`/DSS`, `/Type /DocTimeStamp`) live in
- * object dictionaries; a comment, a stream payload (arbitrary compressed data) or bytes appended
- * after the final `%%EOF` are not structure, and matching them would let a plain B-B document
- * claim XL/LTA.
+ * The `N G obj … endobj` dictionary bodies up to the last `%%EOF`, with the data that only looks
+ * like syntax removed: `%` comments, literal-string contents and each body's stream payload. A
+ * PDF's markers (`/DSS`, `/Type /DocTimeStamp`) live in object dictionaries; a comment, a string,
+ * a stream payload (arbitrary compressed data) or bytes appended after the final `%%EOF` are not
+ * structure, and matching them — even a fake `N G obj` header written inside one — would let a
+ * plain B-B document claim XL/LTA.
  */
 function pdfObjectBodies(pdf: Bytes): string {
 	const text = new TextDecoder('utf-8', { fatal: false }).decode(pdf);
 	const eof = text.lastIndexOf('%%EOF');
 	const document = eof < 0 ? text : text.slice(0, eof);
+	// `%` runs a comment to the end of its line (ISO 32000-1 §7.2.4) and `( )` delimits a literal
+	// string; neither is syntax, so a fake object header inside one must not open a body.
+	const syntax = document.replace(/%.*$/gm, '').replace(/\((?:\\.|[^\\()])*\)/g, '()');
 	const header = /\d+\s+\d+\s+obj(?![a-z])/g;
 	const bodies: string[] = [];
-	for (let match = header.exec(document); match; match = header.exec(document)) {
-		const end = document.indexOf('endobj', header.lastIndex);
+	for (let match = header.exec(syntax); match; match = header.exec(syntax)) {
+		const end = syntax.indexOf('endobj', header.lastIndex);
 		if (end < 0) break; // a truncated tail is not structure: claim nothing from it
-		const body = document.slice(header.lastIndex, end);
+		const body = syntax.slice(header.lastIndex, end);
 		// Only the dictionary before the `stream` keyword is PDF syntax; the payload after it is
 		// arbitrary data. The lookbehind keeps `endstream` from matching.
 		const stream = /(?<![a-zA-Z])stream\r?\n/.exec(body);
 		bodies.push(stream ? body.slice(0, stream.index) : body);
 		header.lastIndex = end;
 	}
-	// A `%` runs a comment to the end of its line (ISO 32000-1 §7.2.4).
-	return bodies.join('\n').replace(/%.*$/gm, '');
+	return bodies.join('\n');
 }
 
 function padesEvidence(pdf: Bytes, checks: Check[]): LevelEvidence {
