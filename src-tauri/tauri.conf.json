@@ -27,5 +27,12 @@
   "bundle": {
     "active": false,
     "externalBin": ["binaries/autofirme-mcp"]
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["afirma"]
+      }
+    }
   }
 }

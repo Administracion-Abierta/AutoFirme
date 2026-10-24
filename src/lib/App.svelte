@@ -35,6 +35,16 @@
 	import FileDrop from '#lib/components/FileDrop.svelte';
 	import PwaControls from '#lib/components/PwaControls.svelte';
 	import { isDesktop } from '#lib/desktop';
+	import {
+		deeplinkConfirm,
+		deeplinkList,
+		deeplinkRemove,
+		deeplinkStatus,
+		listenDeepLinks,
+		payloadFromGated,
+		type IncomingRequest,
+		type SchemeStatus
+	} from '#lib/deeplink';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.js';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -173,11 +183,26 @@
 		mcp = readMcp();
 		pinMinutes = readPinMemorySettings().minutes;
 		void consumeEntry();
-		if (!isExtension()) return;
-		const detach = listenMcpBridge((status) => (bridge = status));
-		void mcpBridgeStatus().then((status) => (bridge = status)).catch(() => {});
-		if (mcp.enabled) void connectBridge();
-		return detach;
+		const cleanups: (() => void)[] = [];
+		if (isDesktop()) {
+			void deeplinkStatus().then((status) => (afirmaScheme = status)).catch(() => {});
+			void deeplinkList().then((domains) => (afirmaAllow = domains)).catch(() => {});
+			void listenDeepLinks((request) => {
+				afirma = request;
+				afirmaRemember = false;
+				afirmaNotice = '';
+			})
+				.then((detach) => cleanups.push(detach))
+				.catch(() => {});
+		}
+		if (isExtension()) {
+			cleanups.push(listenMcpBridge((status) => (bridge = status)));
+			void mcpBridgeStatus().then((status) => (bridge = status)).catch(() => {});
+			if (mcp.enabled) void connectBridge();
+		}
+		return () => {
+			for (const cleanup of cleanups) cleanup();
+		};
 	});
 
 	/** PWA sign entry (#47): share_target, file_handlers, shortcut, portal deep-link. */
@@ -185,6 +210,12 @@
 	let deepLinkError = $state('');
 	let entryNotice = $state('');
 	let returned = $state<DeepLinkResult | null>(null);
+	/** Desktop shell `afirma://` request (#103): gated portal call awaiting review. */
+	let afirma = $state<IncomingRequest | null>(null);
+	let afirmaScheme = $state<SchemeStatus | null>(null);
+	let afirmaAllow = $state<string[]>([]);
+	let afirmaRemember = $state(false);
+	let afirmaNotice = $state('');
 
 	/** One-shot intake: preload files/data, never sign without explicit user confirm. */
 	async function consumeEntry(): Promise<void> {
@@ -236,6 +267,42 @@
 	function returnToPortal(): void {
 		if (!deepLink?.returnUrl || !returned) return;
 		location.href = buildDeepLinkReturn(deepLink.returnUrl, returned);
+	}
+	/**
+	 * Desktop `afirma://` review (#103): triggers the NATIVE per-request dialog
+	 * (op + origin + params). `remember` allow-lists ONLY this request's domain.
+	 * A confirmed request loads the portal's `dat` payload into the sign flow;
+	 * cert pick + sign still happen inside the app.
+	 */
+	async function confirmAfirma(allow: boolean): Promise<void> {
+		if (!afirma || !('gated' in afirma)) {
+			afirma = null;
+			return;
+		}
+		const gated = afirma.gated;
+		try {
+			const ok = await deeplinkConfirm(gated, allow, afirmaRemember);
+			afirmaNotice = allow && ok ? t.afirmaConfirmed : '';
+			if (ok && allow) {
+				const payload = await payloadFromGated(gated);
+				if (payload) {
+					files = [payload.file];
+					if (payload.format) format = payload.format;
+					step = 2;
+				} else if (gated.params.some(([key]) => key === 'dat')) {
+					afirmaNotice = `${t.entryError}: portal dat payload is not valid base64/gzip`;
+				}
+			}
+			if (ok) afirmaAllow = await deeplinkList().catch(() => afirmaAllow);
+			afirma = null;
+		} catch {
+			afirmaNotice = '';
+		}
+	}
+	async function removeAfirmaDomain(domain: string): Promise<void> {
+		if (await deeplinkRemove(domain).catch(() => false)) {
+			afirmaAllow = afirmaAllow.filter((entry) => entry !== domain);
+		}
 	}
 	$effect(() => applyTheme(theme));
 	const THEMES = $derived([
@@ -512,6 +579,42 @@
 					<TriangleAlertIcon class="size-4" aria-hidden="true" />
 					<AlertDescription>{t.insecureContext}</AlertDescription>
 				</Alert>
+			{/if}
+			{#if afirma}
+				<!-- Desktop `afirma://` request: gated by the shell, reviewed here, confirmed natively. -->
+				<div class="mx-auto w-full max-w-3xl rounded-lg border p-3 text-sm" role="alert">
+					{#if 'gated' in afirma}
+						<p class="font-medium">{t.afirmaTitle}</p>
+						<p class="text-muted-foreground mt-1 text-xs">{t.afirmaHint}</p>
+						<p class="mt-2">{t.afirmaOp}: <span class="font-mono">{afirma.gated.op}</span></p>
+						<p>{t.afirmaOrigin}: <span class="font-medium">{afirma.gated.origin ?? t.afirmaNoOrigin}</span></p>
+						{#if afirma.gated.origin}
+							<label class="mt-2 flex items-center gap-2 text-sm">
+								<input type="checkbox" class="accent-primary size-4" bind:checked={afirmaRemember} />
+								{t.afirmaRemember}
+							</label>
+						{/if}
+						<div class="mt-2 flex gap-2">
+							<Button size="sm" disabled={!afirma.gated.origin} onclick={() => void confirmAfirma(true)}>
+								{t.afirmaReview}
+							</Button>
+							<Button size="sm" variant="outline" onclick={() => (afirma = null)}>
+								{t.afirmaDismiss}
+							</Button>
+						</div>
+					{:else}
+						<p class="text-destructive font-medium">{t.entryError}: {afirma.refused.reason}</p>
+						<p class="text-muted-foreground mt-1 font-mono text-xs">{afirma.refused.raw}</p>
+						<div class="mt-2">
+							<Button size="sm" variant="outline" onclick={() => (afirma = null)}>
+								{t.afirmaDismiss}
+							</Button>
+						</div>
+					{/if}
+				</div>
+			{/if}
+			{#if afirmaNotice}
+				<p class="mx-auto w-full max-w-3xl text-sm" role="status">{afirmaNotice}</p>
 			{/if}
 			<div
 				id="panel-sign"
@@ -1035,6 +1138,37 @@
 								{extensionCopy[lang].access}
 							</h3>
 							{@render extensionSettings(lang)}
+						</section>
+					{/if}
+					{#if isDesktop()}
+						<!-- `afirma://` portals: desktop shell only; entries land here via per-request confirm. -->
+						<section class="flex flex-col gap-2">
+							<h3 class="flex items-center gap-2 text-sm font-medium">{t.afirmaTitle}</h3>
+							<p class="text-muted-foreground text-xs" role="status">
+								{afirmaScheme === 'ours'
+									? t.afirmaSchemeOurs
+									: afirmaScheme === 'none'
+										? t.afirmaSchemeNone
+										: afirmaScheme
+											? t.afirmaSchemeOther
+											: ''}
+							</p>
+							<p class="text-muted-foreground text-xs">{t.afirmaHint}</p>
+							<h4 class="text-sm font-medium">{t.afirmaListTitle}</h4>
+							{#if afirmaAllow.length === 0}
+								<p class="text-muted-foreground text-sm">{t.afirmaListEmpty}</p>
+							{:else}
+								<ul class="flex flex-col gap-1">
+									{#each afirmaAllow as domain (domain)}
+										<li class="flex items-center justify-between gap-2 text-sm">
+											<span class="font-mono">{domain}</span>
+											<Button size="sm" variant="outline" onclick={() => void removeAfirmaDomain(domain)}>
+												{t.afirmaRemove}
+											</Button>
+										</li>
+									{/each}
+								</ul>
+							{/if}
 						</section>
 					{/if}
 				</div>

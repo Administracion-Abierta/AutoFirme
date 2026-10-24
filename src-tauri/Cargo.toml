@@ -28,6 +28,8 @@ log = "0.4"
 # settings UI grows a log viewer.
 env_logger = "0.11"
 parking_lot = "0.12"
+tauri-plugin-deep-link = "2.6.2"
+tauri-plugin-single-instance = { version = "2.5.4", features = ["deep-link"] }
 # P1.4a smartcard layer (Refs #98): PC/SC reader/session plus the OpenSC PKCS#11
 # sign path, absorbed as the `smartcard` module of the desktop lib.
 cryptoki = "0.12.1"
