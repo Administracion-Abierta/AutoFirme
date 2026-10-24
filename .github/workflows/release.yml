@@ -13,8 +13,13 @@ jobs:
   artifacts:
     name: build and attach release artifacts
     runs-on: ubuntu-latest
+    # node:24-trixie: curl + python3 for the Forgejo API upload below; the
+    # default label image is uncontrolled and has no curl CA bundle guarantee.
+    container: node:24-trixie
     timeout-minutes: 25
     steps:
+      - name: Install toolchain
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.release.tag_name }}
@@ -43,8 +48,8 @@ jobs:
         run: tar -czf dist/autofirme-web-${{ github.event.release.tag_name }}.tar.gz -C build .
       - name: Attach artifacts to the release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-*.tar.gz --clobber
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/forgejo-release.sh "${{ github.event.release.tag_name }}" dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-*.tar.gz
       - uses: actions/upload-artifact@v3
         with:
           name: release-artifacts
@@ -68,10 +73,9 @@ jobs:
       - name: Toolchain
         run: |
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends git curl ca-certificates pkg-config build-essential \
+          apt-get install -y -qq --no-install-recommends git ca-certificates pkg-config build-essential \
             libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev \
-            rpm desktop-file-utils shared-mime-info gh
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+            rpm desktop-file-utils shared-mime-info
       - uses: dtolnay/rust-toolchain@1.90
       - uses: Swatinem/rust-cache@v2
         with:
@@ -102,8 +106,8 @@ jobs:
           printf '%s\n' "$DESKTOP" | grep -F 'application/pdf'
       - name: Attach linux packages to the release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name }}" dist/*.deb dist/*.rpm dist/*.AppImage dist/SHA256SUMS.linux --clobber
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/forgejo-release.sh "${{ github.event.release.tag_name }}" dist/*.deb dist/*.rpm dist/*.AppImage dist/SHA256SUMS.linux
       - uses: actions/upload-artifact@v3
         with:
           name: linux-packages
