@@ -158,6 +158,9 @@ async fn pump_events(
                     ChildExit::Crashed
                 };
             }
+            // Plugin's `CommandEvent` is `#[non_exhaustive]`: newer plugin
+            // versions may add variants; ignore unknown ones like channel traffic.
+            Ok(_) => {}
             Err(_) => {
                 // Empty or disconnected: disconnected means the reader tasks died
                 // with the child, so treat a closed channel as a crash.
