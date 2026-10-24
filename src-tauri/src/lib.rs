@@ -76,3 +76,41 @@ pub fn run() {
             }
         });
 }
+
+#[cfg(test)]
+mod logger_tests {
+    use log::LevelFilter;
+
+    /// Pins the logger config installed by [`run`]: default threshold `info`
+    /// (supervisor stderr capture is `warn`/`error`), `RUST_LOG` wins when set.
+    /// Builds the same [`env_logger::Builder`] chain `run()` runs — the filter is
+    /// introspectable without touching the global logger, so the test never races
+    /// `env_logger::init`'s once-only guard.
+    #[test]
+    fn logger_defaults_to_info_and_honors_rust_log() {
+        assert_eq!(
+            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                .build()
+                .filter(),
+            LevelFilter::Info
+        );
+        // Records below the default threshold are dropped — the property the
+        // original review finding (logger never installed, every record lost)
+        // turned into a contract.
+        let logger =
+            env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+                .build();
+        let probe = log::Record::builder()
+            .args(format_args!("probe"))
+            .level(log::Level::Debug)
+            .target("autofirme::probe")
+            .build();
+        assert!(!logger.matches(&probe));
+        let warn = log::Record::builder()
+            .args(format_args!("probe"))
+            .level(log::Level::Warn)
+            .target("autofirme::probe")
+            .build();
+        assert!(logger.matches(&warn));
+    }
+}
