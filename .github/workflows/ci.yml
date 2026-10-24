@@ -22,13 +22,16 @@ jobs:
     # Debian trixie (OpenSSL 3.5) instead of the runner image (OpenSSL 3.0: the fixture
     # generator in src/test/fixtures.ts needs >= 3.4 for `-not_before`/`-not_after`).
     container:
-      image: debian:trixie
+    # node:24-trixie = debian:trixie (OpenSSL 3.5) + node preinstalled. A plain trixie
+    # image has no node, so every node-based action (checkout, setup-node, pnpm) dies
+    # with `crun: executable file 'node' not found in $PATH` before step 2.
+      image: node:24-trixie
     steps:
-      # The image is minimal and checkout needs git, so the toolchain comes first.
+      # node:24-trixie ships node/git/python3/unzip; apt only adds the test oracles.
       - name: Toolchain
         run: |
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends git openssl unzip zip python3 ca-certificates xmlsec1 libxml2-utils
+          apt-get install -y -qq --no-install-recommends openssl unzip zip python3 ca-certificates xmlsec1 libxml2-utils
           # The workspace is mounted from the host; without this, git refuses to read it.
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           openssl version
@@ -73,13 +76,13 @@ jobs:
     # Same OpenSSL floor as `checks`: `mcp/test/helpers.ts` builds the shared CAdES fixtures,
     # whose expired leaf needs `-not_before`/`-not_after` (OpenSSL >= 3.4) — absent on the runner.
     container:
-      image: debian:trixie
+      image: node:24-trixie
     steps:
-      # The image is minimal and checkout needs git, so the toolchain comes first.
+      # node:24-trixie ships node/git; apt only adds the OpenSSL fixture oracle.
       - name: Toolchain
         run: |
           apt-get update -qq
-          apt-get install -y -qq --no-install-recommends git openssl ca-certificates
+          apt-get install -y -qq --no-install-recommends openssl ca-certificates
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           openssl version
       - uses: actions/checkout@v4
@@ -103,14 +106,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     container:
-      image: debian:trixie
+      image: node:24-trixie
     steps:
-      # The image is minimal and checkout needs git, so the toolchain comes first.
+      # node:24-trixie ships git/node; apt adds the native build chain and test oracles.
       - name: Toolchain and test oracles
         run: |
           apt-get update -qq
           apt-get install -y -qq --no-install-recommends \
-            build-essential curl git ca-certificates pkg-config libssl-dev \
+            build-essential curl ca-certificates pkg-config libssl-dev \
             libwebkit2gtk-4.1-dev \
             libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
             xvfb xauth \

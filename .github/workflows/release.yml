@@ -59,7 +59,8 @@ jobs:
     name: build linux packages (deb, rpm, AppImage)
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    container: debian:trixie
+    # node:24-trixie: same OpenSSL 3.5 floor, node preinstalled for the actions/* steps.
+    container: node:24-trixie
     steps:
       - uses: actions/checkout@v4
         with:
