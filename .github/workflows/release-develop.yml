@@ -51,7 +51,7 @@ jobs:
             --notes "$NOTES" \
             dist/autofirme-extension-*.zip dist/SHA256SUMS
           echo "release $TAG created"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: autofirme-web
           path: build/

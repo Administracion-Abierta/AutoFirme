@@ -59,7 +59,7 @@ jobs:
       # 50 MB PDF, 500-file batch and cold start; absolute ceilings calibrated on a dev box.
       - run: pnpm perf
       - run: pnpm package:extension
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: autofirme-extension
           path: |
@@ -154,7 +154,7 @@ jobs:
           timeout 120 xvfb-run -a --server-args="-screen 0 1280x1024x24" \
             ./src-tauri/target/release/autofirme-desktop | tee smoke.log
           grep -q "SHELL_SMOKE Finished" smoke.log
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: shell-smoke
           path: smoke.log
