@@ -139,8 +139,9 @@ fn valid_key(key: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'_' || b == b'-')
 }
 
-/// Decoded values: printable ASCII (plus TAB), no shell metachars that could
-/// surprise a downstream consumer, no backslashes. Base64/URL payloads pass.
+/// Decoded values: printable ASCII (plus TAB); rejects control chars, quotes,
+/// backslash, and angle brackets. `$ ; | & *` pass — defence-in-depth only, no
+/// shell consumer exists. Base64/URL payloads pass.
 fn valid_value(value: &str) -> bool {
     value.len() <= MAX_VALUE_LEN
         && value.chars().all(|c| {
