@@ -89,7 +89,9 @@ test('the linux-packages job collects bundles into dist before uploading (review
 
 test('the trixie container installs gh before uploading to the release (review round 1)', () => {
 	const linux = job(workflow, 'linux-packages');
-	assert.match(linux, /container: debian:trixie/);
+	// node:24-trixie = debian:trixie + node; keeps the OpenSSL 3.5 floor and lets the
+	// node-based actions/* steps run (plain trixie has no node).
+	assert.match(linux, /container: node:24-trixie/);
 	// debian:trixie ships no gh (unlike ubuntu-latest); the toolchain apt list must
 	// include it or `gh release upload` dies on ENOENT. The list spans continuation
 	// lines, so walk until a line without the trailing backslash.
