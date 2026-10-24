@@ -75,6 +75,36 @@ test('out-of-scope chrome-webstore and attestation stay out', () => {
 	assert.doesNotMatch(workflow, /attest-build-provenance|id-token/, 'not requested in #3');
 });
 
+test('the linux-packages job collects bundles into dist before uploading (review round 1)', () => {
+	const linux = job(workflow, 'linux-packages');
+	for (const dir of ['deb', 'rpm', 'appimage']) {
+		assert.match(linux, new RegExp(`cp src-tauri/target/release/bundle/${dir}/\\*\\.\\S+ dist/`));
+	}
+	assert.match(linux, /sha256sum \*\.deb \*\.rpm \*\.AppImage > SHA256SUMS\.linux/);
+	assert.ok(
+		linux.indexOf('sha256sum') < linux.indexOf('gh release upload'),
+		'packages must be collected and checksummed before gh release upload'
+	);
+});
+
+test('the trixie container installs gh before uploading to the release (review round 1)', () => {
+	const linux = job(workflow, 'linux-packages');
+	assert.match(linux, /container: debian:trixie/);
+	// debian:trixie ships no gh (unlike ubuntu-latest); the toolchain apt list must
+	// include it or `gh release upload` dies on ENOENT. The list spans continuation
+	// lines, so walk until a line without the trailing backslash.
+	const lines = linux.split('\n');
+	const start = lines.findIndex((line) => line.includes('apt-get install'));
+	assert.ok(start >= 0, 'toolchain apt-get install step missing');
+	let list = '';
+	for (let i = start; i < lines.length; i++) {
+		list += ` ${lines[i]}`;
+		if (!lines[i].trimEnd().endsWith('\\')) break;
+	}
+	const pkgs = list.replace(/\\/g, ' ').split(/\s+/).filter(Boolean);
+	assert.ok(pkgs.includes('gh'), `gh missing from the toolchain apt list: ${pkgs.join(' ')}`);
+});
+
 // The develop pre-release channel: every push to develop ships code + extension zip
 // as a marked-unstable dev-<sha> pre-release.
 
