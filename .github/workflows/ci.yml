@@ -106,7 +106,11 @@ jobs:
   # the parity gate declares `openssl` >= 3.4; trixie has webkit2gtk-4.1 and OpenSSL 3.5.
   shell:
     name: tauri shell check and webview smoke
-    runs-on: ubuntu-24.04
+    # The single runner advertises `ubuntu-latest`; `ubuntu-24.04` matches no
+    # label, so this job sat `waiting` forever — and, for push runs on develop,
+    # the run never concluded, wedging the workflow's concurrency group and
+    # queueing every later ci.yml push run behind it (run 351).
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
       image: node:24-trixie
