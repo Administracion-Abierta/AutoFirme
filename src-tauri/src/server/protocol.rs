@@ -239,10 +239,7 @@ mod tests {
             "afirma://sign?dat=é%",
         ] {
             let response = handle_frame(frame);
-            assert!(
-                response == "OK" || response.starts_with("SAF_"),
-                "frame {frame:?} gave {response:?}"
-            );
+            assert_eq!(response, "OK", "frame {frame:?} gave {response:?}");
         }
     }
 }
