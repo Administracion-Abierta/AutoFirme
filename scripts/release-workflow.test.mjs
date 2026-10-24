@@ -44,8 +44,8 @@ test('the artifacts job builds twice and diffs SHA256SUMS before uploading', () 
 	const packs = artifacts.match(/pnpm package:extension/g);
 	assert.ok(packs && packs.length === 2, `expected exactly 2 package:extension runs, got ${packs?.length}`);
 	assert.ok(
-		artifacts.indexOf('diff sums-a.txt') < artifacts.indexOf('gh release upload'),
-		'reproducibility diff must run before gh release upload'
+		artifacts.indexOf('diff sums-a.txt') < artifacts.indexOf('forgejo-release.sh'),
+		'reproducibility diff must run before the release upload'
 	);
 });
 
@@ -82,19 +82,27 @@ test('the linux-packages job collects bundles into dist before uploading (review
 	}
 	assert.match(linux, /sha256sum \*\.deb \*\.rpm \*\.AppImage > SHA256SUMS\.linux/);
 	assert.ok(
-		linux.indexOf('sha256sum') < linux.indexOf('gh release upload'),
-		'packages must be collected and checksummed before gh release upload'
+		linux.indexOf('sha256sum') < linux.indexOf('forgejo-release.sh'),
+		'packages must be collected and checksummed before the release upload'
 	);
 });
 
-test('the trixie container installs gh before uploading to the release (review round 1)', () => {
+test('release uploads go through the Forgejo v1 API helper, not gh', () => {
+	// gh hardcodes the GitHub /api/v3 surface, which Forgejo does not implement;
+	// every release step must use scripts/forgejo-release.sh instead.
+	assert.doesNotMatch(workflow, /\bgh release\b|\bGH_TOKEN\b/, 'gh cannot talk to Forgejo');
+	for (const j of ['artifacts', 'linux-packages']) {
+		assert.match(job(workflow, j), /scripts\/forgejo-release\.sh/);
+	}
+});
+
+test('the trixie container pins the release jobs (review round 1)', () => {
 	const linux = job(workflow, 'linux-packages');
 	// node:24-trixie = debian:trixie + node; keeps the OpenSSL 3.5 floor and lets the
 	// node-based actions/* steps run (plain trixie has no node).
 	assert.match(linux, /container: node:24-trixie/);
-	// debian:trixie ships no gh (unlike ubuntu-latest); the toolchain apt list must
-	// include it or `gh release upload` dies on ENOENT. The list spans continuation
-	// lines, so walk until a line without the trailing backslash.
+	// gh is gone (it cannot reach the Forgejo API); the helper needs curl + python3,
+	// both preinstalled in the image, so the apt list must NOT grow them.
 	const lines = linux.split('\n');
 	const start = lines.findIndex((line) => line.includes('apt-get install'));
 	assert.ok(start >= 0, 'toolchain apt-get install step missing');
@@ -104,8 +112,9 @@ test('the trixie container installs gh before uploading to the release (review r
 		if (!lines[i].trimEnd().endsWith('\\')) break;
 	}
 	const pkgs = list.replace(/\\/g, ' ').split(/\s+/).filter(Boolean);
-	assert.ok(pkgs.includes('gh'), `gh missing from the toolchain apt list: ${pkgs.join(' ')}`);
+	assert.ok(!pkgs.includes('gh'), 'gh cannot talk to Forgejo; drop it from the apt list');
 });
+
 
 // The develop pre-release channel: every push to develop ships code + extension zip
 // as a marked-unstable dev-<sha> pre-release.
@@ -125,10 +134,12 @@ test('develop artifacts job publishes the pre-release with code, extension zip a
 	assert.match(artifacts, /pnpm package:extension/);
 	// The tag is commit-pinned so a release always maps to exactly one tree.
 	assert.match(artifacts, /TAG="dev-\$\{GITHUB_SHA::7\}"/);
-	assert.match(artifacts, /--target "\$GITHUB_SHA"/);
+	// The helper derives tag/commit from the env GITHUB_TOKEN context: --sha pins the
+	// release to the exact tree, --prerelease keeps it off the stable channel.
+	assert.match(artifacts, /--sha "\$GITHUB_SHA"/);
 	assert.match(artifacts, /--prerelease/);
 	assert.match(artifacts, /--title "\[Development build\] \$TAG/);
-	assert.match(artifacts, /--notes "\$NOTES"/);
+	assert.match(artifacts, /--notes-file release-notes\.md/);
 	assert.match(artifacts, /dist\/autofirme-extension-\*\.zip dist\/SHA256SUMS/);
 });
 

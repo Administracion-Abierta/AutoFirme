@@ -19,8 +19,13 @@ jobs:
   artifacts:
     name: build and publish dev-<commit> release
     runs-on: ubuntu-latest
+    container: node:24-trixie
     timeout-minutes: 25
     steps:
+      # node:24-trixie ships node, git, python3, tar and curl; only the CA bundle
+      # for the API calls below is missing.
+      - name: Install toolchain
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -33,7 +38,7 @@ jobs:
       - run: pnpm package:extension
       - name: Create the development pre-release tagged dev-<short-sha>
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NOTES: |-
             :construction: **Development build — not for production use.**
 
@@ -46,9 +51,12 @@ jobs:
             Verify with `SHA256SUMS` before installing.
         run: |
           TAG="dev-${GITHUB_SHA::7}"
-          gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
+          echo "$NOTES" > release-notes.md
+          scripts/forgejo-release.sh "$TAG" \
+            --sha "$GITHUB_SHA" \
             --title "[Development build] $TAG — unstable, for testing only" \
-            --notes "$NOTES" \
+            --notes-file release-notes.md \
+            --prerelease \
             dist/autofirme-extension-*.zip dist/SHA256SUMS
           echo "release $TAG created"
       - uses: actions/upload-artifact@v3

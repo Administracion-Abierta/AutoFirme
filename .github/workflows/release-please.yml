@@ -18,7 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: googleapis/release-please-action@v4
+      # Fully qualified URL: data.forgejo.org (DEFAULT_ACTIONS_URL) has no googleapis mirror.
+      - uses: https://github.com/googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
