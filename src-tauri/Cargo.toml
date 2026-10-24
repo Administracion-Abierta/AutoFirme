@@ -38,5 +38,17 @@ quinn = "0.11.12"
 mdns-sd = "0.21.6"
 rcgen = "0.14.10"
 sha2 = "0.11.1"
-tokio = { version = "1.54.1", features = ["rt", "time", "io-util", "sync", "macros", "fs"] }
+tokio = { version = "1.54.1", features = ["rt", "time", "io-util", "sync", "macros", "fs", "net"] }
 rustls = { version = "0.23.46", features = ["ring"] }
+# P2.2a loopback sign server, protocol 3 (Refs #104): axum WebSocket on
+# 127.0.0.1:63117 behind rustls; per-install self-signed cert via rcgen.
+axum = { version = "0.8", features = ["ws"] }
+axum-server = { version = "0.8", features = ["tls-rustls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+# TLS WebSocket client for the server round-trip tests (Refs #104).
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+url = "2"

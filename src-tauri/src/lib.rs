@@ -9,6 +9,9 @@ pub mod p2p;
 
 // P5.1 MCP sidecar supervisor (Refs #107).
 pub mod supervisor;
+// P2.2a loopback sign server, protocol 3 (Refs #104).
+pub mod server;
+pub mod tls;
 
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
