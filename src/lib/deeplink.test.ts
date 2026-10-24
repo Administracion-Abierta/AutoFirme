@@ -63,3 +63,53 @@ describe('bridge on desktop', () => {
 		expect(seen).toHaveLength(1);
 	});
 });
+
+describe('payloadFromGated', () => {
+	const gated = (params: [string, string][], op = 'sign') => ({
+		op,
+		origin: 'sede.example.es',
+		allowed: true,
+		params
+	});
+
+	it('decodes base64 dat and maps the portal format', async () => {
+		const { payloadFromGated } = await import('./deeplink');
+		const payload = await payloadFromGated(
+			gated([
+				['dat', 'cG9ydGFsLWRvYw=='],
+				['format', 'CAdES'],
+				['filename', '../../etc/passwd']
+			])
+		);
+		expect(payload).not.toBeNull();
+		expect(payload!.format).toBe('cades');
+		expect(payload!.file.name).toBe('..-..-etc-passwd');
+		expect(Array.from(new Uint8Array(await payload!.file.arrayBuffer()))).toEqual(
+			Array.from(new TextEncoder().encode('portal-doc'))
+		);
+	});
+
+	it('inflates gzip payloads', async () => {
+		const { payloadFromGated } = await import('./deeplink');
+		const payload = await payloadFromGated(
+			gated([
+				['dat', 'H4sIAAAAAAAAAyvILypJzNFNyU8GAGjUedQKAAAA'],
+				['gzip', 'true']
+			])
+		);
+		expect(payload).not.toBeNull();
+		expect(payload!.format).toBeNull();
+		expect(payload!.file.name).toBe('documento');
+		expect(Array.from(new Uint8Array(await payload!.file.arrayBuffer()))).toEqual(
+			Array.from(new TextEncoder().encode('portal-doc'))
+		);
+	});
+
+	it('refuses malformed, absent, or non-signing payloads', async () => {
+		const { payloadFromGated } = await import('./deeplink');
+		await expect(payloadFromGated(gated([['dat', '@@@not-base64@@@']]))).resolves.toBeNull();
+		await expect(payloadFromGated(gated([['dat', 'cG9ydGFsLWRvYw=='], ['gzip', 'true']]))).resolves.toBeNull();
+		await expect(payloadFromGated(gated([['fileid', 'abc']]))).resolves.toBeNull();
+		await expect(payloadFromGated(gated([['dat', 'cG9ydGFsLWRvYw==']], 'selectcert'))).resolves.toBeNull();
+	});
+});

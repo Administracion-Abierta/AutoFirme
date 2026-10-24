@@ -5,11 +5,13 @@
  *
  * Flow: the shell parses + gates each portal URL and emits
  * `deeplink://request`. This module surfaces the gated request, triggers the
- * native per-request confirmation (`deeplink_confirm`), and manages the
- * per-domain allow-list. Nothing here signs: a confirmed request still needs
- * the user to pick a certificate and sign inside the app.
+ * native per-request confirmation (`deeplink_confirm`), manages the
+ * per-domain allow-list, and pulls the portal's document payload (`dat`) out
+ * of a confirmed request so the existing engine signs it. Result delivery
+ * back to the portal's servlet is not implemented here (Refs #103 gap note).
  */
 
+import type { SignFormat } from './sign';
 import { isDesktop } from './desktop';
 
 /** Who owns the `afirma://` scheme. Mirrors the Rust `SchemeStatus`. */
@@ -105,4 +107,84 @@ export async function listenDeepLinks(
 		const incoming = classifyIncoming(event.payload);
 		if (incoming) listener(incoming);
 	});
+}
+
+/** A confirmed request's document, ready for the sign flow. */
+export interface PortalPayload {
+	file: File;
+	/** `format` param mapped to an engine format; `null` keeps the current one. */
+	format: SignFormat | null;
+}
+
+/** Ops that carry a document to sign (AutoFirma 1.9 `ProtocolInvocationLauncher`). */
+const SIGN_OPS = new Set(['sign', 'cosign', 'countersign', 'signandsave']);
+
+async function gunzip(bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer> | null> {
+	try {
+		const source = new ReadableStream<Uint8Array<ArrayBuffer>>({
+			start(controller) {
+				controller.enqueue(bytes);
+				controller.close();
+			}
+		});
+		const reader = source.pipeThrough(new DecompressionStream('gzip')).getReader();
+		const chunks: Uint8Array[] = [];
+		let total = 0;
+		for (;;) {
+			const { done, value } = await reader.read();
+			if (done) break;
+			chunks.push(value);
+			total += value.byteLength;
+		}
+		const out = new Uint8Array(total);
+		let offset = 0;
+		for (const chunk of chunks) {
+			out.set(chunk, offset);
+			offset += chunk.byteLength;
+		}
+		return out;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Document payload of a confirmed `afirma://` request: the `dat` param is
+ * base64 document bytes (AutoFirma 1.9 `UrlParameters`), optionally gzipped
+ * when `gzip` is set. Returns `null` when the request carries no loadable
+ * payload (e.g. `fileid` servlet retrieval — needs a network fetch, out of
+ * this slice) or the bytes are malformed, so the caller can refuse + show.
+ */
+export async function payloadFromGated(gated: GatedRequest): Promise<PortalPayload | null> {
+	if (!SIGN_OPS.has(gated.op)) return null;
+	const params = new Map(gated.params);
+	const dat = params.get('dat');
+	if (!dat) return null;
+	let bytes: Uint8Array<ArrayBuffer>;
+	try {
+		const binary = atob(dat.replaceAll(/\s/g, ''));
+		bytes = new Uint8Array(binary.length);
+		for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+	} catch {
+		return null;
+	}
+	const gzip = (params.get('gzip') ?? '').toLowerCase();
+	if (gzip === 'true' || gzip === '1') {
+		const inflated = await gunzip(bytes);
+		if (!inflated) return null;
+		bytes = inflated;
+	}
+	if (bytes.length === 0) return null;
+	// Portal formats arrive as `CAdES`/`XAdES`/`PAdES` (any case).
+	const raw = (params.get('format') ?? '').toLowerCase();
+	const format = raw.includes('pades')
+		? 'pades'
+		: raw.includes('xades')
+			? 'xades'
+			: raw.includes('cades')
+				? 'cades'
+				: null;
+	// Strip path separators: the name only labels the in-memory file.
+	const name = (params.get('filename') ?? '').replaceAll(/[/\\]/g, '-').slice(0, 128);
+	return { file: new File([bytes], name || 'documento'), format };
 }

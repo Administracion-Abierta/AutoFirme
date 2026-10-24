@@ -39,6 +39,7 @@
 		deeplinkRemove,
 		deeplinkStatus,
 		listenDeepLinks,
+		payloadFromGated,
 		type IncomingRequest,
 		type SchemeStatus
 	} from '#lib/deeplink';
@@ -270,16 +271,28 @@
 	/**
 	 * Desktop `afirma://` review (#103): triggers the NATIVE per-request dialog
 	 * (op + origin + params). `remember` allow-lists ONLY this request's domain.
-	 * A confirmed request still needs cert pick + sign inside the app.
+	 * A confirmed request loads the portal's `dat` payload into the sign flow;
+	 * cert pick + sign still happen inside the app.
 	 */
 	async function confirmAfirma(allow: boolean): Promise<void> {
 		if (!afirma || !('gated' in afirma)) {
 			afirma = null;
 			return;
 		}
+		const gated = afirma.gated;
 		try {
-			const ok = await deeplinkConfirm(afirma.gated, allow, afirmaRemember);
+			const ok = await deeplinkConfirm(gated, allow, afirmaRemember);
 			afirmaNotice = allow && ok ? t.afirmaConfirmed : '';
+			if (ok && allow) {
+				const payload = await payloadFromGated(gated);
+				if (payload) {
+					files = [payload.file];
+					if (payload.format) format = payload.format;
+					step = 2;
+				} else if (gated.params.some(([key]) => key === 'dat')) {
+					afirmaNotice = `${t.entryError}: portal dat payload is not valid base64/gzip`;
+				}
+			}
 			if (ok) afirmaAllow = await deeplinkList().catch(() => afirmaAllow);
 			afirma = null;
 		} catch {
