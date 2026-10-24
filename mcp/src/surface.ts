@@ -74,14 +74,14 @@ export function buildServer(config: ServerConfig, store: CertStore, bridge?: Bri
 		'autofirma_sign',
 		{
 			title: 'Sign a document',
-			description:
-				'Produce a CAdES-BES signature over the given document with a loaded certificate. The result is DETACHED: keep the document, it is needed to verify. When the extension bridge is connected, the operator confirms the signature in Chrome and no server-side certificate or PIN is needed; otherwise signing needs the operator to have set AUTOFIRME_MCP_CERTS and AUTOFIRME_MCP_PIN.',
-			inputSchema: {
-				...SOURCE_FIELDS,
-				format: z.enum(['cades', 'xades', 'pades']).describe('Only cades is available in this build.'),
-				cert_id: z.string().describe('cert_id from autofirma_list_certs; must be a signable certificate.'),
-				signing_time: z.string().optional().describe('ISO 8601 signing time; defaults to now.')
-			}
+		description:
+			'Produce a signature with a loaded certificate: CAdES-BES is DETACHED (keep the document to verify); OOXML/XAdES/PAdES refuse honestly in this DOM-less build. When the extension bridge is connected, the operator confirms the signature in Chrome and no server-side certificate or PIN is needed.',
+		inputSchema: {
+			...SOURCE_FIELDS,
+			format: z.enum(['cades', 'xades', 'pades', 'ooxml']).describe('Only cades signs in this build; the rest refuse with unsupported_format.'),
+			cert_id: z.string().describe('cert_id from autofirma_list_certs; must be a signable certificate.'),
+			signing_time: z.string().optional().describe('ISO 8601 signing time; defaults to now.')
+		}
 		},
 		async (args) => {
 			try {

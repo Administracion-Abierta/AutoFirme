@@ -64,7 +64,7 @@ cross-reading: <https://github.com/ctt-gob-es/clienteafirma>.
 | XMLDSig (no XAdES properties) | `signers/xmldsig/AOXMLDSigSigner.java` | `core/signers/AOSignConstants.java:31` | — | `MISSING` | P2 |
 | PAdES | `signers/pades/AOPDFSigner.java` | `core/signers/AOSignConstants.java:38` | `src/lib/pades.ts` (#11), wired into the picker (B-B + B-T) plus visible signatures (#45) | `DONE` | — |
 | ODF (`.odt/.ods/.odp`) | `signers/odf/AOODFSigner.java` | `core/signers/AOSignConstants.java:34-35` | — | `MISSING` | P0 |
-| OOXML (`.docx/.xlsx/.pptx`) | `signers/ooxml/AOOOXMLSigner.java` | `core/signers/AOSignConstants.java:32-33` | `src/lib/ooxml.ts` (#10), not wired | `PARTIAL` | P0 |
+| OOXML (`.docx/.xlsx/.pptx`) | `signers/ooxml/AOOOXMLSigner.java` | `core/signers/AOSignConstants.java:32-33` | `src/lib/ooxml.ts` (#10), wired into the picker with drop auto-detect (#127); verification stays unsupported (1.9 parity) | `PARTIAL` (verification outstanding) | — |
 | FacturaE | `signers/xades/AOFacturaESigner.java` | `core/signers/AOSignConstants.java:41-43` | — | `MISSING` | P0 |
 | ASiC-S (CAdES / XAdES in a ZIP) | `signers/cades/asic/AOCAdESASiCSSigner.java`, `signers/xades/asic/AOXAdESASiCSSigner.java` | `core/signers/AOSignConstants.java:11,19` | — | `MISSING` | P1 |
 | Tri-phase variants (`*Tri`) | `signers/*/client/**`, `AOPkcs1TriPhaseSigner` | `core/signers/AOSignConstants.java:14,18,26,39` | `src/lib/extension/triphase.ts` — CAdES only, in the extension; the page's signing server builds the structure and the extension supplies the PKCS#1 signature | `PARTIAL` (CAdES; XAdES/PAdES tri servers still use native AutoFirma) | P1 |
@@ -205,7 +205,7 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 2. **Co-signature and counter-signature** (leafs/tree) for CAdES/XAdES/PDF — §3.
 3. **Revocation and trust depth** in the verify engine: OCSP/CRL, `CA_NOT_SUPPORTED`
    reporting, trust beyond the bundled FNMT root — §5. CORS is the known constraint.
-4. **OOXML in the UI** (engine exists, unused) and **ODF signing** (missing entirely) — §2.
+4. **ODF signing** (missing entirely) and **OOXML verification** (unsupported, 1.9 parity) — §2.
 5. **FacturaE profile** (XAdES with policy, role, production place) — §2.
 6. **XAdES-T** (generate `SignatureTimeStamp`) and display of received timestamps — §4.3
    (CAdES-T and PAdES B-T generation already ship, #43).

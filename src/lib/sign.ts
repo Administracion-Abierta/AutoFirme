@@ -3,7 +3,7 @@ import { softwareProvider, type KeyProvider } from './keys/provider';
 
 /** Domain types for the sign flow. Signature engines land in #6–#11; this file is the seam. */
 
-export type SignFormat = 'cades' | 'xades' | 'pades';
+export type SignFormat = 'cades' | 'xades' | 'pades' | 'ooxml';
 
 export interface SignFormatOption {
 	id: SignFormat;
@@ -18,7 +18,10 @@ export interface SignFormatOption {
 export const SIGN_FORMATS: readonly SignFormatOption[] = [
 	{ id: 'cades', label: 'CAdES-BES', extension: '.csig', issue: 6, implemented: true },
 	{ id: 'xades', label: 'XAdES-EPES', extension: '.xsig', issue: 7, implemented: true },
-	{ id: 'pades', label: 'PAdES-B-B', extension: '.pdf', issue: 11, implemented: true }
+	{ id: 'pades', label: 'PAdES-B-B', extension: '.pdf', issue: 11, implemented: true },
+	// OOXML signs in place (the signed bytes are still a .docx/.xlsx), so there is no
+	// appended extension; batch output keeps the original file name. Refs #127.
+	{ id: 'ooxml', label: 'OOXML', extension: '', issue: 127, implemented: true }
 ];
 
 export interface SelectedFile {

@@ -14,13 +14,15 @@ import type { CertStore, CertSummary } from './certstore';
 import type { ServerConfig } from './config';
 import { type Bytes, ToolError, readSource, type Source } from './input';
 
-export type SignFormat = 'cades' | 'xades' | 'pades';
+export type SignFormat = 'cades' | 'xades' | 'pades' | 'ooxml';
 
 /** Formats this slice can actually produce, and the honest reason for the rest. */
 const FORMAT_SUPPORT: Record<SignFormat, string | null> = {
 	cades: null,
 	xades: 'XAdES needs a DOM (DOMParser/XMLSerializer); this stdio build has none — Refs #28',
-	pades: 'PAdES is not wired into this server yet; the engine can do it — Refs #28'
+	pades: 'PAdES is not wired into this server yet; the engine can do it — Refs #28',
+	// OOXML signing needs a DOM too (it builds XAdES inside the package) — Refs #127.
+	ooxml: 'OOXML needs a DOM (DOMParser/XMLSerializer); this stdio build has none — Refs #127'
 };
 
 export interface SignInput extends Source {

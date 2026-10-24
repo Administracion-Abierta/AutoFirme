@@ -27,7 +27,7 @@ llamadas `AutoScript` de las sedes electrónicas.
 | **PAdES B-B** (PDF) | funciona, en la interfaz | actualización incremental real, `adbe.pkcs7.detached` / `ETSI.CAdES.detached` (#11) |
 | **PAdES B-T** | funciona | con TSA configurado |
 | **Firma visible en PDF** | funciona, en la interfaz | imagen PNG/JPEG (alfa vía `/SMask`), nombre y fecha, por página y esquina o coordenadas; desactivada por defecto (#45) |
-| **OOXML** (docx/xlsx/pptx) | librería hecha y probada, **sin enlace en la interfaz** | parte `XAdES v1.3.2` + `origin.sigs`, deja el resto del ZIP idéntico bit a bit (#10) |
+| **OOXML** (docx/xlsx/pptx) | funciona, en la interfaz; auto-detectado al soltar el archivo | parte `XAdES v1.3.2` + `origin.sigs`, deja el resto del ZIP idéntico bit a bit (#10, #127). Verificar OOXML no está soportado (igual que 1.9) |
 | ODF, FacturaE, ASiC-S, co-firma/contrafirma, Detached/Enveloping | no | ver `PARITY.md` §G |
 
 Claves admitidas: **RSA (RSASSA-PKCS1-v1_5)** y **ECDSA P-256/P-384/P-521**. Nada de SHA-1 para

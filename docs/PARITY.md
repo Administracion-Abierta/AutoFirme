@@ -51,11 +51,11 @@ table (constants `:13-30`); `getSigner(byte[])` `:36` content-sniffs in table or
 | PAdES B-B, incremental update, `adbe.pkcs7.detached` / `ETSI.CAdES.detached` | `signers/pades/AOPDFSigner.java:118,378`; `pades/PdfUtil.java:129` append mode | `src/lib/pades.ts:293 signPdf`, wired into the picker (`src/lib/sign.ts:20`) | **full** — engine + UI, openssl/pdfsig-checked (#11) | needed |
 | PAdES visible signature (image/text, page, position) | `standalone/ui/preferences/PreferencesPanelPades.java:52`; `signers/pades/AOPDFSigner.java` appearance path | `src/lib/pades-visible.ts`, sign panel toggle off-by-default (#45) | **full** | needed |
 | PAdES-T / LTV (DSS, `ETSI.RFC3161`, DocTimeStamp) | `signers/pades/PdfTimestamper.java:31,60`; `signvalidation/SignatureFormatDetectorPadesCades.java:27` | `src/lib/pades.ts:19,510,516` (B-T via TSA); LTV DSS/DocTimeStamp still absent | **partial** (B-T full, no LTV) | needed (#43) |
-| OOXML (docx/xlsx/pptx) signature part + origin | `signers/ooxml/AOOOXMLSigner.java:188`; `ooxml/OOXMLZipHelper.java:41,232` | `src/lib/ooxml.ts:255 signOoxmlPackage` | **partial** — library written and tested, **not called** from `src/lib/App.svelte`/`src/lib/batch.ts` (`README.md` "Formatos y algoritmos") | needed |
+| OOXML (docx/xlsx/pptx) signature part + origin | `signers/ooxml/AOOOXMLSigner.java:188`; `ooxml/OOXMLZipHelper.java:41,232` | `src/lib/ooxml.ts:255 signOoxmlPackage`, wired into the picker (`src/lib/App.svelte`), batch (`src/lib/batch.ts`), MCP (`mcp/src/tools.ts`) and the extension bridge (`src/lib/extension/sign-request.ts`) (#127) | **full** — engine + UI; verification explicitly unsupported (1.9 parity) | needed |
 | ODF (`.odt`/`.ods`) signature via manifest | `signers/odf/AOODFSigner.java:336,366` | none | **missing** | needed (low priority — office formats are rare in Spanish admin flows) |
 | FacturaE 3.0/3.1 (XAdES Enveloped forced, FacturaE policy, parameter + claimed-role whitelist) | `signers/xades/AOFacturaESigner.java:26-27` (`POLICY_FACTURAE_30/31`), `:29-49` (`ALLOWED_PARAMS`, `FORMAT=…ENVELOPED`), `:81,85` (`signerClaimedRoles`, default `emisor`), `:89,94` (policy whitelist), `:69` cosign throws | none | **missing** | needed (public-sector invoicing is AutoFirma's flagship use case) |
 | Raw PKCS#1 (`NONE`, `.p1`, sign-only) | `core/signers/AOPkcs1Signer.java:21` (`.p1`), `:25` (sign), `:117` (`isSign` always false) | none exposed; `src/lib/sign.ts:77 signBytes` is the internal primitive | **partial** (internal only) | browser-moot as a UI feature — nothing a user picks |
-| Format auto-detection on input | `core/signers/AOSignerFactory.java:36,64` | `src/lib/verify/detect.ts:12 detectFormat` (magic bytes) | **partial** — detection exists for *verify*, not for choosing a signer | needed |
+| Format auto-detection on input | `core/signers/AOSignerFactory.java:36,64` | `src/lib/verify/detect.ts:12 detectFormat` (verify) and `src/lib/verify/detect.ts:52 suggestSignFormat` (signing-side, #127) | **full** — magic bytes for verify and signer choice; extension-only ambiguity falls back to `cades` | needed |
 | Digest/algo matrix SHA1/256/384/512 × RSA/DSA/ECDSA | `core/signers/AOSignConstants.java:66-81` | WebCrypto only: `src/lib/sign.ts:32 SigningAlgorithm` (RSA + ECDSA, P-256/384/521, no DSA) | **partial** — SHA-1 and DSA deliberately absent | browser-moot for SHA-1/DSA (`MUST NOT` in current guidance); RSA/ECDSA = full |
 
 **Modes and profiles** (original): `explicit`/`implicit` and `advanced`/`baseline`
@@ -75,7 +75,7 @@ Original `AOSigner` is a composite of `AOSimpleSigner` + `AOCoSigner` + `AOCount
 | CAdES co-sign (detached + embedded) | `signers/cades/AOCAdESSigner.java:51,75` → `signers/multi/cades/CAdESCoSigner.java:127` | none — one signer per artifact | **missing** | needed |
 | CAdES counter-sign (tree + leaf) | `signers/cades/AOCAdESSigner.java:101` | none | **missing** | needed |
 | XAdES co-sign / counter-sign | `signers/xades/AOXAdESSigner.java:222,244` | none (`src/lib/xades.ts` writes a fresh `ds:Signature`) | **missing** | needed |
-| PAdES / ODF / OOXML co-sign = re-sign the same document | `signers/pades/AOPDFSigner.java:149`; `signers/odf/AOODFSigner.java:542`; `signers/ooxml/AOOOXMLSigner.java:202` | none wired; `src/lib/pades.ts:293 signPdf` appends one revision, so co-sign would work at the byte level | **missing** (engine-ready, unreachable) | needed |
+| PAdES / ODF / OOXML co-sign = re-sign the same document | `signers/pades/AOPDFSigner.java:149`; `signers/odf/AOODFSigner.java:542`; `signers/ooxml/AOOOXMLSigner.java:202` | none; `src/lib/pades.ts:293 signPdf` appends one revision, so co-sign would work at the byte level | **missing** | needed |
 | Counter-sign of PAdES/ODF/OOXML/FacturaE (throws in the original) | `signers/pades/AOPDFSigner.java:159`; `signers/odf/AOODFSigner.java:552`; `signers/facturae` `AOFacturaESigner.java:74` | n/a | **missing** | browser-moot by construction — the original refuses too |
 
 ## C. Verification and validation
@@ -157,8 +157,7 @@ Each line is issue-sized. `P0` breaks the "drop-in replacement" promise for a no
 1. PAdES verification depth: form modification and PSA/shadow-attack checks still absent
    (`signvalidation/ValidatePdfSignature.java:64,71,164`); byte-range, digest and chain already
    ship (`src/lib/verify/pades.ts`). *(New — not covered by an open issue.)*
-2. OOXML signing is written and tested but unreachable from the UI (`src/lib/ooxml.ts`,
-   `README.md` "Formatos y algoritmos"); wire it, with verify-side honesty about the missing validator.
+2. ~~OOXML signing is written and tested but unreachable from the UI~~ Done (#127): `suggestSignFormat` auto-detects OOXML and the picker, batch, MCP and extension bridge sign it; verification stays explicitly unsupported (1.9 parity).
 3. DNIe / CERES smartcard users have no path yet: desktop scope via the `KeyProvider` seam
    (PKCS#11/PC/SC; `docs/DESKTOP-ROADMAP.md`). Decision recorded 2026-10-20: desktop is the
    full product, extension keeps PKCS#12-only. *(New.)*
@@ -206,7 +205,7 @@ and PAdES verification** (PAdES without form-modification/shadow-attack depth), 
 signing with visible signatures**, certificate loading from **PKCS#12**, **batch** signing with a
 manifest and ES/EN UI. The gap between that and "drop-in replacement" is
 concentrated in four places: **PAdES depth** (LTV, PSA/shadow checks), **office formats** (OOXML
-unwired, ODF absent, FacturaE absent), **long-term validity** (XAdES-T, OCSP/CRL, anchors = FNMT
+signing shipped in #127, ODF absent, FacturaE absent, OOXML verification unsupported per 1.9), **long-term validity** (XAdES-T, OCSP/CRL, anchors = FNMT
 only), and **multi-signature** (no co-sign/counter-sign). The desktop half of AutoFirma —
 smartcards, OS keystores, the `afirma://` hand-off, installers, the updater — is owned by the
 desktop product (`docs/DESKTOP-ROADMAP.md`); locked 2026-10-20, superseding the discarded-desktop
