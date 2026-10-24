@@ -39,7 +39,10 @@ test('no doc still claims the OOXML signer is unwired (review UNFIXED list, #127
 test('the extension doc lists the OOXML intercept call it actually handles', () => {
 	const text = doc('docs/CHROME-EXTENSION.md');
 	expect(text).toMatch(/AutoScript\.sign\(base64, 'SHA256withRSA', 'OOXML', null, success, error\);/);
-	expect(text).toMatch(/an OOXML package \(`\[Content_Types\]\.xml`\)\s+signs as OOXML/);
+	// AUTO resolves only PDF/XML/CAdES in `extension/core/contract.js` contentFormat;
+	// a claim that AUTO sniffed OOXML packages was false and is now pinned as such.
+	expect(text).toMatch(/OOXML packages go through\s+the explicit `OOXML` format, not `AUTO`/);
+	expect(text).not.toMatch(/an OOXML package \(`\[Content_Types\]\.xml`\)\s+signs as OOXML/);
 });
 
 test('the docs state the wired OOXML path and the unsupported verification', () => {
