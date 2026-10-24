@@ -510,7 +510,7 @@ export const copy: Record<Lang, Copy> = {
 			toastSaveFailed: 'No se ha podido guardar el fichero.',
 			toastSaveCancelled: 'Guardado cancelado.',
 			toastError: 'Se ha producido un error.',
-		}
+		},
 		afirmaSchemeOurs: 'Esta app gestiona los enlaces afirma://.',
 		afirmaSchemeOther: 'Otra app gestiona los enlaces afirma://: solo funcionará la extensión.',
 		afirmaSchemeNone: 'Ninguna app gestiona los enlaces afirma://.',
@@ -757,7 +757,7 @@ export const copy: Record<Lang, Copy> = {
 			toastSaveFailed: 'The file could not be saved.',
 			toastSaveCancelled: 'Save cancelled.',
 			toastError: 'Something went wrong.',
-		}
+		},
 		afirmaSchemeOurs: 'This app handles afirma:// links.',
 		afirmaSchemeOther: 'Another app handles afirma:// links: only the extension will work.',
 		afirmaSchemeNone: 'No app handles afirma:// links.',
