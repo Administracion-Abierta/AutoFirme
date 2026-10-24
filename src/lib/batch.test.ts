@@ -5,9 +5,9 @@
  * archive, by Node's independent CRC-32.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { webcrypto } from 'node:crypto';
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { crc32 as nodeCrc32 } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -16,7 +16,10 @@ import {
 	buildManifest,
 	buildZip,
 	createBatchQueue,
+	formatForName,
 	sha256Hex,
+	signCadesFromDigest,
+	summarizeBatch,
 	type BatchSigner,
 	type SignedDocument
 } from './batch';
@@ -24,7 +27,7 @@ import { signCadesDetached } from './cms';
 import { loadSignerSession } from './keystore';
 import type { SignerCert } from './sign';
 import { signingAlgorithmName } from './sign';
-import { createCadesFixtures, FIXTURE_PIN, type CadesFixtures } from '../test/fixtures';
+import { createCadesFixtures, FIXTURE_PIN, writeFixtureFile, type CadesFixtures } from '../test/fixtures';
 
 // jsdom's `crypto` only has getRandomValues; the queue's SHA-256 needs SubtleCrypto — the same API
 // browsers expose.
@@ -413,5 +416,162 @@ describe('per-document format', () => {
 
 		// The override was a no-op: the run kept the format the batch started with.
 		expect(state.documents.map((document) => document.format)).toEqual(['cades', 'cades']);
+	});
+});
+
+describe('directory walk helpers', () => {
+	it('picks the format from the file name: PDFs to PAdES, XML to XAdES, the rest to CAdES', () => {
+		expect(formatForName('contrato.pdf')).toBe('pades');
+		expect(formatForName('CONTRATO.PDF')).toBe('pades');
+		expect(formatForName('factura.xml')).toBe('xades');
+		expect(formatForName('nota.txt')).toBe('cades');
+		expect(formatForName('sin-extension')).toBe('cades');
+	});
+
+	it('summarizes a mixed run as one verdict row per document', async () => {
+		const queue = createBatchQueue();
+		queue.set([file('a.txt', 'uno'), file('b.txt', 'dos')], 'cades');
+		const state = await queue.run(async (document, bytes) =>
+			document.name === 'b.txt' ? cadesEngine(keyless)(document, bytes) : cadesEngine()(document, bytes)
+		);
+		const report = summarizeBatch(state);
+		expect(report.signed).toBe(1);
+		expect(report.failed).toBe(1);
+		expect(report.rows.map((row) => [row.name, row.result])).toEqual([
+			['a.txt', 'DONE_AND_SAVED'],
+			['b.txt', 'ERROR_PRE']
+		]);
+		expect(report.rows[1].detail).toMatch(/no private key/);
+	});
+
+	it('signs 500 files with a per-file verdict table and retries only the failure', async () => {
+		const files = Array.from({ length: 500 }, (_, index) =>
+			file(`document-${String(index + 1).padStart(3, '0')}.txt`, `document ${index + 1}\n`)
+		);
+		const queue = createBatchQueue();
+		queue.set(files, 'cades');
+		// Bulk rows use a stub signer: 500 real signatures prove nothing the 1-3-file
+		// openssl tests do not already prove, and would make the suite crypto-bound.
+		const stub: Engine = async (document) => ({
+			bytes: new TextEncoder().encode(`stub:${document.name}`),
+			algorithm: 'stub'
+		});
+		const tried = new Set<string>();
+		const seen: string[] = [];
+		const state = await queue.run(async (document, bytes) => {
+			seen.push(document.name);
+			if (document.name === 'document-250.txt' && !tried.has(document.name)) {
+				tried.add(document.name);
+				throw new Error('injected failure');
+			}
+			return stub(document, bytes);
+		});
+		const report = summarizeBatch(state);
+		expect(report.rows).toHaveLength(500);
+		expect(report.signed).toBe(499);
+		expect(report.failed).toBe(1);
+		expect(seen).toHaveLength(500);
+		// A rerun retries only the failure: the second run touches one document.
+		const second: string[] = [];
+		const retried = await queue.run(async (document, bytes) => {
+			second.push(document.name);
+			return stub(document, bytes);
+		});
+		expect(summarizeBatch(retried).failed).toBe(0);
+		expect(second).toEqual(['document-250.txt']);
+	});
+});
+
+describe('pre-hashed digest input', () => {
+	it('signs a digest computed elsewhere; openssl verifies it against the original file', async () => {
+		const content = new TextEncoder().encode('documento con digest externo\n');
+		const digest = await sha256Hex(content);
+		const signature = await signCadesFromDigest(certificate, { digest });
+		expect(verify(signature, contentPath('digest-mode', content), 'digest-mode.csig')).toBeNull();
+	});
+
+	it('produces the same signature as the content path in #lib/cms, so the two cannot drift', async () => {
+		const content = new TextEncoder().encode('mismo documento por las dos vias\n');
+		const digest = await sha256Hex(content);
+		const signingTime = new Date('2026-10-21T00:00:00Z');
+
+		// `signCadesFromDigest` re-assembles the `SignedData` that `#lib/cms` builds, because
+		// `#lib/cms` hashes the content itself and this path only ever has the digest. The two
+		// copies must therefore produce the very same signature: this is the guard that makes a
+		// change in one of them fail loudly instead of silently producing a different structure.
+		const fromDigest = await signCadesFromDigest(certificate, { digest, signingTime });
+		const fromContent = await signCadesDetached(certificate, content, { signingTime });
+
+		expect(
+			fromDigest,
+			'the digest-mode signer has drifted from #lib/cms: the two paths must build the same ' +
+				'SignedData, so whatever changed in #lib/cms has to be mirrored here'
+		).toEqual(fromContent);
+	});
+
+	it('signs a digest with an EC key too (the raw r||s re-encoded as a DER SEQUENCE)', async () => {
+		const { signer } = await loadSignerSession(fixtures.ecP12, FIXTURE_PIN);
+		const content = new TextEncoder().encode('documento con clave EC\n');
+		const digest = await sha256Hex(content);
+		const signature = await signCadesFromDigest(signer, { digest });
+
+		expect(signer.algorithm?.name).toBe('ECDSA');
+		expect(verify(signature, contentPath('digest-mode-ec', content), 'digest-mode-ec.csig')).toBeNull();
+	});
+
+	it('accepts the raw 32-byte digest and rejects a malformed one', async () => {
+		const content = new TextEncoder().encode('otro documento\n');
+		const hex = await sha256Hex(content);
+		const raw = new Uint8Array(32);
+		for (let i = 0; i < 32; i += 1) raw[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+		const fromRaw = await signCadesFromDigest(certificate, {
+			digest: raw,
+			signingTime: new Date('2026-10-21T00:00:00Z')
+		});
+		const fromHex = await signCadesFromDigest(certificate, {
+			digest: hex,
+			signingTime: new Date('2026-10-21T00:00:00Z')
+		});
+		expect(fromRaw).toEqual(fromHex);
+		await expect(signCadesFromDigest(certificate, { digest: 'zz' })).rejects.toThrow(
+			/64-hex-char/
+		);
+	});
+});
+
+describe('batch CLI directory walk', () => {
+	it('records an unreachable entry as ERROR_PRE and keeps signing the rest', () => {
+		const root = join(fixtures.dir, 'cli-walk');
+		const input = join(root, 'in');
+		const output = join(root, 'out');
+		mkdirSync(input, { recursive: true });
+		writeFixtureFile(input, 'a.txt', new TextEncoder().encode('uno'));
+		writeFixtureFile(input, 'z.txt', new TextEncoder().encode('dos'));
+		// A dangling symlink: `statSync` fails, so the walk cannot even classify the entry.
+		symlinkSync(join(input, 'missing.txt'), join(input, 'dangling.txt'));
+		const p12Path = writeFixtureFile(root, 'cert.p12', fixtures.p12);
+
+		const run = spawnSync(
+			process.execPath,
+			[
+				'--import', './scripts/ts-hook.mjs', 'scripts/batch-sign.mjs',
+				'--p12', p12Path, '--out', output, input
+			],
+			{ cwd: process.cwd(), encoding: 'utf8', env: { ...process.env, P12_PIN: FIXTURE_PIN } }
+		);
+
+		// The unreachable entry is a failure row, not the end of the batch: both good files signed
+		// and the run reports failure through its exit code.
+		expect(run.stdout, run.stderr).toContain('signed 2, failed 1');
+		expect(run.status).toBe(1);
+		const manifest = JSON.parse(readFileSync(join(output, 'manifest.json'), 'utf8'));
+		expect(manifest.singlesigns.map((row: { datareference: string; result: string }) => [
+			row.datareference,
+			row.result
+		])).toEqual([
+			['a.txt', 'DONE_AND_SAVED'],
+			['dangling.txt', 'ERROR_PRE'],
+			['z.txt', 'DONE_AND_SAVED']
+		]);
 	});
 });
