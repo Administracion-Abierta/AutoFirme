@@ -126,8 +126,10 @@ jobs:
           xmlsec1 --version
           xmllint --version
           zip -v | sed -n '2p'
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      # Fully qualified URLs: data.forgejo.org (DEFAULT_ACTIONS_URL) mirrors only
+      # actions/*; dtolnay and Swatinem live on github.com.
+      - uses: https://github.com/dtolnay/rust-toolchain@stable
+      - uses: https://github.com/Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       - uses: pnpm/action-setup@v4
