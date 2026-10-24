@@ -106,7 +106,7 @@ describe('checkRevocation', () => {
 		// after producedAt so the cache window never lapses between regeneration
 		// and test run — run 351 failed exactly 25h after the fixture was made.
 		const probe = await parseOcspResponse(fixture('resp.der'), SERIAL, caCert);
-		const now = new Date(Date.parse(probe.responderTime) + 60 * 60_000);
+		const now = new Date(Date.parse(probe.responderTime ?? '') + 60 * 60_000);
 
 		const first = await checkRevocation(leaf, ca, { transport, now });
 		const second = await checkRevocation(leaf, ca, { transport, now });

@@ -116,6 +116,10 @@ jobs:
       image: node:24-trixie
     steps:
       # node:24-trixie ships git/node; apt adds the native build chain and test oracles.
+      # Latent bug exposed when the label fix let this job run for the first
+      # time: without a checkout the workspace is empty, and pnpm/action-setup
+      # dies with "No pnpm version is specified" (no package.json in sight).
+      - uses: actions/checkout@v4
       - name: Toolchain and test oracles
         run: |
           apt-get update -qq
