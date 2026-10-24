@@ -51,8 +51,10 @@ interface XadesCommon {
 	certificates: readonly SignerCert[];
 	/** The certificate owning the private key (#5). Defaults to the first chain entry with a key. */
 	signer?: SignerCert;
+	/** XAdES `SignerRole` claimed roles (FacturaE: emisor/receptor/tercero/…). */
+	claimedRoles?: readonly string[];
 	/** EPES signature policy. Defaults to `SignaturePolicyImplied` (nothing is invented). */
-	policy?: { identifier: string; description?: string; digest?: Bytes };
+	policy?: { identifier: string; description?: string; digest?: Bytes; digestAlgorithm?: SigningAlgorithm['hash'] };
 	/** XAdES `DataObjectFormat` of the signed document. */
 	dataObject?: { description?: string; mimeType?: string };
 	/** Overrides the certificate's default hash (legacy portals ask for SHA1withRSA). The XAdES
@@ -186,8 +188,15 @@ function certificatesXml(
 		.join('');
 }
 
+function signerRoleXml(claimedRoles: readonly string[] | undefined): string {
+	if (!claimedRoles || claimedRoles.length === 0) return '';
+	const roles = claimedRoles.map((role) => `<xades:ClaimedRole>${escapeXml(role)}</xades:ClaimedRole>`).join('');
+	return `<xades:SignerRole><xades:ClaimedRoles>${roles}</xades:ClaimedRoles></xades:SignerRole>`;
+}
+
 function policyXml(policy: XadesSignatureOptions['policy']): string {
 	if (!policy) return '<xades:SignaturePolicyIdentifier><xades:SignaturePolicyImplied/></xades:SignaturePolicyIdentifier>';
+	const digestAlgorithm = DIGEST_ALGORITHM[policy.digestAlgorithm ?? 'SHA-256'];
 	return `<xades:SignaturePolicyIdentifier>
 				<xades:SignaturePolicyId>
 					<xades:SigPolicyId>
@@ -197,7 +206,7 @@ function policyXml(policy: XadesSignatureOptions['policy']): string {
 					${
 						policy.digest
 							? `<xades:SigPolicyHash>
-						<ds:DigestMethod Algorithm="${DIGEST_ALGORITHM['SHA-256']}"/>
+						<ds:DigestMethod Algorithm="${digestAlgorithm}"/>
 						<ds:DigestValue>${toBase64(policy.digest)}</ds:DigestValue>
 					</xades:SigPolicyHash>`
 							: ''
@@ -279,6 +288,7 @@ export async function signXades(options: XadesSignatureOptions): Promise<string>
 					<xades:SigningTime>${signingTime}</xades:SigningTime>
 					<xades:SigningCertificate>${certificatesXml(chain, certificateDigests, hash)}</xades:SigningCertificate>
 					${policyXml(options.policy)}
+					${signerRoleXml(options.claimedRoles)}
 				</xades:SignedSignatureProperties>
 				<xades:SignedDataObjectProperties>
 					<xades:DataObjectFormat ObjectReference="#${ids.documentReference}">
