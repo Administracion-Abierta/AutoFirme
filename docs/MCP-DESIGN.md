@@ -1,10 +1,10 @@
-# MCP server for AutoFirma Web — design study
+# MCP server for AutoFirme — design study
 
 **Issue:** #28 (stdio, CAdES only) and #46 (remote transport, deployment). **Status:**
 recommendation implemented — `mcp/` ships both transports. En español: qué hace el servidor MCP, en [LEEME.md](LEEME.md).
 
-AutoFirma Web's signing engine is a client-side SPA: the private key never leaves the browser and
-the CLI equivalent — desktop AutoFirma — is a Java GUI an agent cannot drive. The goal is to let a
+The signing engine (`src/lib/`) runs client-side — in the extension today, in the desktop WebView
+next — so the private key never leaves the machine, and the CLI equivalent — desktop AutoFirma — is a Java GUI an agent cannot drive. The goal is to let a
 coding agent on the same machine sign and verify documents through this engine, with an MCP server
 as the surface.
 
@@ -40,7 +40,7 @@ touches only globals Node has had as first-class citizens since 18 (`crypto`, `a
 The DOM-dependent modules are **not** on the CAdES path. `src/lib/cms.ts` (sign) and
 `src/lib/verify/cms.ts` (verify) build and parse the `SignedData` structures by hand over
 `crypto.subtle`, so a CAdES server needs **zero engine changes** — which is also why this slice is
-low-risk: the browser app keeps working exactly as before, and the Node build is a second consumer
+low-risk: the app keeps working exactly as before, and the Node build is a second consumer
 of the same code, not a fork.
 
 Cost of the rejected alternatives:

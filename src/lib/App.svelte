@@ -10,6 +10,7 @@
 	} from '#lib/batch';
 	import { browserVault } from '#lib/certstore';
 	import { signCadesDetached } from '#lib/cms';
+	import { signOoxmlPackage } from '#lib/ooxml';
 	import { signPdf } from '#lib/pades';
 	import {
 		SIGNATURE_CORNERS,
@@ -26,6 +27,7 @@
 		type SignerCert
 	} from '#lib/sign';
 	import { saveBytes } from '#lib/save-file';
+	import { suggestSignFormat } from '#lib/verify/detect';
 	import { signXades } from '#lib/xades';
 	import BatchQueue from '#lib/components/BatchQueue.svelte';
 	import CertPicker from '#lib/components/CertPicker.svelte';
@@ -33,6 +35,16 @@
 	import FileDrop from '#lib/components/FileDrop.svelte';
 	import PwaControls from '#lib/components/PwaControls.svelte';
 	import { isDesktop } from '#lib/desktop';
+	import {
+		deeplinkConfirm,
+		deeplinkList,
+		deeplinkRemove,
+		deeplinkStatus,
+		listenDeepLinks,
+		payloadFromGated,
+		type IncomingRequest,
+		type SchemeStatus
+	} from '#lib/deeplink';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Alert, AlertDescription } from '#lib/components/ui/alert/index.js';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -171,11 +183,26 @@
 		mcp = readMcp();
 		pinMinutes = readPinMemorySettings().minutes;
 		void consumeEntry();
-		if (!isExtension()) return;
-		const detach = listenMcpBridge((status) => (bridge = status));
-		void mcpBridgeStatus().then((status) => (bridge = status)).catch(() => {});
-		if (mcp.enabled) void connectBridge();
-		return detach;
+		const cleanups: (() => void)[] = [];
+		if (isDesktop()) {
+			void deeplinkStatus().then((status) => (afirmaScheme = status)).catch(() => {});
+			void deeplinkList().then((domains) => (afirmaAllow = domains)).catch(() => {});
+			void listenDeepLinks((request) => {
+				afirma = request;
+				afirmaRemember = false;
+				afirmaNotice = '';
+			})
+				.then((detach) => cleanups.push(detach))
+				.catch(() => {});
+		}
+		if (isExtension()) {
+			cleanups.push(listenMcpBridge((status) => (bridge = status)));
+			void mcpBridgeStatus().then((status) => (bridge = status)).catch(() => {});
+			if (mcp.enabled) void connectBridge();
+		}
+		return () => {
+			for (const cleanup of cleanups) cleanup();
+		};
 	});
 
 	/** PWA sign entry (#47): share_target, file_handlers, shortcut, portal deep-link. */
@@ -183,6 +210,12 @@
 	let deepLinkError = $state('');
 	let entryNotice = $state('');
 	let returned = $state<DeepLinkResult | null>(null);
+	/** Desktop shell `afirma://` request (#103): gated portal call awaiting review. */
+	let afirma = $state<IncomingRequest | null>(null);
+	let afirmaScheme = $state<SchemeStatus | null>(null);
+	let afirmaAllow = $state<string[]>([]);
+	let afirmaRemember = $state(false);
+	let afirmaNotice = $state('');
 
 	/** One-shot intake: preload files/data, never sign without explicit user confirm. */
 	async function consumeEntry(): Promise<void> {
@@ -203,9 +236,7 @@
 					shared.text.length > 0 ? [new File([shared.text], 'compartido.txt', { type: 'text/plain' })] : [];
 				const picked = [...shared.files, ...textFile];
 				if (picked.length > 0) {
-					files = [...files, ...picked];
-					const pdf = picked.find((file) => file.type === 'application/pdf' || file.name.endsWith('.pdf'));
-					if (pdf) format = 'pades';
+					await adoptFiles(picked);
 					entryNotice = 'shared';
 				}
 			} catch {
@@ -218,7 +249,7 @@
 	).launchQueue;
 	launcher?.setConsumer((launch) => {
 		if (launch.files.length > 0) {
-			files = [...files, ...launch.files];
+			void adoptFiles(launch.files);
 			step = 2;
 		}
 	});
@@ -236,6 +267,42 @@
 	function returnToPortal(): void {
 		if (!deepLink?.returnUrl || !returned) return;
 		location.href = buildDeepLinkReturn(deepLink.returnUrl, returned);
+	}
+	/**
+	 * Desktop `afirma://` review (#103): triggers the NATIVE per-request dialog
+	 * (op + origin + params). `remember` allow-lists ONLY this request's domain.
+	 * A confirmed request loads the portal's `dat` payload into the sign flow;
+	 * cert pick + sign still happen inside the app.
+	 */
+	async function confirmAfirma(allow: boolean): Promise<void> {
+		if (!afirma || !('gated' in afirma)) {
+			afirma = null;
+			return;
+		}
+		const gated = afirma.gated;
+		try {
+			const ok = await deeplinkConfirm(gated, allow, afirmaRemember);
+			afirmaNotice = allow && ok ? t.afirmaConfirmed : '';
+			if (ok && allow) {
+				const payload = await payloadFromGated(gated);
+				if (payload) {
+					files = [payload.file];
+					if (payload.format) format = payload.format;
+					step = 2;
+				} else if (gated.params.some(([key]) => key === 'dat')) {
+					afirmaNotice = `${t.entryError}: portal dat payload is not valid base64/gzip`;
+				}
+			}
+			if (ok) afirmaAllow = await deeplinkList().catch(() => afirmaAllow);
+			afirma = null;
+		} catch {
+			afirmaNotice = '';
+		}
+	}
+	async function removeAfirmaDomain(domain: string): Promise<void> {
+		if (await deeplinkRemove(domain).catch(() => false)) {
+			afirmaAllow = afirmaAllow.filter((entry) => entry !== domain);
+		}
 	}
 	$effect(() => applyTheme(theme));
 	const THEMES = $derived([
@@ -264,6 +331,26 @@
 	}
 	let format = $state<SignFormat>('cades');
 	let formatOpen = $state(false);
+	/**
+	 * Signing-side auto-detect (#127): the first dropped file decides the batch format when it
+	 * sniffs as something the default cannot sign (OOXML/PDF/XML). Reads only the leading
+	 * bytes; a failure to read leaves the current format untouched.
+	 */
+	async function adoptFiles(picked: File[]): Promise<void> {
+		if (picked.length === 0) return;
+		files = [...files, ...picked];
+		const first = picked[0];
+		let suggestion: ReturnType<typeof suggestSignFormat> | null = null;
+		try {
+			const head = new Uint8Array(await first.slice(0, 72 * 1024).arrayBuffer());
+			suggestion = suggestSignFormat(first.name, head as Uint8Array<ArrayBuffer>);
+		} catch {
+			suggestion = null;
+		}
+		// OOXML is the only new engine in this slice; ODF/ASiC stay manual (rejected loudly at
+		// sign time), and PDF follows the existing deep-link behavior. Refs #127.
+		if (suggestion === 'ooxml' || (suggestion === 'pades' && format === 'cades')) format = suggestion;
+	}
 	// Visible signature block (#45), PAdES only and off by default: an uploaded image plus the
 	// signer's name and the signing date, placed on a page and against a corner.
 	let visibleOn = $state(false);
@@ -327,15 +414,33 @@
 				};
 			}
 			if (kind === 'xades') {
+			return {
+				bytes: new TextEncoder().encode(
+					await signXades({
+						xml: bytes,
+						certificates: chain,
+						signer: certificate,
+						dataObject: { mimeType: file.type || 'application/xml' }
+					})
+				),
+				algorithm
+			};
+		}
+			if (kind === 'ooxml') {
+				// RSA only: the package signature is RSASSA-PKCS1-v1_5; a non-RSA key
+				// surfaces the engine's error on the document, no silent fallback. Refs #127.
+				if (!key) throw new Error('The signing certificate has no private key');
 				return {
-					bytes: new TextEncoder().encode(
-						await signXades({
-							xml: bytes,
-							certificates: chain,
-							signer: certificate,
-							dataObject: { mimeType: file.type || 'application/xml' }
+					bytes: new Uint8Array(
+						await signOoxmlPackage(bytes, {
+							key,
+							certificates: [
+								der as Uint8Array,
+								...chain.filter((entry) => entry !== certificate).map((entry) => entry.der as Uint8Array)
+							],
+							signingTime: new Date()
 						})
-					),
+					) as Uint8Array<ArrayBuffer>,
 					algorithm
 				};
 			}
@@ -440,7 +545,7 @@
 			if (step !== 2) return;
 			event.preventDefault();
 			const dropped = Array.from(event.dataTransfer?.files ?? []);
-			if (dropped.length > 0) files = [...files, ...dropped];
+			if (dropped.length > 0) void adoptFiles(dropped);
 		}}
 	/>
 
@@ -474,6 +579,42 @@
 					<TriangleAlertIcon class="size-4" aria-hidden="true" />
 					<AlertDescription>{t.insecureContext}</AlertDescription>
 				</Alert>
+			{/if}
+			{#if afirma}
+				<!-- Desktop `afirma://` request: gated by the shell, reviewed here, confirmed natively. -->
+				<div class="mx-auto w-full max-w-3xl rounded-lg border p-3 text-sm" role="alert">
+					{#if 'gated' in afirma}
+						<p class="font-medium">{t.afirmaTitle}</p>
+						<p class="text-muted-foreground mt-1 text-xs">{t.afirmaHint}</p>
+						<p class="mt-2">{t.afirmaOp}: <span class="font-mono">{afirma.gated.op}</span></p>
+						<p>{t.afirmaOrigin}: <span class="font-medium">{afirma.gated.origin ?? t.afirmaNoOrigin}</span></p>
+						{#if afirma.gated.origin}
+							<label class="mt-2 flex items-center gap-2 text-sm">
+								<input type="checkbox" class="accent-primary size-4" bind:checked={afirmaRemember} />
+								{t.afirmaRemember}
+							</label>
+						{/if}
+						<div class="mt-2 flex gap-2">
+							<Button size="sm" disabled={!afirma.gated.origin} onclick={() => void confirmAfirma(true)}>
+								{t.afirmaReview}
+							</Button>
+							<Button size="sm" variant="outline" onclick={() => (afirma = null)}>
+								{t.afirmaDismiss}
+							</Button>
+						</div>
+					{:else}
+						<p class="text-destructive font-medium">{t.entryError}: {afirma.refused.reason}</p>
+						<p class="text-muted-foreground mt-1 font-mono text-xs">{afirma.refused.raw}</p>
+						<div class="mt-2">
+							<Button size="sm" variant="outline" onclick={() => (afirma = null)}>
+								{t.afirmaDismiss}
+							</Button>
+						</div>
+					{/if}
+				</div>
+			{/if}
+			{#if afirmaNotice}
+				<p class="mx-auto w-full max-w-3xl text-sm" role="status">{afirmaNotice}</p>
 			{/if}
 			<div
 				id="panel-sign"
@@ -601,7 +742,7 @@
 							</fieldset>
 
 							{#if files.length === 0}
-								<FileDrop copy={t} onselect={(picked) => (files = [...files, ...picked])} />
+								<FileDrop copy={t} onselect={(picked) => void adoptFiles(picked)} />
 							{/if}
 							{#if files.length > 0}
 								<div class="relative min-w-0">
@@ -613,7 +754,7 @@
 									<TableBody>
 										<TableRow class="border-border/50 hover:bg-transparent">
 											<TableCell class="p-0">
-												<FileDrop copy={t} compact onselect={(picked) => (files = [...files, ...picked])} />
+												<FileDrop copy={t} compact onselect={(picked) => void adoptFiles(picked)} />
 											</TableCell>
 										</TableRow>
 										{#each files as file, index (index)}
@@ -999,6 +1140,37 @@
 							{@render extensionSettings(lang)}
 						</section>
 					{/if}
+					{#if isDesktop()}
+						<!-- `afirma://` portals: desktop shell only; entries land here via per-request confirm. -->
+						<section class="flex flex-col gap-2">
+							<h3 class="flex items-center gap-2 text-sm font-medium">{t.afirmaTitle}</h3>
+							<p class="text-muted-foreground text-xs" role="status">
+								{afirmaScheme === 'ours'
+									? t.afirmaSchemeOurs
+									: afirmaScheme === 'none'
+										? t.afirmaSchemeNone
+										: afirmaScheme
+											? t.afirmaSchemeOther
+											: ''}
+							</p>
+							<p class="text-muted-foreground text-xs">{t.afirmaHint}</p>
+							<h4 class="text-sm font-medium">{t.afirmaListTitle}</h4>
+							{#if afirmaAllow.length === 0}
+								<p class="text-muted-foreground text-sm">{t.afirmaListEmpty}</p>
+							{:else}
+								<ul class="flex flex-col gap-1">
+									{#each afirmaAllow as domain (domain)}
+										<li class="flex items-center justify-between gap-2 text-sm">
+											<span class="font-mono">{domain}</span>
+											<Button size="sm" variant="outline" onclick={() => void removeAfirmaDomain(domain)}>
+												{t.afirmaRemove}
+											</Button>
+										</li>
+									{/each}
+								</ul>
+							{/if}
+						</section>
+					{/if}
 				</div>
 			{:else if settingsTab === 'mcp'}
 				<div
@@ -1126,7 +1298,7 @@
 			>
 				{#each SIGN_FORMATS as option (option.id)}
 					<label
-						class="hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5 flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-3 transition-colors"
+						class="hover:border-primary/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5 flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-3 transition-colors {option.id === 'ooxml' ? 'flex-wrap' : ''}"
 					>
 						<input
 							type="radio"
@@ -1141,6 +1313,9 @@
 						/>
 						<span class="font-medium">{option.label}</span>
 						<span class="text-muted-foreground tnum text-sm">{option.extension}</span>
+						{#if option.id === 'ooxml'}
+							<span class="text-muted-foreground block w-full text-xs">{t.formatOoxmlNoVerify}</span>
+						{/if}
 						{#if !option.implemented}
 							<Badge variant="secondary" class="ms-auto">
 								{t.pendingIssue} #{option.issue}

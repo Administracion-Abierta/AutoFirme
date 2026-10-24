@@ -5,13 +5,13 @@ import {MAX_GLOBAL_REQUESTS} from '../core/coordinator.js';
 
 const event = () => ({listeners: /** @type {((...args: any[]) => any)[]} */ ([]),addListener(fn){this.listeners.push(fn);},async emit(...args){return Promise.all(this.listeners.map(fn=>fn(...args)));}});
 function browser() {
-  /** @type {{disabled:string[],enabled:string[],granted:Set<string>,registered:any[],registrations:number,resized:any[],windows:any[],removed:any[],frame:any,windowDiesOnCreate:boolean}} */
-  const state={disabled:[],enabled:[],granted:new Set(),registered:[],registrations:0,resized:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'},windowDiesOnCreate:false};
+  /** @type {{disabled:string[],enabled:string[],granted:Set<string>,registered:any[],registrations:number,resized:any[],windows:any[],removed:any[],frame:any,windowDiesOnCreate:boolean,failRegistration:boolean}} */
+  const state={disabled:[],enabled:[],granted:new Set(),registered:[],registrations:0,resized:[],windows:[],removed:[],frame:{documentId:'doc-a',url:'https://site.test/form'},windowDiesOnCreate:false,failRegistration:false};
   const live=new Set();
   const chrome={runtime:{id:'extension',getURL:path=>'chrome-extension://extension/'+path,onInstalled:event(),onStartup:event(),onMessage:event(),onConnect:event()},
     storage:{local:{async get(){return {enabledOrigins:state.enabled,disabledOrigins:state.disabled};},async set(v){if(v.disabledOrigins)state.disabled=v.disabledOrigins;},async setAccessLevel(){}}},
     permissions:{async getAll(){return {origins:[...state.granted]};},async contains({origins}){return origins.every(x=>state.granted.has(x)||state.granted.has(new URL(x).protocol+'//*/*'));},onAdded:event(),onRemoved:event()},
-    scripting:{async getRegisteredContentScripts(){return state.registered;},async unregisterContentScripts(){state.registered=[];},async registerContentScripts(v){state.registered=v;state.registrations++;}},
+    scripting:{async getRegisteredContentScripts(){return state.registered;},async unregisterContentScripts(){state.registered=[];},async registerContentScripts(v){if(state.failRegistration)throw Error('registration refused');state.registered=v;state.registrations++;}},
     windows:{async update(id,options){state.resized.push({id,...options});return {id,...options};},async create(options){const win={id:20+state.windows.length,tabs:[{id:15+state.windows.length}]};state.windows.push({...win,...options});if(state.windowDiesOnCreate){chrome.windows.onRemoved.emit(win.id);}else live.add(win.id);return win;},async get(id){if(!live.has(id))throw Error('No window with id: '+id);return {id};},async remove(id){live.delete(id);state.removed.push(id);},onRemoved:event()},
     tabs:{async create(options){state.windows.push(options);},onRemoved:event()},
     webNavigation:{async getFrame(){return state.frame;},onCommitted:event()},action:{onClicked:event()}};
@@ -44,6 +44,16 @@ test('a clean install registers the wildcard bridge and captures website calls',
   await connected.port.onMessage.emit({id:crypto.randomUUID(),request:{operation:'selectCertificate'}});
   const item=[...env.bridge.coordinator.requests.values()][0];assert.ok(item);
   await env.bridge.handleMessage({type:'request:cancel',id:item.id},chooser(item));
+});
+
+test('a refused content-script registration is reported instead of silently disabling interception',async()=>{
+  const env=browser();env.state.failRegistration=true;env.state.granted.add('https://*/*');
+  const bridge=createBridge(env.chrome);await bridge.ready.catch(()=>{});
+  const list=await bridge.handleMessage({type:'sites:list'},app());
+  assert.match(list.scriptsError,/registration refused/);
+  env.state.failRegistration=false;
+  await bridge.updateScripts();
+  assert.equal((await bridge.handleMessage({type:'sites:list'},app())).scriptsError,'');
 });
 
 test('sites:list reports per-origin grants and the all-sites wildcard separately',async()=>{

@@ -125,6 +125,30 @@ test('adapter failures never replay and cancellation uses original error contrac
   assert.equal(originals,0);assert.equal(errors[0][0],'java.lang.Exception');
 });
 
+test('transport errors and cancellations reach the page in the portal error shape', async () => {
+  const errors = [];
+  const api = { sign(..._args) { void _args; }, selectCertificate(..._args) { void _args; } };
+  wrapAutoScript(api, async () => ({ kind: 'error' }));
+  api.sign('YQ==', 'SHA256withRSA', 'CAdES', '', () => assert.fail(), (...values) => errors.push(values));
+  api.selectCertificate('', () => assert.fail(), (...values) => errors.push(values));
+  await flush();
+  assert.equal(errors.length, 2);
+  for (const [type, message] of errors) {
+    assert.equal(type, 'java.lang.Exception');
+    assert.match(message, /AutoFirme/);
+  }
+  const cancels = [];
+  const cancelApi = { sign(..._args) { void _args; }, selectCertificate(..._args) { void _args; } };
+  wrapAutoScript(cancelApi, async () => ({ kind: 'cancel' }));
+  cancelApi.sign('YQ==', 'SHA256withRSA', 'CAdES', '', () => assert.fail(), (...values) => cancels.push(values));
+  cancelApi.selectCertificate('', () => assert.fail(), (...values) => cancels.push(values));
+  await flush();
+  assert.deepEqual(cancels, [
+    ['es.gob.afirma.core.AOCancelledOperationException', 'Operation cancelled'],
+    ['es.gob.afirma.core.AOCancelledOperationException', 'Operation cancelled'],
+  ]);
+});
+
 test('capture derives origin and document identity from sender and enforces per-document limits',()=>{
   const c=new Coordinator();
   assert.throws(()=>c.capture({...sender(),documentId:undefined},sign,()=>{}));

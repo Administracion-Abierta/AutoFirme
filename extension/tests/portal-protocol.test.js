@@ -4,9 +4,10 @@
  * uses (`demo/lib/registradores.mjs`), so a change to either the page contract or the adapter shows
  * up here without a browser.
  */
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseCall } from '../core/contract.js';
+import { parseCall, validateRequest } from '../core/contract.js';
 import { wrapAutoScript } from '../core/adapter.js';
 import {
 	FORMATS,
@@ -59,6 +60,48 @@ test('every format the page offers maps to the documented contract', () => {
 	assert.deepEqual(FORMATS, ['CAdES', 'XAdES', 'PAdES', 'AUTO']);
 });
 
+test('AUTO with PAdES stamp parameters keeps the full stamp bag across the worker boundary', () => {
+	const pdf = Buffer.from('%PDF-1.7\n');
+	const stamp = [
+		'visibleSignature=want',
+		'signaturePositionOnPageLowerLeftX=45',
+		'signaturePositionOnPageLowerLeftY=80',
+		'signaturePositionOnPageUpperRightX=560',
+		'signaturePositionOnPageUpperRightY=140',
+		'signaturePage=-1',
+		'layer2Text=Firmado por $$SUBJECTCN$$',
+		'signReason=Conforme',
+	].join('\n');
+	const request = sign(pdf, 'AUTO', stamp);
+	assert.equal(request?.format, 'PAdES');
+	// The worker re-validates the forwarded request; the round-trip must be lossless.
+	assert.deepEqual(validateRequest({ ...request }), request);
+	const plain = sign(pdf, 'PAdES', stamp);
+	assert.deepEqual(request?.params, plain?.params, 'AUTO must not drop stamp parameters');
+});
+
+test('AUTO with stamp parameters on a non-PDF payload falls back to desktop AutoFirma', () => {
+	const data = generatedPayload();
+	const stamp = 'visibleSignature=want\nsignaturePage=-1';
+	assert.equal(sign(data, 'AUTO', stamp), null, 'stamp keys are meaningless without a PDF');
+});
+
+// OOXML rides AutoScript like the desktop app's `AOOOXMLSigner` entry in `AOSignerFactory`.
+test('an OOXML package signs through the contract, stamped parameters refused', () => {
+	const docx = Buffer.from('PK\x03\x04[Content_Types].xml');
+	const request = sign(docx, 'OOXML', 'mode=implicit');
+
+	assert.deepEqual(request, {
+		operation: 'sign',
+		data: docx.toString('base64'),
+		algorithm: 'SHA256withRSA',
+		format: 'OOXML',
+		mode: 'implicit'
+	});
+	// Visible-signature parameters are PAdES-only in the contract, as in AutoFirma.
+	assert.equal(sign(docx, 'OOXML', 'mode=implicit\nvisibleSignature=want'), null);
+});
+
 test('selectCertificate replays the page call shape', () => {
 	const request = parseCall('selectCertificate', [null, success, failure]);
 	assert.deepEqual(request, { operation: 'selectCertificate' });
@@ -94,4 +137,13 @@ test('an unsupported page call falls through to desktop AutoFirma unchanged', ()
 		success, failure];
 	api.sign(...args);
 	assert.deepEqual(calls, [args]);
+});
+
+// Protocol 4 in-page (Refs #85): the adapter is method-level interception, so a portal that
+// used AutoFirma's localhost socket / `afirma://` scheme needs no native helper here — and
+// none may be declared, or the in-page guarantee silently stops holding.
+test('protocol-4 portals stay in-page: no native helper is declared', () => {
+	const manifest = JSON.parse(readFileSync(new URL('../manifest.json', import.meta.url), 'utf8'));
+	assert.equal(manifest.permissions.includes('nativeMessaging'), false,
+		'a native messaging host would put protocol-4 portals back on the desktop helper');
 });

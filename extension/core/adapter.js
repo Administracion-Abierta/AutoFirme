@@ -35,14 +35,19 @@ export function wrapAutoScript(api, transport) {
     };
   }
 }
+// Sedes expose the signer as `AutoScript`; older integrations use a distinct
+// `MiniApplet` global. Both are wrapped — a shared identity re-wrap is a no-op.
+const ALIASES = ['AutoScript', 'MiniApplet'];
 export function installAdapter(win, transport) {
-  const apply = () => wrapAutoScript(win.AutoScript, transport);
+  const apply = () => { for (const name of ALIASES) wrapAutoScript(win[name], transport); };
   // Polling also handles replacement objects; the setter covers immediate initialization.
-  const descriptor = Object.getOwnPropertyDescriptor(win, 'AutoScript');
-  if (!descriptor || (descriptor.configurable && 'value' in descriptor)) {
-    let current = win.AutoScript;
-    Object.defineProperty(win, 'AutoScript', {configurable: true, enumerable: true,
-      get: () => current, set(value) { current = value; wrapAutoScript(value, transport); }});
+  for (const name of ALIASES) {
+    const descriptor = Object.getOwnPropertyDescriptor(win, name);
+    if (!descriptor || (descriptor.configurable && 'value' in descriptor)) {
+      let current = win[name];
+      Object.defineProperty(win, name, {configurable: true, enumerable: true,
+        get: () => current, set(value) { current = value; wrapAutoScript(value, transport); }});
+    }
   }
   apply();
   let timer = win.setInterval(apply, 250);

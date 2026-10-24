@@ -1,0 +1,1 @@
+{"expect":"SAF_03: sign operations need 'dat' or 'fileid'","request":"afirma://sign?format=CAdES&algorithm=SHA256withRSA"}

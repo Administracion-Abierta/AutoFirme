@@ -66,6 +66,8 @@ export interface Copy {
 	formatHint: string;
 	/** Label shown next to the chosen format: it applies to the whole batch. */
 	formatAll: string;
+	/** Honest note under the OOXML option: AutoFirma 1.9 never verifies these. Refs #127. */
+	formatOoxmlNoVerify: string;
 	/** Optional RFC 3161 timestamp: the TSA address field of the sign panel. */
 	timeStampTitle: string;
 	timeStampPlaceholder: string;
@@ -104,6 +106,23 @@ export interface Copy {
 	entryReturnWait: string;
 	entryReturnReady: string;
 	entryReturnButton: string;
+	/** Desktop shell (`afirma://` deep-links, #103): scheme owner status lines. */
+	afirmaSchemeOurs: string;
+	afirmaSchemeOther: string;
+	afirmaSchemeNone: string;
+	/** Desktop shell: incoming portal request banner + allow-list section. */
+	afirmaTitle: string;
+	afirmaHint: string;
+	afirmaOp: string;
+	afirmaOrigin: string;
+	afirmaNoOrigin: string;
+	afirmaReview: string;
+	afirmaDismiss: string;
+	afirmaRemember: string;
+	afirmaConfirmed: string;
+	afirmaListTitle: string;
+	afirmaListEmpty: string;
+	afirmaRemove: string;
 	checkLabels: Record<CheckId, string>;
 	storeTitle: string;
 	storeHint: string;
@@ -123,6 +142,9 @@ export interface Copy {
 	storeUnlock: string;
 	storeOpen: string;
 	storeExpiry: string;
+	/** Alias of a saved signature: the user-chosen name shown instead of the file name. */
+	storeAlias: string;
+	storeRename: string;
 	storeErrors: Record<StoreErrorCode, string>;
 	stepConfigure: string;
 	stepFiles: string;
@@ -153,6 +175,107 @@ export interface Copy {
 	mcpBridgeUnreachable: string;
 	/** Extension chooser label when the request comes from an MCP agent. */
 	mcpOrigin: string;
+	/** Copy of the in-app diagnostics page (#167): the WebCrypto probe, the parity table and the
+	 *  PAdES budget run. Nested so the page reads `t.diagnostics.title`. */
+	diagnostics: DiagnosticsCopy;
+	/** Native surfaces of the Tauri shell: PIN and consent dialogs, save dialog, updater, installer, error toasts. */
+	native: NativeCopy;
+}
+
+/** Copy of the in-app diagnostics page (#167). */
+export interface DiagnosticsCopy {
+	/** Browser tab title of the diagnostics page. */
+	title: string;
+	/** Page heading. */
+	heading: string;
+	/** Sentence introducing the WebCrypto secure-context probe. */
+	secureContext: string;
+	/** Heading of the WebCrypto probe block. */
+	webCryptoTitle: string;
+	/** Probe state while the probes run. */
+	probesRunning: string;
+	/** Probe state when every probe passed. */
+	probeOk: string;
+	/** Probe state when a probe failed. */
+	probeFail: string;
+	/** Heading of the 12-item parity gate block. */
+	parityTitle: string;
+	/** Sentence explaining that each item is proven by the suite named next to it. */
+	parityHint: string;
+	/** The command that runs the suites, e.g. `pnpm test`. */
+	parityCommand: string;
+	/** Heading of the PAdES budget block. */
+	budgetTitle: string;
+	/** Sentence describing what the budget run does. */
+	budgetHint: string;
+	/** Placeholder of the PIN field. */
+	pinPlaceholder: string;
+	/** Label of the button that starts the budget run. */
+	runBudget: string;
+	/** Label of the button while the budget run is in flight. */
+	running: string;
+	/** Prefix of the progress line. */
+	phase: string;
+	/** Row label of the signing time. */
+	signRow: string;
+	/** Row label of the verification time. */
+	verifyRow: string;
+	/** Row label of the signed size. */
+	signedRow: string;
+	/** Row label of the verification verdict. */
+	verifiedRow: string;
+	/** Row label of the pass/fail verdict. */
+	verdictRow: string;
+	/** Value of the verification verdict when it held. */
+	verifiedYes: string;
+	/** Value of the verification verdict when it did not hold. */
+	verifiedNo: string;
+	/** Value of the pass/fail verdict when the run passed. */
+	verdictPass: string;
+	/** Value of the pass/fail verdict when the run failed. */
+	verdictFail: string;
+	/** The run's time against its budget, e.g. `671 ms (budget 30000 ms)`. */
+	msBudget: string;
+	/** The signed size in bytes, e.g. `52432788 bytes`. */
+	bytes: string;
+}
+
+/** Strings only the desktop shell shows (`src-tauri/src/i18n.rs` embeds this same block). */
+export interface NativeCopy {
+	pinTitle: string;
+	pinPrompt: string;
+	pinRemember: string;
+	/** `{count}` is replaced by the attempts left before the card locks. */
+	pinAttemptsLeft: string;
+	pinLocked: string;
+	pinWrong: string;
+	pinCancel: string;
+	consentTitle: string;
+	/** `{origin}` is replaced by the requesting website. */
+	consentBody: string;
+	consentOrigin: string;
+	consentDigest: string;
+	consentRemember: string;
+	consentAllow: string;
+	consentDeny: string;
+	saveTitle: string;
+	saveFilterPdf: string;
+	saveFilterAll: string;
+	saveOverwrite: string;
+	updaterAvailable: string;
+	updaterInstall: string;
+	updaterDownloading: string;
+	updaterRestart: string;
+	updaterFailed: string;
+	updaterCurrent: string;
+	installerTitle: string;
+	installerProgress: string;
+	installerDone: string;
+	installerFailed: string;
+	installerRestart: string;
+	toastSaveFailed: string;
+	toastSaveCancelled: string;
+	toastError: string;
 }
 
 export const copy: Record<Lang, Copy> = {
@@ -211,6 +334,7 @@ export const copy: Record<Lang, Copy> = {
 		formatTitle: 'Formato de firma',
 		formatHint: 'Elige el tipo de firma digital que quieres generar',
 		formatAll: 'para todo el lote — se puede cambiar por archivo',
+		formatOoxmlNoVerify: 'OOXML se firma, no se verifica: la comprobación no está soportada (AutoFirma 1.9).',
 		timeStampTitle: 'Sello de tiempo (TSA)',
 		timeStampPlaceholder: 'https://tu-servidor-tsa/ruta',
 		timeStampHint:
@@ -284,6 +408,8 @@ export const copy: Record<Lang, Copy> = {
 		storeUnlock: 'Usar',
 		storeOpen: 'Abrir',
 		storeExpiry: 'Caduca',
+		storeAlias: 'Alias',
+		storeRename: 'Cambiar nombre',
 		storeErrors: {
 			'wrong-pin': 'PIN incorrecto.',
 			tampered: 'El PIN no es el correcto, o la firma guardada está alterada.',
@@ -319,7 +445,87 @@ export const copy: Record<Lang, Copy> = {
 		mcpBridgeNeedsToken: 'Falta el token de acceso.',
 		mcpBridgeBadEndpoint: 'La dirección debe ser http(s)://…/mcp, sin usuario ni contraseña.',
 		mcpBridgeUnreachable: 'No se pudo abrir el puente: ¿está el servidor MCP en marcha y publicado por TLS?',
-		mcpOrigin: 'Agente MCP'
+		mcpOrigin: 'Agente MCP',
+		diagnostics: {
+			title: 'Diagnóstico · AutoFirma',
+			heading: 'Diagnóstico',
+			secureContext: 'WebCrypto en este contexto:',
+			webCryptoTitle: 'WebCrypto',
+			probesRunning: 'Ejecutando…',
+			probeOk: 'ok',
+			probeFail: 'falla',
+			parityTitle: 'Puerta de paridad de 12 puntos',
+			parityHint:
+				'Cada punto lo demuestra la suite que se nombra a su lado; ejecútalas con',
+			parityCommand: 'pnpm test',
+			budgetTitle: 'Diagnóstico · presupuesto PAdES',
+			budgetHint:
+				'Firma un PDF sintético en un Web Worker y lo verifica. El progreso de abajo demuestra que la interfaz sigue viva.',
+			pinPlaceholder: 'PIN',
+			runBudget: 'Ejecutar presupuesto',
+			running: 'Ejecutando…',
+			phase: 'Fase:',
+			signRow: 'Firma',
+			verifyRow: 'Verificación',
+			signedRow: 'Firmado',
+			verifiedRow: 'Verificado',
+			verdictRow: 'Resultado',
+			verifiedYes: 'sí',
+			verifiedNo: 'NO',
+			verdictPass: 'CORRECTO',
+			verdictFail: 'FALLO',
+			msBudget: '{ms} ms (presupuesto {budget})',
+			bytes: '{bytes} bytes'
+		},
+		native: {
+			pinTitle: 'Firma con tarjeta',
+			pinPrompt: 'Introduce el PIN de tu tarjeta para firmar.',
+			pinRemember: 'Recordar el PIN durante esta sesión',
+			pinAttemptsLeft: 'Intentos restantes: {count}',
+			pinLocked: 'La tarjeta está bloqueada. Desbloquéala con el PUK.',
+			pinWrong: 'PIN incorrecto.',
+			pinCancel: 'Cancelar',
+			consentTitle: 'Solicitud de firma',
+			consentBody: 'El sitio {origin} pide firmar. Confirma solo si reconoces la solicitud.',
+			consentOrigin: 'Sitio solicitante',
+			consentDigest: 'Resumen SHA-256',
+			consentRemember: 'Permitir durante esta sesión',
+			consentAllow: 'Firmar',
+			consentDeny: 'Denegar',
+			saveTitle: 'Guardar documento firmado',
+			saveFilterPdf: 'Documento PDF',
+			saveFilterAll: 'Todos los ficheros',
+			saveOverwrite: 'Ya existe un fichero con ese nombre. ¿Quieres reemplazarlo?',
+			updaterAvailable: 'Hay una versión nueva de AutoFirma.',
+			updaterInstall: 'Descargar e instalar',
+			updaterDownloading: 'Descargando la actualización…',
+			updaterRestart: 'Reinicia para aplicar la actualización',
+			updaterFailed: 'No se pudo actualizar. Inténtalo de nuevo más tarde.',
+			updaterCurrent: 'Ya tienes la última versión.',
+			installerTitle: 'Instalación de AutoFirma',
+			installerProgress: 'Instalando…',
+			installerDone: 'Instalación completada.',
+			installerFailed: 'La instalación ha fallado.',
+			installerRestart: 'Cierra la aplicación y vuelve a abrirla.',
+			toastSaveFailed: 'No se ha podido guardar el fichero.',
+			toastSaveCancelled: 'Guardado cancelado.',
+			toastError: 'Se ha producido un error.',
+		},
+		afirmaSchemeOurs: 'Esta app gestiona los enlaces afirma://.',
+		afirmaSchemeOther: 'Otra app gestiona los enlaces afirma://: solo funcionará la extensión.',
+		afirmaSchemeNone: 'Ninguna app gestiona los enlaces afirma://.',
+		afirmaTitle: 'Solicitudes de portales (afirma://)',
+		afirmaHint: 'Cada solicitud se confirma una a una. Solo el dominio de esta solicitud puede recordarse, nunca todos.',
+		afirmaOp: 'Operación',
+		afirmaOrigin: 'Portal',
+		afirmaNoOrigin: 'Sin origen comprobable: se rechaza.',
+		afirmaReview: 'Revisar y firmar',
+		afirmaDismiss: 'Descartar',
+		afirmaRemember: 'Recordar este dominio',
+		afirmaConfirmed: 'Solicitud confirmada: elige certificado y firma.',
+		afirmaListTitle: 'Portales permitidos',
+		afirmaListEmpty: 'Ningún portal permitido todavía.',
+		afirmaRemove: 'Quitar'
 	},
 	en: {
 		langLabel: 'Language',
@@ -376,6 +582,7 @@ export const copy: Record<Lang, Copy> = {
 		formatTitle: 'Signature format',
 		formatHint: 'Pick the type of digital signature to generate',
 		formatAll: 'for the whole batch — changeable per file',
+		formatOoxmlNoVerify: 'OOXML signs, it does not verify: checking is unsupported (AutoFirma 1.9).',
 		timeStampTitle: 'Trusted timestamp (TSA)',
 		timeStampPlaceholder: 'https://your-tsa-server/path',
 		timeStampHint:
@@ -449,6 +656,8 @@ export const copy: Record<Lang, Copy> = {
 		storeUnlock: 'Use',
 		storeOpen: 'Open',
 		storeExpiry: 'Expires',
+		storeAlias: 'Alias',
+		storeRename: 'Rename',
 		storeErrors: {
 			'wrong-pin': 'Wrong PIN.',
 			tampered: 'The PIN is wrong, or the saved signature was altered.',
@@ -484,6 +693,85 @@ export const copy: Record<Lang, Copy> = {
 		mcpBridgeNeedsToken: 'The access token is missing.',
 		mcpBridgeBadEndpoint: 'The address must be http(s)://…/mcp, without a user or password.',
 		mcpBridgeUnreachable: 'Could not open the bridge: is the MCP server running and published over TLS?',
-		mcpOrigin: 'MCP agent'
+		mcpOrigin: 'MCP agent',
+		diagnostics: {
+			title: 'Diagnostics · AutoFirma',
+			heading: 'Diagnostics',
+			secureContext: 'WebCrypto under this context:',
+			webCryptoTitle: 'WebCrypto',
+			probesRunning: 'Running…',
+			probeOk: 'ok',
+			probeFail: 'fails',
+			parityTitle: '12-item parity gate',
+			parityHint: 'Each item is proven by the suite named next to it; run them with',
+			parityCommand: 'pnpm test',
+			budgetTitle: 'Diagnostics · PAdES budget',
+			budgetHint:
+				'Signs a synthetic PDF in a Web Worker, then verifies it. Progress below proves the UI stays alive.',
+			pinPlaceholder: 'PIN',
+			runBudget: 'Run budget',
+			running: 'Running…',
+			phase: 'Phase:',
+			signRow: 'Sign',
+			verifyRow: 'Verify',
+			signedRow: 'Signed',
+			verifiedRow: 'Verified',
+			verdictRow: 'Verdict',
+			verifiedYes: 'yes',
+			verifiedNo: 'NO',
+			verdictPass: 'PASS',
+			verdictFail: 'FAIL',
+			msBudget: '{ms} ms (budget {budget})',
+			bytes: '{bytes} bytes'
+		},
+		native: {
+			pinTitle: 'Sign with card',
+			pinPrompt: 'Enter your card PIN to sign.',
+			pinRemember: 'Remember the PIN for this session',
+			pinAttemptsLeft: 'Attempts left: {count}',
+			pinLocked: 'The card is locked. Unlock it with the PUK.',
+			pinWrong: 'Wrong PIN.',
+			pinCancel: 'Cancel',
+			consentTitle: 'Signature request',
+			consentBody: '{origin} asks to sign. Confirm only if you recognise the request.',
+			consentOrigin: 'Requesting website',
+			consentDigest: 'SHA-256 digest',
+			consentRemember: 'Allow for this session',
+			consentAllow: 'Sign',
+			consentDeny: 'Deny',
+			saveTitle: 'Save signed document',
+			saveFilterPdf: 'PDF document',
+			saveFilterAll: 'All files',
+			saveOverwrite: 'A file with that name already exists. Replace it?',
+			updaterAvailable: 'A new version of AutoFirma is available.',
+			updaterInstall: 'Download and install',
+			updaterDownloading: 'Downloading the update…',
+			updaterRestart: 'Restart to apply the update',
+			updaterFailed: 'The update failed. Try again later.',
+			updaterCurrent: 'You are on the latest version.',
+			installerTitle: 'AutoFirma installation',
+			installerProgress: 'Installing…',
+			installerDone: 'Installation complete.',
+			installerFailed: 'The installation failed.',
+			installerRestart: 'Close the application and open it again.',
+			toastSaveFailed: 'The file could not be saved.',
+			toastSaveCancelled: 'Save cancelled.',
+			toastError: 'Something went wrong.',
+		},
+		afirmaSchemeOurs: 'This app handles afirma:// links.',
+		afirmaSchemeOther: 'Another app handles afirma:// links: only the extension will work.',
+		afirmaSchemeNone: 'No app handles afirma:// links.',
+		afirmaTitle: 'Portal requests (afirma://)',
+		afirmaHint: 'Each request is confirmed one by one. Only this request\u2019s domain can be remembered, never all.',
+		afirmaOp: 'Operation',
+		afirmaOrigin: 'Portal',
+		afirmaNoOrigin: 'No verifiable origin: refused.',
+		afirmaReview: 'Review and sign',
+		afirmaDismiss: 'Dismiss',
+		afirmaRemember: 'Remember this domain',
+		afirmaConfirmed: 'Request confirmed: pick a certificate and sign.',
+		afirmaListTitle: 'Allowed portals',
+		afirmaListEmpty: 'No allowed portals yet.',
+		afirmaRemove: 'Remove'
 	}
 };

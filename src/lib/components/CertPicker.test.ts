@@ -243,6 +243,36 @@ describe('certificate picker', () => {
 		expect(await vault.listIdentities()).toEqual([]);
 	});
 
+	it('renames a stored signature from the modal', async () => {
+		const vault = createVault(memoryBackend());
+		await vault.saveIdentity({
+			label: 'despacho.p12',
+			session,
+			container: fixtures.modern,
+			pin: FIXTURE_PIN
+		});
+		mount(vault);
+
+		await openPicker();
+		const modal = await screen.findByRole('dialog');
+		await waitFor(
+			() => expect(within(modal).getByRole('button', { name: /despacho\.p12/ })).toBeTruthy(),
+			ASYNC
+		);
+
+		await fireEvent.click(within(modal).getByRole('button', { name: copy.es.storeRename }));
+		await fireEvent.input(within(modal).getByLabelText(copy.es.storeAlias), {
+			target: { value: 'Firma personal' }
+		});
+		await fireEvent.click(within(modal).getByRole('button', { name: copy.es.storeSave }));
+
+		await waitFor(
+			() => expect(within(modal).getByRole('button', { name: /Firma personal/ })).toBeTruthy(),
+			ASYNC
+		);
+		expect((await vault.listIdentities())[0].label).toBe('Firma personal');
+	});
+
 	it('seals every sign added from the modal and keeps them all in the store', async () => {
 		const vault = createVault(memoryBackend());
 		mount(vault);

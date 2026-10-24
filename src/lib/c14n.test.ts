@@ -71,6 +71,14 @@ describe('canonicalize', () => {
 		);
 	});
 
+	it('never copies the default namespace onto a prefixed element just for its unprefixed attributes', () => {
+		const doc = parse('<r xmlns="urn:d" xmlns:p="urn:p"><p:y Id="1"/></r>');
+		const apex = doc.documentElement.firstElementChild!;
+		expect(new TextDecoder().decode(canonicalize(apex, { exclusive: true }))).toBe(
+			'<p:y xmlns:p="urn:p" Id="1"></p:y>'
+		);
+	});
+
 	it('keeps comments only when asked, and canonicalizes a whole Document', () => {
 		const doc = parse('<a><!-- note --><b/></a>');
 		expect(new TextDecoder().decode(canonicalize(doc))).toBe('<a><b></b></a>');

@@ -1,0 +1,41 @@
+# PAdES B-B interop — independent validators (Refs #96)
+# artifact: pades.pdf = test/fixtures/pades-source.pdf (1454 B) + byte-range incremental update
+
+$ python3 -c 'extract ByteRange [0 1590 6120 669] -> pades.byrange-content.bin'
+extracted 2259 bytes; matches committed pades.byrange-content.bin: True
+unsigned prefix preserved: signed[:1454] == source bytes (True)
+signed length 6789; source length 1454; delta 5335 = signature objects + new xref
+
+$ openssl cms -verify -inform DER -in pades.byrange.cms.der -content pades.byrange-content.bin -CAfile chain.pem -binary -out /dev/null
+CMS Verification successful
+exit=0
+
+$ pdfsig pades.pdf
+Digital Signature Info of: pades.pdf
+Signature #1:
+  - Signature Field Name: Signature1
+  - Signer Certificate Common Name: Ñandú Prueba
+  - Signer full Distinguished Name: CN=Ñandú Prueba,O=AutoFirme,C=ES
+  - Signing Time: Oct 21 2026 18:59:51
+  - Signing Hash Algorithm: SHA-256
+  - Signature Type: ETSI.CAdES.detached
+  - Signed Ranges: [0 - 1590], [6120 - 6789]
+  - Total document signed
+  - Signature Validation: Signature is Valid.
+  - Certificate Validation: Certificate issuer isn't Trusted.
+exit=0
+
+$ qpdf --check pades.pdf   # 12.4.2
+checking pades.pdf
+PDF Version: 1.7
+File is not encrypted
+File is not linearized
+No syntax or stream encoding errors found; the file may still contain
+errors that qpdf cannot detect
+exit=0
+
+$ pdfsig -v
+pdfsig version 26.10.0
+$ qpdf --show-npages pades.pdf   # 12.4.2
+1
+exit=0

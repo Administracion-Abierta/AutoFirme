@@ -1,19 +1,22 @@
 # Chrome extension
 
-The Chrome extension renders the AutoFirme Svelte webapp. It shares the app,
+The Chrome extension renders the AutoFirme Svelte app. It shares the app,
 certificate store, signing and verification engines, batch queue and stamp controls
-with the ordinary web build.
+with the desktop product's WebView (and with the local dev harness).
 
 See [CHROME-EXTENSION-DESIGN.md](CHROME-EXTENSION-DESIGN.md) for the implementation
 and request protocol, and [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md)
 for the recorded checks and remaining manual tests. En español: las funciones de la
 extensión están en [LEEME.md](LEEME.md) (sección «Extensión Chrome»).
 
+Store submission copy, permission justifications, listing assets and the privacy
+statement live in [STORE-LISTING.md](STORE-LISTING.md) and [PRIVACY.md](PRIVACY.md).
+
 ## 1. Build and install
 
 Use Node 24 (`.nvmrc`, `engines.node`), pnpm 11.24.0, and Chrome/Chromium 116+. The
 extension is **Chrome-only for now**; Firefox support is deferred to
-[issue #18](https://github.com/Administracion-Abierta/AutoFirme/issues/18)
+[issue #117](https://git.eduard3v.com/EduarD3V/AutoFirme/issues/117)
 (`userScripts` API study, tagged `fleet:hold`).
 
 ```sh
@@ -29,22 +32,22 @@ select `dist/extension`. Pin AutoFirme to the toolbar. Clicking it opens the
 responsive full app in a separate resizable window that remains open when focus
 moves to another window. The app also offers an Open in tab action.
 
-The standalone web build remains `pnpm build`, producing `build/`. Extension code
-is bundled locally; this is not a hosted iframe. The extension uses Chrome's
-installation/update system, so PWA install/update buttons are web-only.
+The SvelteKit build (`pnpm build`) still produces `build/`, now the extension's options
+page and the local dev harness — no website ships. Extension code is bundled locally;
+this is not a hosted iframe. The extension uses Chrome's installation/update system.
 
 ## 2. App features
 
 Use the same signing and verification workflows, certificate import and saved
 identities, PDF visible image/text stamps, implemented signature formats, batch
 queue and ZIP downloads, saved outputs, themes and ES/EN language controls as the
-webapp. Files and keys are processed locally. Optional timestamping contacts the
+desktop app. Files and keys are processed locally. Optional timestamping contacts the
 configured TSA when Chrome grants access to its origin.
 
 Identities are sealed in extension-origin IndexedDB using the app's existing
-PIN-protected store. Unlocking uses the certificate container's PIN. The hosted
-webapp and extension are different origins: existing webapp storage does not
-migrate automatically. Import certificates into the extension. The extension does
+PIN-protected store. Unlocking uses the certificate container's PIN. The retired
+hosted web app and the extension are different origins: storage saved under the old
+web app does not migrate automatically. Import certificates into the extension. The extension does
 not provide operating-system certificate-store access or a native helper.
 
 ### MCP bridge
@@ -62,7 +65,9 @@ the browser side and stdio MCP servers cannot use it. See `docs/MCP-DESIGN.md`.
 
 The extension intercepts every HTTP and HTTPS website from installation: the manifest
 declares `http://*/*` and `https://*/*` as install-time host permissions, so a site's
-AutoScript calls open the chooser on the first request with no prior setup.
+`AutoScript` calls open the chooser on the first request with no prior setup. Older
+integrations that publish the same API as `MiniApplet` are intercepted too; when a page
+assigns the two names the same object it is still wrapped only once.
 
 For a `CAdEStri` call (Aragon's portafirmas), the page's signing server performs the
 pre-sign and post-sign phases: the extension sends the selected certificate and the
@@ -105,13 +110,18 @@ AutoScript.sign(base64, 'SHA256withRSA', 'CAdES', 'mode=explicit', success, erro
 AutoScript.sign(base64, 'SHA256withRSA', 'PAdES', null, success, error);
 AutoScript.sign(base64, 'SHA256withRSA', 'AUTO', null, success, error);
 AutoScript.sign(base64, 'SHA1withRSA', 'XAdES', null, success, error);
+// The same signatures under the legacy `MiniApplet` alias:
+MiniApplet.sign(base64, 'SHA256withRSA', 'CAdES', null, success, error);
+MiniApplet.selectCertificate(null, success, error);
+AutoScript.sign(base64, 'SHA256withRSA', 'OOXML', null, success, error);
 ```
 
 Input must be canonical Base64, at most 4 MiB. Certificate selection does not
 honor unsupported filters. Supported signing uses currently valid RSA certificates
 with at least 2048-bit keys and appropriate document-signing usage. `AUTO` sniffs
-the payload the way AutoFirma does: a `%PDF-` header signs as PAdES, XML signs as
-enveloped XAdES when the mode is implicit, and everything else signs as CAdES.
+the payload: a `%PDF-` header signs as PAdES, XML signs as enveloped XAdES when
+the mode is implicit, and everything else signs as CAdES. OOXML packages go through
+the explicit `OOXML` format, not `AUTO`.
 Legacy portals that still request `SHA1withRSA` are honored only for enveloped
 XAdES; CAdES and PAdES stay SHA-256-only.
 Explicit XAdES needs a detached signature and continues through the original
@@ -133,7 +143,7 @@ cannot authorize replay. Worker restarts fail pending requests safely.
 
 Certificate-chain packaging does not establish trust for an administration. The
 extension does not add online revocation checks or OS biometrics. It inherits the
-webapp's format and verification limitations. It has not had an external security
+app's format and verification limitations. It has not had an external security
 audit; real administration sites and physical Windows/macOS Chrome still require
 compatibility testing. Browser external-protocol rules may affect actual AutoFirma
 launch during fallback.

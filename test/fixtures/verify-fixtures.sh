@@ -20,6 +20,28 @@ expect_ok() {
   if "$@" >/dev/null 2>&1; then ok "$name"; else fail "$name"; fi
 }
 
+# --- OCSP / CRL revocation fixtures (test/fixtures/revocation, #136) -------
+# `openssl ocsp` exits 0 even on "Response Verify Failure", so grep the report
+# instead of trusting the exit status.
+
+expect_ok "revocation/resp.der verifies against revocation/ca.der" \
+  sh -c 'openssl ocsp -respin revocation/resp.der -CAfile revocation/ca.der 2>&1 | grep -q "Response verify OK"'
+
+expect_ok "revocation/good_ca.der verifies against revocation/ca.der" \
+  sh -c 'openssl ocsp -respin revocation/good_ca.der -CAfile revocation/ca.der 2>&1 | grep -q "Response verify OK"'
+
+expect_ok "revocation/forged_embed.der is NOT trusted (self-signed rogue responder)" \
+  sh -c 'openssl ocsp -respin revocation/forged_embed.der -CAfile revocation/ca.der 2>&1 | grep -q "Response Verify Failure"'
+
+expect_ok "revocation/resp.der reports the pinned serial as revoked" \
+  sh -c 'openssl ocsp -respin revocation/resp.der -text -noverify 2>&1 | grep -q "Cert Status: revoked"'
+
+expect_ok "revocation/good_ca.der reports the pinned serial as good" \
+  sh -c 'openssl ocsp -respin revocation/good_ca.der -text -noverify 2>&1 | grep -q "Cert Status: good"'
+
+expect_ok "revocation/crl.der verifies against revocation/ca.der" \
+  openssl crl -in revocation/crl.der -inform der -CAfile revocation/ca.der -noout
+
 expect_fail() {
   local name="$1"
   shift

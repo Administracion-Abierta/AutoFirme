@@ -1,5 +1,9 @@
 # PWA signing on Chrome Android
 
+> **Superseded (2026-10-20):** the hosted web app and the PWA are retired
+> (`docs/DESKTOP-ROADMAP.md` §1). This file is kept as the record of what the
+> platform forbade; it describes a surface that no longer ships.
+
 Installable via Chrome Android today: `static/manifest.webmanifest` (name, icons,
 `shortcuts`, `share_target`, `file_handlers`), `src/service-worker.ts` (offline shell,
 never caches runtime output), install prompt in `PwaControls.svelte`. Served over HTTPS by

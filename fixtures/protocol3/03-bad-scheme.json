@@ -1,0 +1,1 @@
+{"expect":"SAF_02: invocation URL must start with 'afirma://'","request":"https://example.invalid/sign?dat=AA%3D%3D"}

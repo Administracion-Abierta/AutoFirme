@@ -32,6 +32,8 @@ export function createBridge(chrome, deps = {}) {
   let sitesQueue = Promise.resolve();
   let bridgeSocket = null;
   let bridgeSettings = null;
+  /** Last content-script registration failure, surfaced by `sites:list`; empty when healthy. */
+  let scriptsError = '';
   let bridgeError = '';
   let bridgeAttempt = 0;
   let bridgeRetry = null;
@@ -52,9 +54,19 @@ export function createBridge(chrome, deps = {}) {
     for (const pattern of http.filter(pattern => !wildcards.includes(pattern))) {
       try { granted.push(normalizeOrigin(pattern.slice(0, -2))); } catch { /* Not an exact-origin pattern. */ }
     }
-    return {allSites: wildcards.some(pattern => http.includes(pattern)), grantedOrigins: [...new Set(granted)]};
+    return {allSites: wildcards.some(pattern => http.includes(pattern)), grantedOrigins: [...new Set(granted)], scriptsError};
   }
+  /** A refused registration leaves interception silently dead; keep the reason for the UI. */
   async function syncScripts() {
+    try {
+      await registerScripts();
+      scriptsError = '';
+    } catch (error) {
+      scriptsError = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+  }
+  async function registerScripts() {
     const {origins = []} = await chrome.permissions.getAll();
     const granted = origins.filter(pattern => /^https?:\/\//.test(pattern));
     // Interception follows the installed wildcard policy only: host grants requested later
@@ -398,7 +410,7 @@ export function createBridge(chrome, deps = {}) {
   });
   chrome.permissions.onAdded.addListener(() => updateScripts().catch(() => {}));
   chrome.permissions.onRemoved.addListener(async () => {
-    await updateScripts();
+    await updateScripts().catch(() => {});
     for (const item of coordinator.requests.values()) if (!item.bridge && !await permitted(item.origin)) terminate(item);
   });
   chrome.action.onClicked.addListener(tab => {

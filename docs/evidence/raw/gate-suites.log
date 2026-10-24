@@ -1,0 +1,1744 @@
+# the 12 gate items of #19, mapped to the suites it names — full run output (Refs #96)
+# date: 2026-10-21T21:25:10Z · host: Linux 5.14.0-687.15.1.el9_8.x86_64 x86_64 · node v26.7.0 · vitest 5.0.4
+# engine under test: 5f8c6af2 (HEAD 3112a664, docs-only since; `git diff 5f8c6af2 HEAD -- src/ extension/ scripts/` is empty)
+# $ npx vitest run src/lib/pkcs12.test.ts src/lib/cms.test.ts src/lib/timestamp.test.ts src/lib/xades.test.ts src/lib/c14n.test.ts src/lib/pades.test.ts src/lib/pades-visible.test.ts src/lib/batch.test.ts src/lib/verify.test.ts src/lib/certstore.test.ts src/lib/App.test.ts --reporter=default --reporter=json --outputFile=docs/evidence/raw/gate-suites.json
+ RUN  v5.0.4 /home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96
+stdout | src/lib/certstore.test.ts
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/certstore.test.ts
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/certstore.test.ts
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/certstore.test.ts
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/certstore.test.ts
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/certstore.test.ts
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:store] vault ready (persistent)
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:store] saved "Trabajo" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > lists every certificate of the container and pairs the key with its own
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > lists every certificate of the container and pairs the key with its own
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > lists every certificate of the container and pairs the key with its own
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > lists every certificate of the container and pairs the key with its own
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/certstore.test.ts > stored identities > encrypts the container and unlocks it again with its own PIN
+[autofirme:store] unlocked Ñandú Prueba
+stdout | src/lib/certstore.test.ts > stored identities > lists the stored identity with its label, common name and expiry
+[autofirme:store] vault ready (persistent)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > lists every certificate of the container and pairs the key with its own
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > lists every certificate of the container and pairs the key with its own
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > lists every certificate of the container and pairs the key with its own
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > lists every certificate of the container and pairs the key with its own
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > lists every certificate of the container and pairs the key with its own
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > imports the key as non-extractable and signing-only
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > imports the key as non-extractable and signing-only
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > imports the key as non-extractable and signing-only
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > imports the key as non-extractable and signing-only
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > imports the key as non-extractable and signing-only
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > imports the key as non-extractable and signing-only
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > imports the key as non-extractable and signing-only
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > imports the key as non-extractable and signing-only
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > imports the key as non-extractable and signing-only
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > signs with the imported key, and openssl verifies the signature
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > lists the stored identity with its label, common name and expiry
+[autofirme:store] saved "Firma del despacho" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/certstore.test.ts > stored identities > lists the stored identity with its label, common name and expiry
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:store] vault ready (persistent)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > signs with the imported key, and openssl verifies the signature
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > signs with the imported key, and openssl verifies the signature
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > signs with the imported key, and openssl verifies the signature
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > signs with the imported key, and openssl verifies the signature
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > signs with the imported key, and openssl verifies the signature
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > signs with the imported key, and openssl verifies the signature
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > signs with the imported key, and openssl verifies the signature
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > signs with the imported key, and openssl verifies the signature
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > uses the certificate embedded in the file, not a re-parsed copy
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:store] saved "Trabajo" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:store] vault ready (persistent)
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > uses the certificate embedded in the file, not a re-parsed copy
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > uses the certificate embedded in the file, not a re-parsed copy
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > uses the certificate embedded in the file, not a re-parsed copy
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > uses the certificate embedded in the file, not a re-parsed copy
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > uses the certificate embedded in the file, not a re-parsed copy
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > uses the certificate embedded in the file, not a re-parsed copy
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > uses the certificate embedded in the file, not a re-parsed copy
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > uses the certificate embedded in the file, not a re-parsed copy
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > reports a wrong PIN as such
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/certstore.test.ts > stored identities > survives a reload: a new vault over the same backend still unlocks
+[autofirme:store] unlocked Ñandú Prueba
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:store] vault ready (persistent)
+stderr | src/lib/pkcs12.test.ts > PKCS#12 loading > reports a wrong PIN as such
+[autofirme:pkcs12] wrong-pin: SHA-256 MAC mismatch (wrong password or altered file)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > rejects a file that is not a PKCS#12 container
+[autofirme:keystore] loading container { bytes: 38, pin: 4 }
+stderr | src/lib/pkcs12.test.ts > PKCS#12 loading > rejects a file that is not a PKCS#12 container
+[autofirme:pkcs12] not-pkcs12: not a PKCS#12 container: truncated DER value
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:store] saved "Primera" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads an expired certificate but flags it
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a container whose certificate expired years ago, and still signs with it (#40)
+[autofirme:keystore] loading container { bytes: 2603, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 2603 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:store] saved "Segunda" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:store] listed 2 saved signature(s)
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a container whose certificate expired years ago, and still signs with it (#40)
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a container whose certificate expired years ago, and still signs with it (#40)
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a container whose certificate expired years ago, and still signs with it (#40)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a container whose certificate expired years ago, and still signs with it (#40)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a container whose certificate expired years ago, and still signs with it (#40)
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a container whose certificate expired years ago, and still signs with it (#40)
+[autofirme:pkcs12] 1 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a container whose certificate expired years ago, and still signs with it (#40)
+[autofirme:keystore] container parsed { certificates: 1, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a container whose certificate expired years ago, and still signs with it (#40)
+[autofirme:keystore] certificates parsed [ 'Caducada Prueba' ]
+[autofirme:keystore] session ready { signer: 'Caducada Prueba', chain: 1 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > handles an EC P-256 container
+[autofirme:keystore] loading container { bytes: 1096, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 1096 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:store] unlocked Ñandú Prueba
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > handles an EC P-256 container
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > handles an EC P-256 container
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > handles an EC P-256 container
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > handles an EC P-256 container
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > handles an EC P-256 container
+[autofirme:pkcs12] key bag decrypted: 138 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > handles an EC P-256 container
+[autofirme:pkcs12] 1 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > handles an EC P-256 container
+[autofirme:keystore] container parsed { certificates: 1, keyBytes: 138 }
+[autofirme:keystore] key recognised { algorithm: { name: 'ECDSA', hash: 'SHA-256', namedCurve: 'P-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > handles an EC P-256 container
+[autofirme:keystore] certificates parsed [ 'EC Prueba' ]
+[autofirme:keystore] session ready { signer: 'EC Prueba', chain: 1 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > gives every certificate a unique id, even when serials collide
+[autofirme:keystore] loading container { bytes: 3419, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3419 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:keystore] loading container { bytes: 3467, pin: 8 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > gives every certificate a unique id, even when serials collide
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > gives every certificate a unique id, even when serials collide
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > gives every certificate a unique id, even when serials collide
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > gives every certificate a unique id, even when serials collide
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > gives every certificate a unique id, even when serials collide
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > gives every certificate a unique id, even when serials collide
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > gives every certificate a unique id, even when serials collide
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > gives every certificate a unique id, even when serials collide
+[autofirme:keystore] certificates parsed [ 'Dup Serial Uno', 'Dup Serial Dos' ]
+[autofirme:keystore] session ready { signer: 'Dup Serial Uno', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > ignores trailing NUL padding after the container
+[autofirme:keystore] loading container { bytes: 3471, pin: 4 }
+[autofirme:pkcs12] ignoring 4 trailing byte(s) after the container
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stderr | src/lib/certstore.test.ts > stored identities > keeps several signatures, each with its own PIN
+[autofirme:pkcs12] wrong-pin: SHA-256 MAC mismatch (wrong password or altered file)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > ignores trailing NUL padding after the container
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > ignores trailing NUL padding after the container
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > ignores trailing NUL padding after the container
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > ignores trailing NUL padding after the container
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > ignores trailing NUL padding after the container
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > ignores trailing NUL padding after the container
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > ignores trailing NUL padding after the container
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > ignores trailing NUL padding after the container
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:keystore] loading container { bytes: 3497, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3497 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > rejects a tampered ciphertext instead of returning garbage
+[autofirme:store] vault ready (persistent)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 loading > loads a BER container with indefinite lengths and chunked strings
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads a 3DES container and the decrypted key is real PKCS#8
+[autofirme:pkcs12] container: tag 0x30, 3309 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-1, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > rejects a tampered ciphertext instead of returning garbage
+[autofirme:store] saved "Trabajo" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads a 3DES container and the decrypted key is real PKCS#8
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads a 3DES container and the decrypted key is real PKCS#8
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES1 pbeWithSHA1And3-KeyTripleDES-CBC (1.2.840.113549.1.12.1.3), 24-byte key
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:store] vault ready (persistent)
+stderr | src/lib/App.test.ts > App (sign workflow shell) > starts on the certificate step, with the next button disabled
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > starts on the certificate step, with the next button disabled
+[autofirme:store] vault ready (memory only)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > starts on the certificate step, with the next button disabled
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > starts on the certificate step, with the next button disabled
+[autofirme:picker] identities refreshed 0
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:store] saved "Trabajo" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:app] picker cleared the signer
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads a 3DES container and the decrypted key is real PKCS#8
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads a 3DES container and the decrypted key is real PKCS#8
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES1 pbeWithSHA1And3-KeyTripleDES-CBC (1.2.840.113549.1.12.1.3), 24-byte key
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads a 3DES container and the decrypted key is real PKCS#8
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads a 3DES container and the decrypted key is real PKCS#8
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > advances to documents once a certificate is loaded, and Firmar gates on files
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC2 128-bit variant
+[autofirme:pkcs12] container: tag 0x30, 3309 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-1, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/certstore.test.ts > stored identities > rejects a wrong PIN without touching the other signatures
+[autofirme:store] unlocked Ñandú Prueba
+stdout | src/lib/certstore.test.ts > stored identities > binds the ciphertext to its record id
+[autofirme:store] vault ready (persistent)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC2 128-bit variant
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC2 128-bit variant
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES1 pbeWithSHA1And128BitRC2-CBC (1.2.840.113549.1.12.1.5), 16-byte key
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC2 128-bit variant
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC2 128-bit variant
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES1 pbeWithSHA1And128BitRC2-CBC (1.2.840.113549.1.12.1.5), 16-byte key
+stdout | src/lib/certstore.test.ts > stored identities > binds the ciphertext to its record id
+[autofirme:store] saved "Trabajo" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > switches language from the settings modal
+[autofirme:store] vault ready (memory only)
+stderr | src/lib/App.test.ts > App (sign workflow shell) > switches language from the settings modal
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > switches language from the settings modal
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/certstore.test.ts > stored identities > forgets an identity, leaving nothing to unlock
+[autofirme:store] vault ready (persistent)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > switches language from the settings modal
+[autofirme:picker] identities refreshed 0
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC2 128-bit variant
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC2 128-bit variant
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the -legacy container (3DES keys, RC2-40 certificates)
+[autofirme:keystore] loading container { bytes: 2437, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 2437 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-1, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > switches the theme from the settings modal, remembering it for the next visit
+[autofirme:store] vault ready (memory only)
+stderr | src/lib/App.test.ts > App (sign workflow shell) > switches the theme from the settings modal, remembering it for the next visit
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > switches the theme from the settings modal, remembering it for the next visit
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the -legacy container (3DES keys, RC2-40 certificates)
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the -legacy container (3DES keys, RC2-40 certificates)
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES1 pbeWithSHA1And40BitRC2-CBC (1.2.840.113549.1.12.1.6), 5-byte key
+stdout | src/lib/certstore.test.ts > stored identities > forgets an identity, leaving nothing to unlock
+[autofirme:store] saved "Trabajo" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/certstore.test.ts > stored identities > forgets an identity, leaving nothing to unlock
+[autofirme:store] removed identity 4eacddd8-8d45-4030-817f-001036de74ed
+stdout | src/lib/certstore.test.ts > stored identities > forgets an identity, leaving nothing to unlock
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/certstore.test.ts > stored identities > forgets an identity, leaving nothing to unlock
+[autofirme:store] unlock failed: no identity 4eacddd8-8d45-4030-817f-001036de74ed
+stdout | src/lib/certstore.test.ts > stored identities > maps a full store onto the quota error
+[autofirme:store] vault ready (persistent)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > switches the theme from the settings modal, remembering it for the next visit
+[autofirme:picker] identities refreshed 0
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the -legacy container (3DES keys, RC2-40 certificates)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the -legacy container (3DES keys, RC2-40 certificates)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES1 pbeWithSHA1And3-KeyTripleDES-CBC (1.2.840.113549.1.12.1.3), 24-byte key
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+ ✓ src/lib/certstore.test.ts (9 tests) 5698ms
+   ✓ stored identities (9)
+     ✓ encrypts the container and unlocks it again with its own PIN 435ms
+     ✓ survives a reload: a new vault over the same backend still unlocks 638ms
+     ✓ keeps several signatures, each with its own PIN 1161ms
+     ✓ rejects a tampered ciphertext instead of returning garbage 375ms
+     ✓ rejects a wrong PIN without touching the other signatures 1092ms
+     ✓ binds the ciphertext to its record id 415ms
+     ✓ maps a full store onto the quota error 302ms
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the -legacy container (3DES keys, RC2-40 certificates)
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the -legacy container (3DES keys, RC2-40 certificates)
+[autofirme:pkcs12] 1 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the -legacy container (3DES keys, RC2-40 certificates)
+[autofirme:keystore] container parsed { certificates: 1, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the -legacy container (3DES keys, RC2-40 certificates)
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 1 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC4 variants (stream cipher, no padding)
+[autofirme:pkcs12] container: tag 0x30, 3298 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-1, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC4 variants (stream cipher, no padding)
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC4 variants (stream cipher, no padding)
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES1 pbeWithSHA1And40BitRC4 (1.2.840.113549.1.12.1.2), 5-byte key
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: a file dragged over the page raises the full-screen drop overlay until it leaves
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:app] picker cleared the signer
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC4 variants (stream cipher, no padding)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC4 variants (stream cipher, no padding)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES1 pbeWithSHA1And128BitRC4 (1.2.840.113549.1.12.1.1), 16-byte key
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC4 variants (stream cipher, no padding)
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > loads the RC4 variants (stream cipher, no padding)
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > reports a wrong PIN on the RC4 container as wrong-pin
+[autofirme:pkcs12] container: tag 0x30, 3298 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-1, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stderr | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > reports a wrong PIN on the RC4 container as wrong-pin
+[autofirme:pkcs12] wrong-pin: SHA-1 MAC mismatch (wrong password or altered file)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > reports a wrong PIN on a 3DES container as wrong-pin
+[autofirme:pkcs12] container: tag 0x30, 3309 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-1, 2048 iterations
+stderr | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > reports a wrong PIN on a 3DES container as wrong-pin
+[autofirme:pkcs12] wrong-pin: SHA-1 MAC mismatch (wrong password or altered file)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > reports a wrong PIN on the RC2-40 container as wrong-pin
+[autofirme:keystore] loading container { bytes: 2437, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 2437 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-1, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content
+[autofirme:picker] add saved keystore.p12
+stderr | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > reports a wrong PIN on the RC2-40 container as wrong-pin
+[autofirme:pkcs12] wrong-pin: SHA-1 MAC mismatch (wrong password or altered file)
+stdout | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > rejects an altered MacData even with the right PIN (the MAC is really checked)
+[autofirme:pkcs12] container: tag 0x30, 3309 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-1, 2049 iterations
+stderr | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:store] listed 0 saved signature(s)
+stderr | src/lib/pkcs12.test.ts > PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) > rejects an altered MacData even with the right PIN (the MAC is really checked)
+[autofirme:pkcs12] wrong-pin: SHA-1 MAC mismatch (wrong password or altered file)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+ ✓ src/lib/pkcs12.test.ts (24 tests) 7322ms
+   ✓ PKCS#12 loading (13)
+     ✓ uses the certificate embedded in the file, not a re-parsed copy 328ms
+     ✓ loads an expired certificate but flags it 408ms
+   ✓ PKCS#12 legacy PBES1 (SHA-1 KDF + 3DES/RC2) (8)
+     ✓ loads a 3DES container and the decrypted key is real PKCS#8 1160ms
+     ✓ loads the RC2 128-bit variant 671ms
+     ✓ loads the -legacy container (3DES keys, RC2-40 certificates) 1089ms
+     ✓ loads the RC4 variants (stream cipher, no padding) 358ms
+stderr | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > loads a PKCS#12 file and enables the next step with the certificate it holds
+[autofirme:picker] add saved keystore.p12
+stderr | src/lib/App.test.ts > App (sign workflow shell) > shows the wrong-PIN error from the modal add and keeps the next step locked
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > shows the wrong-PIN error from the modal add and keeps the next step locked
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stdout | src/lib/App.test.ts > App (sign workflow shell) > shows the wrong-PIN error from the modal add and keeps the next step locked
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > shows the wrong-PIN error from the modal add and keeps the next step locked
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > shows the wrong-PIN error from the modal add and keeps the next step locked
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > shows the wrong-PIN error from the modal add and keeps the next step locked
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > shows the wrong-PIN error from the modal add and keeps the next step locked
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > produces a signature openssl cms -verify accepts, detached and with ESS checked
+[autofirme:keystore] loading container { bytes: 3483, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3483 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > produces a signature openssl cms -verify accepts, detached and with ESS checked
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > produces a signature openssl cms -verify accepts, detached and with ESS checked
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > produces a signature openssl cms -verify accepts, detached and with ESS checked
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > produces a signature openssl cms -verify accepts, detached and with ESS checked
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > produces a signature openssl cms -verify accepts, detached and with ESS checked
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > produces a signature openssl cms -verify accepts, detached and with ESS checked
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > produces a signature openssl cms -verify accepts, detached and with ESS checked
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > produces a signature openssl cms -verify accepts, detached and with ESS checked
+[autofirme:keystore] certificates parsed [ 'Firma CAdES', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma CAdES', chain: 2 }
+stderr | src/lib/App.test.ts > App (sign workflow shell) > shows the wrong-PIN error from the modal add and keeps the next step locked
+[autofirme:pkcs12] wrong-pin: SHA-256 MAC mismatch (wrong password or altered file)
+stderr | src/lib/App.test.ts > App (sign workflow shell) > shows the wrong-PIN error from the modal add and keeps the next step locked
+[autofirme:picker] add failed Pkcs12Error: SHA-256 MAC mismatch (wrong password or altered file)
+    at fail (/home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96/src/lib/pkcs12.ts:62:9)
+    at verifyMac (/home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96/src/lib/pkcs12.ts:225:22)
+    at parsePkcs12 (/home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96/src/lib/pkcs12.ts:294:31)
+    at loadSignerSession (/home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96/src/lib/keystore.ts:186:39)
+    at Module.track_reactivity_loss (/home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96/node_modules/.pnpm/svelte@5.57.2/node_modules/svelte/src/internal/client/reactivity/async.js:218:14)
+    at HTMLButtonElement.saveAdded (/home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96/src/lib/components/CertPicker.svelte:247:17) {
+  code: 'wrong-pin'
+} PIN incorrecto.
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > carries contentType, messageDigest, signingTime and signingCertificateV2
+[autofirme:keystore] loading container { bytes: 3483, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3483 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > says the page is insecure when the browser withholds WebCrypto
+[autofirme:store] vault ready (memory only)
+stderr | src/lib/App.test.ts > App (sign workflow shell) > says the page is insecure when the browser withholds WebCrypto
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > says the page is insecure when the browser withholds WebCrypto
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > says the page is insecure when the browser withholds WebCrypto
+[autofirme:picker] identities refreshed 0
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > carries contentType, messageDigest, signingTime and signingCertificateV2
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > carries contentType, messageDigest, signingTime and signingCertificateV2
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > carries contentType, messageDigest, signingTime and signingCertificateV2
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > carries contentType, messageDigest, signingTime and signingCertificateV2
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > carries contentType, messageDigest, signingTime and signingCertificateV2
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > carries contentType, messageDigest, signingTime and signingCertificateV2
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > carries contentType, messageDigest, signingTime and signingCertificateV2
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > carries contentType, messageDigest, signingTime and signingCertificateV2
+[autofirme:keystore] certificates parsed [ 'Firma CAdES', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma CAdES', chain: 2 }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > signs with an EC key too (raw WebCrypto r||s re-encoded as a DER SEQUENCE)
+[autofirme:keystore] loading container { bytes: 2200, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 2200 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 2603
+stderr | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:keystore] loading container { bytes: 2603, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 2603 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > signs with an EC key too (raw WebCrypto r||s re-encoded as a DER SEQUENCE)
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > signs with an EC key too (raw WebCrypto r||s re-encoded as a DER SEQUENCE)
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > signs with an EC key too (raw WebCrypto r||s re-encoded as a DER SEQUENCE)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > signs with an EC key too (raw WebCrypto r||s re-encoded as a DER SEQUENCE)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > signs with an EC key too (raw WebCrypto r||s re-encoded as a DER SEQUENCE)
+[autofirme:pkcs12] key bag decrypted: 138 bytes of key DER
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > signs with an EC key too (raw WebCrypto r||s re-encoded as a DER SEQUENCE)
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > signs with an EC key too (raw WebCrypto r||s re-encoded as a DER SEQUENCE)
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 138 }
+[autofirme:keystore] key recognised { algorithm: { name: 'ECDSA', hash: 'SHA-256', namedCurve: 'P-256' } }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > signs with an EC key too (raw WebCrypto r||s re-encoded as a DER SEQUENCE)
+[autofirme:keystore] certificates parsed [ 'Firma CAdES EC', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma CAdES EC', chain: 2 }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > is rejected by openssl when the document does not match
+[autofirme:keystore] loading container { bytes: 3483, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3483 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:pkcs12] 1 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:keystore] container parsed { certificates: 1, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:keystore] certificates parsed [ 'Caducada Prueba' ]
+[autofirme:keystore] session ready { signer: 'Caducada Prueba', chain: 1 }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > is rejected by openssl when the document does not match
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > is rejected by openssl when the document does not match
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > is rejected by openssl when the document does not match
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > is rejected by openssl when the document does not match
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > is rejected by openssl when the document does not match
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > is rejected by openssl when the document does not match
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > is rejected by openssl when the document does not match
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > is rejected by openssl when the document does not match
+[autofirme:keystore] certificates parsed [ 'Firma CAdES', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma CAdES', chain: 2 }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > adds an RFC 3161 timestamp over the signature value when a TSA is set (CAdES-T)
+[autofirme:keystore] loading container { bytes: 3483, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3483 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:store] saved "keystore.p12" (Caducada Prueba), 2603 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > adds an RFC 3161 timestamp over the signature value when a TSA is set (CAdES-T)
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > adds an RFC 3161 timestamp over the signature value when a TSA is set (CAdES-T)
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > adds an RFC 3161 timestamp over the signature value when a TSA is set (CAdES-T)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > adds an RFC 3161 timestamp over the signature value when a TSA is set (CAdES-T)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > warns that the picked certificate has expired and still enables signing (#40)
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > adds an RFC 3161 timestamp over the signature value when a TSA is set (CAdES-T)
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > adds an RFC 3161 timestamp over the signature value when a TSA is set (CAdES-T)
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > adds an RFC 3161 timestamp over the signature value when a TSA is set (CAdES-T)
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > adds an RFC 3161 timestamp over the signature value when a TSA is set (CAdES-T)
+[autofirme:keystore] certificates parsed [ 'Firma CAdES', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma CAdES', chain: 2 }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > refuses to sign with a certificate that has no private key
+[autofirme:keystore] loading container { bytes: 3483, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3483 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > refuses to sign with a certificate that has no private key
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > refuses to sign with a certificate that has no private key
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > refuses to sign with a certificate that has no private key
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > refuses to sign with a certificate that has no private key
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > refuses to sign with a certificate that has no private key
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > refuses to sign with a certificate that has no private key
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > refuses to sign with a certificate that has no private key
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/cms.test.ts > CAdES-BES detached signing > refuses to sign with a certificate that has no private key
+[autofirme:keystore] certificates parsed [ 'Firma CAdES', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma CAdES', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/cms.test.ts > golden vector (generated once by OpenSSL, test/fixtures/cades/) > is accepted by openssl and shares the CAdES-BES attribute set with our output
+[autofirme:keystore] loading container { bytes: 3483, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3483 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > golden vector (generated once by OpenSSL, test/fixtures/cades/) > is accepted by openssl and shares the CAdES-BES attribute set with our output
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/cms.test.ts > golden vector (generated once by OpenSSL, test/fixtures/cades/) > is accepted by openssl and shares the CAdES-BES attribute set with our output
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > golden vector (generated once by OpenSSL, test/fixtures/cades/) > is accepted by openssl and shares the CAdES-BES attribute set with our output
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/cms.test.ts > golden vector (generated once by OpenSSL, test/fixtures/cades/) > is accepted by openssl and shares the CAdES-BES attribute set with our output
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > golden vector (generated once by OpenSSL, test/fixtures/cades/) > is accepted by openssl and shares the CAdES-BES attribute set with our output
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/cms.test.ts > golden vector (generated once by OpenSSL, test/fixtures/cades/) > is accepted by openssl and shares the CAdES-BES attribute set with our output
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/cms.test.ts > golden vector (generated once by OpenSSL, test/fixtures/cades/) > is accepted by openssl and shares the CAdES-BES attribute set with our output
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/cms.test.ts > golden vector (generated once by OpenSSL, test/fixtures/cades/) > is accepted by openssl and shares the CAdES-BES attribute set with our output
+[autofirme:keystore] certificates parsed [ 'Firma CAdES', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma CAdES', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > extension CAdES content and certificate chain > embeds implicit content and the certificate chain, independently verified by OpenSSL
+[autofirme:keystore] loading container { bytes: 3483, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3483 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/cms.test.ts > extension CAdES content and certificate chain > embeds implicit content and the certificate chain, independently verified by OpenSSL
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/cms.test.ts > extension CAdES content and certificate chain > embeds implicit content and the certificate chain, independently verified by OpenSSL
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > extension CAdES content and certificate chain > embeds implicit content and the certificate chain, independently verified by OpenSSL
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/cms.test.ts > extension CAdES content and certificate chain > embeds implicit content and the certificate chain, independently verified by OpenSSL
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/cms.test.ts > extension CAdES content and certificate chain > embeds implicit content and the certificate chain, independently verified by OpenSSL
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/cms.test.ts > extension CAdES content and certificate chain > embeds implicit content and the certificate chain, independently verified by OpenSSL
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/cms.test.ts > extension CAdES content and certificate chain > embeds implicit content and the certificate chain, independently verified by OpenSSL
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/cms.test.ts > extension CAdES content and certificate chain > embeds implicit content and the certificate chain, independently verified by OpenSSL
+[autofirme:keystore] certificates parsed [ 'Firma CAdES', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma CAdES', chain: 2 }
+ ✓ src/lib/cms.test.ts (9 tests) 1918ms
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:picker] add saved keystore.p12
+stderr | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > seals the added sign into the store and selects it again from the modal
+[autofirme:picker] modal opened
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:picker] file picked other.p12 1096
+stderr | src/lib/App.test.ts > App (sign workflow shell) > clears the loaded certificate when another keystore file is picked
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:app] picker cleared the signer
+stdout | src/lib/batch.test.ts
+[autofirme:keystore] loading container { bytes: 3483, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3483 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/batch.test.ts
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/batch.test.ts
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/batch.test.ts
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/batch.test.ts
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/batch.test.ts
+[autofirme:pkcs12] key bag decrypted: 1218 bytes of key DER
+stdout | src/lib/batch.test.ts
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/batch.test.ts
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1218 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/batch.test.ts
+[autofirme:keystore] certificates parsed [ 'Firma CAdES', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma CAdES', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+ ✓ src/lib/batch.test.ts (8 tests) 1397ms
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs a 3-file batch with the loaded certificate and hands over one ZIP
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > timestamps the signature when a TSA address is typed in the panel (CAdES-T)
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/xades.test.ts > signXades
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:app] picker cleared the signer
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/xades.test.ts > signXades
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/xades.test.ts > signXades
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/xades.test.ts > signXades
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/xades.test.ts > signXades
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/xades.test.ts > signXades
+[autofirme:pkcs12] key bag decrypted: 1217 bytes of key DER
+stdout | src/lib/xades.test.ts > signXades
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/xades.test.ts > signXades
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1217 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/xades.test.ts > signXades
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps the picked signature but disables signing when the document list is emptied
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/verify.test.ts > expired signer certificates (#40) > signs with an expired certificate and verifies as valid-but-expired, not invalid
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:store] vault ready (memory only)
+[autofirme:picker] modal opened
+stderr | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/verify.test.ts > expired signer certificates (#40) > signs with an expired certificate and verifies as valid-but-expired, not invalid
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:picker] identities refreshed 0
+[autofirme:picker] file picked keystore.p12 3467
+stderr | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:app] picker cleared the signer
+stdout | src/lib/verify.test.ts > expired signer certificates (#40) > signs with an expired certificate and verifies as valid-but-expired, not invalid
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/verify.test.ts > expired signer certificates (#40) > signs with an expired certificate and verifies as valid-but-expired, not invalid
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/verify.test.ts > expired signer certificates (#40) > signs with an expired certificate and verifies as valid-but-expired, not invalid
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/verify.test.ts > expired signer certificates (#40) > signs with an expired certificate and verifies as valid-but-expired, not invalid
+[autofirme:pkcs12] key bag decrypted: 1217 bytes of key DER
+stdout | src/lib/verify.test.ts > expired signer certificates (#40) > signs with an expired certificate and verifies as valid-but-expired, not invalid
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/verify.test.ts > expired signer certificates (#40) > signs with an expired certificate and verifies as valid-but-expired, not invalid
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1217 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/verify.test.ts > expired signer certificates (#40) > signs with an expired certificate and verifies as valid-but-expired, not invalid
+[autofirme:keystore] certificates parsed [ 'Firma Caducada', 'AutoFirme CAdES CA' ]
+[autofirme:keystore] session ready { signer: 'Firma Caducada', chain: 2 }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:picker] add start keystore.p12
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:keystore] loading container { bytes: 3467, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 3467 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/xades.test.ts > signXades > signs with an EC key too, and xmlsec1 verifies it
+[autofirme:keystore] loading container { bytes: 1096, pin: 4 }
+[autofirme:pkcs12] container: tag 0x30, 1096 bytes, version 3
+[autofirme:pkcs12] authSafe ContentInfo 1.2.840.113549.1.7.1
+[autofirme:pkcs12] MacData present: SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:pkcs12] key bag decrypted: 1216 bytes of key DER
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:pkcs12] 2 certificate(s), private key present
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:keystore] container parsed { certificates: 2, keyBytes: 1216 }
+[autofirme:keystore] key recognised { algorithm: { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } }
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:keystore] certificates parsed [ 'Ñandú Prueba', 'AutoFirme Test CA' ]
+[autofirme:keystore] session ready { signer: 'Ñandú Prueba', chain: 2 }
+stdout | src/lib/xades.test.ts > signXades > signs with an EC key too, and xmlsec1 verifies it
+[autofirme:pkcs12] MacData verified
+stdout | src/lib/xades.test.ts > signXades > signs with an EC key too, and xmlsec1 verifies it
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.6
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/xades.test.ts > signXades > signs with an EC key too, and xmlsec1 verifies it
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.3
+[autofirme:pkcs12] ContentInfo 1.2.840.113549.1.7.1
+stdout | src/lib/xades.test.ts > signXades > signs with an EC key too, and xmlsec1 verifies it
+[autofirme:pkcs12] SafeBag 1.2.840.113549.1.12.10.1.2
+[autofirme:pkcs12] PBES2 with AES-CBC-256 (2.16.840.1.101.3.4.1.42), SHA-256, 2048 iterations
+stdout | src/lib/xades.test.ts > signXades > signs with an EC key too, and xmlsec1 verifies it
+[autofirme:pkcs12] key bag decrypted: 138 bytes of key DER
+stdout | src/lib/xades.test.ts > signXades > signs with an EC key too, and xmlsec1 verifies it
+[autofirme:pkcs12] 1 certificate(s), private key present
+stdout | src/lib/xades.test.ts > signXades > signs with an EC key too, and xmlsec1 verifies it
+[autofirme:keystore] container parsed { certificates: 1, keyBytes: 138 }
+[autofirme:keystore] key recognised { algorithm: { name: 'ECDSA', hash: 'SHA-256', namedCurve: 'P-256' } }
+stdout | src/lib/xades.test.ts > signXades > signs with an EC key too, and xmlsec1 verifies it
+[autofirme:keystore] certificates parsed [ 'EC Prueba' ]
+[autofirme:keystore] session ready { signer: 'EC Prueba', chain: 1 }
+ ✓ src/lib/xades.test.ts (11 tests) 2797ms
+   ✓ signXades (11)
+     ✓ signs with an EC key too, and xmlsec1 verifies it 325ms
+ ✓ src/lib/verify.test.ts (23 tests) 1137ms
+   ✓ fixture cross-check (1)
+     ✓ is confirmed by openssl and an independent digest recomputation 475ms
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:store] saved "keystore.p12" (Ñandú Prueba), 3467 bytes sealed
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:store] listed 1 saved signature(s)
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:picker] identities refreshed 1
+stdout | src/lib/App.test.ts > App (sign workflow shell) > keeps a signature picked before any document exists
+[autofirme:picker] add saved keystore.p12
+stdout | src/lib/App.test.ts > MCP endpoint settings > stores the endpoint and token typed into the settings modal
+[autofirme:store] vault ready (memory only)
+stderr | src/lib/App.test.ts > MCP endpoint settings > stores the endpoint and token typed into the settings modal
+[autofirme:store] no IndexedDB: saved signatures will not survive a reload
+stdout | src/lib/App.test.ts > MCP endpoint settings > stores the endpoint and token typed into the settings modal
+[autofirme:store] listed 0 saved signature(s)
+stdout | src/lib/App.test.ts > MCP endpoint settings > stores the endpoint and token typed into the settings modal
+[autofirme:picker] identities refreshed 0
+ ✓ src/lib/App.test.ts (19 tests) 13100ms
+   ✓ App (sign workflow shell) (18)
+     ✓ starts on the certificate step, with the next button disabled 805ms
+     ✓ advances to documents once a certificate is loaded, and Firmar gates on files 1159ms
+     ✓ step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button 655ms
+     ✓ step 2: a file dragged over the page raises the full-screen drop overlay until it leaves 513ms
+     ✓ step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content 706ms
+     ✓ loads a PKCS#12 file and enables the next step with the certificate it holds 650ms
+     ✓ shows the wrong-PIN error from the modal add and keeps the next step locked 450ms
+     ✓ warns that the picked certificate has expired and still enables signing (#40) 755ms
+     ✓ seals the added sign into the store and selects it again from the modal 681ms
+     ✓ clears the loaded certificate when another keystore file is picked 519ms
+     ✓ signs a 3-file batch with the loaded certificate and hands over one ZIP 952ms
+     ✓ signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies 760ms
+     ✓ timestamps the signature when a TSA address is typed in the panel (CAdES-T) 1001ms
+     ✓ keeps the picked signature but disables signing when the document list is emptied 810ms
+     ✓ keeps a signature picked before any document exists 1197ms
+ ✓ src/lib/pades.test.ts (9 tests) 790ms
+ ✓ src/lib/timestamp.test.ts (6 tests) 363ms
+ ✓ src/lib/c14n.test.ts (9 tests) 268ms
+ ✓ src/lib/pades-visible.test.ts (6 tests) 19ms
+ Test Files  11 passed (11)
+      Tests  133 passed (133)
+   Start at  23:25:13
+   Duration  23.97s (tests 56%, environment 28%, setup 8%, import 5%, transform 4%)
+Environment  jsdom was created 11 times · 17.08s total, 28% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+JSON report written to /home/eduardez/workspace/AutoFirme/.bullet/worktrees/issue-96/docs/evidence/raw/gate-suites.json
+exit=0

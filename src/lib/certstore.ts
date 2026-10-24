@@ -103,6 +103,19 @@ export async function openBlob(sealed: SealedBlob, pin: string, aad: string): Pr
 	}
 }
 
+/** Source of a certificate that came from a PKCS#12 container — the default, and the only one
+ * the store itself produces. Token certificates carry `pkcs11:<module>` instead (#100). */
+export const PKCS12_SOURCE = 'pkcs12';
+
+/**
+ * Badge text for a certificate's source: PKCS#12 containers have none (the file is the badge),
+ * token certificates say `pkcs11:<module>`. Unknown values pass through so a future provider
+ * only has to set the field.
+ */
+export function certificateSource(source: string | undefined): string {
+	return source ?? PKCS12_SOURCE;
+}
+
 /* ------------------------------------------------------------------ records */
 
 export interface IdentityMeta {
@@ -114,6 +127,8 @@ export interface IdentityMeta {
 	createdAt: string;
 	/** Size of the encrypted container, for the settings list. */
 	size: number;
+	/** Where the certificate came from: `pkcs12` by default, `pkcs11:<module>` for a token (#100). */
+	source: string;
 }
 
 interface IdentityRecord extends IdentityMeta {
@@ -129,6 +144,8 @@ export interface SaveIdentityInput {
 	container: Bytes;
 	/** The container's own PIN: the blob is sealed under it and unlocked with it. Never stored. */
 	pin: string;
+	/** Key source badge of the certificate being saved; absent means a PKCS#12 upload. */
+	source?: string;
 }
 
 export interface Vault {
@@ -139,6 +156,8 @@ export interface Vault {
 	readonly persistent: boolean;
 	listIdentities(): Promise<IdentityMeta[]>;
 	saveIdentity(input: SaveIdentityInput): Promise<IdentityMeta>;
+	/** Change the user-chosen alias; the sealed container and its PIN are untouched. */
+	renameIdentity(id: string, label: string): Promise<IdentityMeta>;
 	/** Unseal the container with its PIN and import its key. */
 	unlockIdentity(id: string, pin: string): Promise<SignerSession>;
 	removeIdentity(id: string): Promise<void>;
@@ -194,7 +213,9 @@ export function createVault(raw: StoreBackend, persistent: boolean | (() => bool
 					commonName: value.commonName,
 					notAfter: value.notAfter,
 					createdAt: value.createdAt,
-					size: value.size
+					size: value.size,
+					// Records written before #100 have no source; they were all PKCS#12 uploads.
+					source: certificateSource(value.source)
 				}))
 				.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 		},
@@ -207,7 +228,8 @@ export function createVault(raw: StoreBackend, persistent: boolean | (() => bool
 				commonName: input.session.signer.commonName,
 				notAfter: input.session.signer.notAfter.toISOString(),
 				createdAt: new Date().toISOString(),
-				size: input.container.length
+				size: input.container.length,
+				source: certificateSource(input.source)
 			};
 			await backend.put('identities', {
 				id,
@@ -215,6 +237,28 @@ export function createVault(raw: StoreBackend, persistent: boolean | (() => bool
 			});
 			log(`saved "${meta.label}" (${meta.commonName}), ${input.container.length} bytes sealed`);
 			return meta;
+		},
+
+		async renameIdentity(id, label) {
+			const record = await backend.get('identities', id);
+			if (!record) {
+				log(`rename failed: no identity ${id}`);
+				throw new StoreError('missing', `no stored identity ${id}`);
+			}
+			const current = record.value as IdentityRecord;
+			const next = label.trim() || current.commonName;
+			await backend.put('identities', { id, value: { ...current, label: next } });
+			log(`renamed ${current.commonName} to "${next}"`);
+			return {
+				id: current.id,
+				label: next,
+				commonName: current.commonName,
+				notAfter: current.notAfter,
+				createdAt: current.createdAt,
+				size: current.size,
+				// Preserved through a rename: the alias is the only thing this call may change.
+				source: certificateSource(current.source)
+			};
 		},
 
 		async unlockIdentity(id, pin) {

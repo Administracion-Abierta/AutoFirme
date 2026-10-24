@@ -1,4 +1,4 @@
-# USE-CASES.md — what AutoFirma 1.9 really does, and where AutoFirma Web stands
+# USE-CASES.md — what AutoFirma 1.9 really does, and where AutoFirme stands
 
 Feature matrix of the **shipped AutoFirma 1.9** (`autofirma.jar`, the reference implementation) against
 this repo. Written for #41. It answers three questions per capability:
@@ -30,8 +30,8 @@ cross-reading: <https://github.com/ctt-gob-es/clienteafirma>.
 | `DONE` | shipped in this repo, exercised by a test or a cross-check |
 | `PARTIAL` | partly there — engine without UI, or UI without the profile/options |
 | `MISSING` | not implemented |
-| `N/A-BROWSER` | existed only because AutoFirma is a desktop Java app; the SPA replaces the mechanism |
-| `OUT-OF-SCOPE` | deliberately out of scope for a browser app (per AGENTS.md "browser replaces them") |
+| `N/A-BROWSER` | existed only because AutoFirma is a desktop Java app; the browser extension replaces the mechanism |
+| `OUT-OF-SCOPE` | deliberately out of scope for the two products (per AGENTS.md) |
 
 **Priority legend** (for `MISSING`/`PARTIAL` rows only)
 
@@ -46,12 +46,12 @@ cross-reading: <https://github.com/ctt-gob-es/clienteafirma>.
 
 | Channel | 1.9 evidence | What it offers | Our status |
 |---|---|---|---|
-| Swing GUI | `standalone/SimpleAfirma.java:84,152,607`; `standalone/ui/MainMenu.java:53-160` | Abrir / Firmar (Ctrl-F) / Ver firma (Ctrl-V), Herramientas → restaurar configuración, plugins, preferencias, Ayuda | Workbench SPA (`src/lib/App.svelte`) — `PARTIAL` |
+| Swing GUI | `standalone/SimpleAfirma.java:84,152,607`; `standalone/ui/MainMenu.java:53-160` | Abrir / Firmar (Ctrl-F) / Ver firma (Ctrl-V), Herramientas → restaurar configuración, plugins, preferencias, Ayuda | Workbench UI (`src/lib/App.svelte`) — `PARTIAL` |
 | CLI (`autofirma` / `autofirmacl`) | `standalone/CommandLineLauncher.java:263-288`; `standalone/CommandLineCommand.java:5-10`; `standalone/CommandLineParameters.java:10-27` | Commands `listaliases`, `sign`, `cosign`, `countersign`, `verify`, `batchsign` + `-i -o -alias -filter -store -format -password -algorithm -config -operation -gui -certgui -preurl -posturl -xml -r` | `N/A-BROWSER` (no shell) |
 | Browser protocol | `standalone/protocol/ProtocolInvocationLauncher.java:109,132,151,203,251,306,372,437`; params in `core/misc/protocol/UrlParameters.java:18-32` | `afirma://` `websocket`, `service`, `batch`, `selectcert`, `save`, `signandsave`, `sign`/`cosign`/`countersign`, `load` | `N/A-BROWSER` mechanism; the *equivalent* embed API is `MISSING` (§8, P0) |
 | Plugins (JVM SPI) | `standalone/plugins/AfirmaPlugin.java:6`; `standalone/plugins/manager/PluginLoader.java:24`; `standalone/plugins/PluginCommand.java:4` | third-party menu actions, CLI commands, sign data processors, custom JARs | `OUT-OF-SCOPE` |
 | Configurator (separate JAR) | `standalone/configurator/common/PreferencesManager.java:14`; `standalone/ui/restoreconfig/RestoreConfigLinux.java:25` | registers the protocol handler, installs CA certs into Firefox/Chrome/OS stores, unattended install | `OUT-OF-SCOPE` |
-| Per-browser detection (incl. Safari) and per-OS paths | `core/misc/Platform.java:18-23,106-113` | the configurator picks the browser/OS-specific integration to install (Firefox cert DB, Chrome/OS store, macOS dock…) | `OUT-OF-SCOPE` — the SPA is *run by* the browser, so there is nothing to detect or install. In the shipped core this detection has no caller anyway `[INFERENCE: rg "BROWSER\|getBrowser" outside Platform.java → only unrelated third-party hits]` |
+| Per-browser detection (incl. Safari) and per-OS paths | `core/misc/Platform.java:18-23,106-113` | the configurator picks the browser/OS-specific integration to install (Firefox cert DB, Chrome/OS store, macOS dock…) | `OUT-OF-SCOPE` — the app *is* the browser client, so there is nothing to detect or install. In the shipped core this detection has no caller anyway `[INFERENCE: rg "BROWSER\|getBrowser" outside Platform.java → only unrelated third-party hits]` |
 
 ## 2. What can be signed — formats
 
@@ -64,7 +64,7 @@ cross-reading: <https://github.com/ctt-gob-es/clienteafirma>.
 | XMLDSig (no XAdES properties) | `signers/xmldsig/AOXMLDSigSigner.java` | `core/signers/AOSignConstants.java:31` | — | `MISSING` | P2 |
 | PAdES | `signers/pades/AOPDFSigner.java` | `core/signers/AOSignConstants.java:38` | `src/lib/pades.ts` (#11), wired into the picker (B-B + B-T) plus visible signatures (#45) | `DONE` | — |
 | ODF (`.odt/.ods/.odp`) | `signers/odf/AOODFSigner.java` | `core/signers/AOSignConstants.java:34-35` | — | `MISSING` | P0 |
-| OOXML (`.docx/.xlsx/.pptx`) | `signers/ooxml/AOOOXMLSigner.java` | `core/signers/AOSignConstants.java:32-33` | `src/lib/ooxml.ts` (#10), not wired | `PARTIAL` | P0 |
+| OOXML (`.docx/.xlsx/.pptx`) | `signers/ooxml/AOOOXMLSigner.java` | `core/signers/AOSignConstants.java:32-33` | `src/lib/ooxml.ts` (#10), wired into the picker with drop auto-detect (#127); verification stays unsupported (1.9 parity) | `PARTIAL` (verification outstanding) | — |
 | FacturaE | `signers/xades/AOFacturaESigner.java` | `core/signers/AOSignConstants.java:41-43` | — | `MISSING` | P0 |
 | ASiC-S (CAdES / XAdES in a ZIP) | `signers/cades/asic/AOCAdESASiCSSigner.java`, `signers/xades/asic/AOXAdESASiCSSigner.java` | `core/signers/AOSignConstants.java:11,19` | — | `MISSING` | P1 |
 | Tri-phase variants (`*Tri`) | `signers/*/client/**`, `AOPkcs1TriPhaseSigner` | `core/signers/AOSignConstants.java:14,18,26,39` | `src/lib/extension/triphase.ts` — CAdES only, in the extension; the page's signing server builds the structure and the extension supplies the PKCS#1 signature | `PARTIAL` (CAdES; XAdES/PAdES tri servers still use native AutoFirma) | P1 |
@@ -170,7 +170,7 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 
 | Operation | 1.9 evidence | Meaning | Our status |
 |---|---|---|---|
-| `afirma://sign`, `cosign`, `countersign` | `standalone/protocol/ProtocolInvocationLauncher.java:372`; `core/misc/protocol/UrlParametersToSignAndSave.java:25,31` (`cop`, `format`, `algorithm`, …) | a web form hands a document (or a URL/fileId) to AutoFirma, gets the signature back | `N/A-BROWSER` — the SPA **is** the signer; drop the document, sign locally |
+| `afirma://sign`, `cosign`, `countersign` | `standalone/protocol/ProtocolInvocationLauncher.java:372`; `core/misc/protocol/UrlParametersToSignAndSave.java:25,31` (`cop`, `format`, `algorithm`, …) | a web form hands a document (or a URL/fileId) to AutoFirma, gets the signature back | `N/A-BROWSER` — the app **is** the signer; drop the document, sign locally |
 | `…/signandsave` + storage servlet | `standalone/protocol/ProtocolInvocationLauncher.java:306`; `UrlParametersToSave`, `UrlParameters.STORAGE_SERVLET_PARAM` | AutoFirma POSTs the result back to the calling server | `MISSING` by design (static, no backend) — a caller-side download is the equivalent (per-row `Descargar`, batch ZIP) |
 | `…/load`, `…/save` | `standalone/protocol/ProtocolInvocationLauncher.java:437,251` | pass a file in/out of the local disk | `N/A-BROWSER` (File System Access API / downloads instead) |
 | `…/selectcert` | `standalone/protocol/ProtocolInvocationLauncher.java:203` | a page asks the user to choose a certificate | `N/A-BROWSER` (`src/lib/components/CertPicker.svelte`) |
@@ -188,7 +188,7 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 | Default format per file type (`-format auto`) | prefs `PREFERENCE_GENERAL_DEFAULT_FORMAT_{PDF,XML,BIN,OOXML,ODF,FACTURAE}` `standalone/configurator/common/PreferencesManager.java:37-42` | `PARTIAL` (fixed three-format picker) | P1 |
 | Language/locale selection | `PREFERENCES_LOCALE` `standalone/configurator/common/PreferencesManager.java:29`; `standalone/SimpleAfirma.java:504` (`buildLocale`) | `DONE` (ES/EN, `src/lib/i18n.ts`) | — |
 | Help window, About dialog, version | `SimpleAfirma.showHelp`, `standalone/ui/AboutDialog.java` | `MISSING` | P2 |
-| Update check / updater | `standalone/updater/Updater.java:20`; pref `PREFERENCE_GENERAL_UPDATECHECK` | `N/A-BROWSER` (static hosting) | — |
+| Update check / updater | `standalone/updater/Updater.java:20`; pref `PREFERENCE_GENERAL_UPDATECHECK` | `MISSING` (desktop product owns the updater, #47 closed) | P1 |
 | Proxy configuration | `standalone/ProxyUtil.java`, `standalone/ProxyConfig.java`, `standalone/ui/preferences/ProxyPanel.java:22` | `N/A-BROWSER` (the browser proxies) | — |
 | Diagnostic data window, debug logging (`afirma_debug`, `-Dafirma_debug_level`) | `standalone/ui/DataDebugDialog.java`; `SimpleAfirma.configureLog` | `PARTIAL` (technical reasons in the verify report) | P2 |
 | VDI/low-resource optimisation, HiDPI | pref `PREFERENCE_GENERAL_VDI_OPTIMIZATION`; `standalone/ui/ScalablePane.java`, `LookAndFeelManager` | `N/A-BROWSER` | — |
@@ -205,12 +205,12 @@ Registry and dispatch: `core/signers/AOSignerFactory.java:31` (format → class 
 2. **Co-signature and counter-signature** (leafs/tree) for CAdES/XAdES/PDF — §3.
 3. **Revocation and trust depth** in the verify engine: OCSP/CRL, `CA_NOT_SUPPORTED`
    reporting, trust beyond the bundled FNMT root — §5. CORS is the known constraint.
-4. **OOXML in the UI** (engine exists, unused) and **ODF signing** (missing entirely) — §2.
+4. **ODF signing** (missing entirely) and **OOXML verification** (unsupported, 1.9 parity) — §2.
 5. **FacturaE profile** (XAdES with policy, role, production place) — §2.
 6. **XAdES-T** (generate `SignatureTimeStamp`) and display of received timestamps — §4.3
    (CAdES-T and PAdES B-T generation already ship, #43).
-7. **DNIe / smartcard path** — a no-key-export PKCS#11 helper decision (`README.md`
-   "Possible improvements"); desktop route discarded (`docs/PIVOT-STUDY.md` §5).
+7. **DNIe / smartcard path** — desktop scope via the `KeyProvider` seam (PKCS#11/PC/SC,
+   `docs/DESKTOP-ROADMAP.md` §1); `README.md` "Alcance actual y limitaciones".
 8. **Embeddable API for a calling web page** (`postMessage`/iframe), i.e. what replaces `afirma://sign`
    for forms — §8.
 
@@ -253,6 +253,6 @@ rg -n "SignValiderFactory.getSignValider" work/decompiled/sources/es/gob/afirma/
 rg -n "BROWSER|getBrowser" work/decompiled/sources/es/gob/afirma/   # only Platform.java (§1)
 ```
 
-Our side: `README.md` (per-issue status — its "PKCS#12 support" section predates the
-PBES1/MAC work in `4c9f6c31` and is stale), `src/lib/sign.ts` (which formats the UI exposes),
+Our side: `README.md` ("Formatos y algoritmos", "Alcance actual y limitaciones"),
+`src/lib/sign.ts` (which formats the UI exposes),
 `src/lib/verify/index.ts` (which artifacts the verifier accepts).

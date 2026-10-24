@@ -2,7 +2,7 @@ export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 export const MAX_DATA_BYTES = 4 * 1024 * 1024;
 export const MAX_BASE64 = 4 * Math.ceil(MAX_DATA_BYTES / 3);
 const MAX_PARAMS = 1_400_000 + 8192;
-const SIGN_FORMATS = {CAdES: true, PAdES: true, XAdES: true, AUTO: true};
+const SIGN_FORMATS = {CAdES: true, PAdES: true, XAdES: true, OOXML: true, AUTO: true};
 const FORMAT_ALIASES = {'CMS/PKCS#7': 'CAdES'};
 // Formats the local engines cannot build; the page's server performs the structure and
 // the extension only contributes the PKCS#1 signature.

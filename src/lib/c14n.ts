@@ -97,10 +97,11 @@ function writeElement(
 	if (options.exclusive) {
 		const own = element.prefix ?? '';
 		if (own === '' ? (scope.get('') ?? '') !== '' : scope.has(own)) wanted.add(own);
+		// Unprefixed attributes are in no namespace (Exclusive C14N §2), so they never pull
+		// the default namespace in — only prefixed attributes pull their own prefix.
 		for (const attribute of element.attributes) {
 			if (attribute.name === 'xmlns' || attribute.prefix === 'xmlns') continue;
 			if (attribute.prefix) wanted.add(attribute.prefix);
-			else if ((scope.get('') ?? '') !== '') wanted.add('');
 		}
 	}
 

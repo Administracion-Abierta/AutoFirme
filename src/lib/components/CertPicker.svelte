@@ -27,6 +27,7 @@
 	import FileIcon from '@lucide/svelte/icons/file';
 	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import XIcon from '@lucide/svelte/icons/x';
 
@@ -73,6 +74,9 @@
 	let openId = $state<string | null>(null);
 	/** The saved signature currently in use, so a click on it means "select this one". */
 	let usedId = $state<string | null>(null);
+	/** Identity whose alias is being edited, plus the draft text. */
+	let renameId = $state<string | null>(null);
+	let renameLabel = $state('');
 	let storePin = $state('');
 	/** PIN of the sign being added from the modal — distinct from `storePin`, which unlocks saved ones. */
 	let addPin = $state('');
@@ -277,10 +281,31 @@
 			await vault.removeIdentity(id);
 			unlockedSessions.delete(id);
 			if (openId === id) openId = null;
+			if (renameId === id) renameId = null;
 			await refresh();
 		} catch (reason) {
 			storeError = reasonText(reason);
 			console.error('[autofirme:picker] forget failed', reason, storeError);
+		}
+	}
+
+	/** Opens the alias editor for one saved signature; the PIN and sealed blob stay untouched. */
+	function startRename(identity: IdentityMeta): void {
+		storeError = '';
+		openId = null;
+		renameId = identity.id;
+		renameLabel = identity.label;
+	}
+
+	async function rename(id: string): Promise<void> {
+		storeError = '';
+		try {
+			await vault.renameIdentity(id, renameLabel);
+			renameId = null;
+			await refresh();
+		} catch (reason) {
+			storeError = reasonText(reason);
+			console.error('[autofirme:picker] rename failed', reason, storeError);
 		}
 	}
 </script>
@@ -452,17 +477,52 @@
 		{/if}
 
 		{#each visibleIdentities as identity (identity.id)}
+			{#if renameId === identity.id}
+				<form
+					class="bg-muted/40 flex flex-col gap-2 rounded-lg p-3 text-xs"
+					onsubmit={(event) => {
+						event.preventDefault();
+						void rename(identity.id);
+					}}
+				>
+					<label class="flex flex-col gap-1" for={`store-alias-${identity.id}`}>
+						{copy.storeAlias}
+						<Input id={`store-alias-${identity.id}`} autocomplete="off" bind:value={renameLabel} />
+					</label>
+					<div class="flex items-center gap-2">
+						<Button type="submit" size="sm" class="h-8">{copy.storeSave}</Button>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							class="h-8"
+							onclick={() => (renameId = null)}>{copy.storeBack}</Button
+						>
+					</div>
+				</form>
+			{:else}
 			<div class="bg-muted/40 relative rounded-lg">
 				{#if !initialId}
-					<Button
-						variant="ghost"
-						size="icon"
-						class="absolute end-1 top-1 size-6"
-						aria-label={copy.remove}
-						onclick={() => forget(identity.id)}
-					>
-						<XIcon class="size-3.5" />
-					</Button>
+					<div class="absolute end-1 top-1 flex gap-0.5">
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-6"
+							aria-label={copy.storeRename}
+							onclick={() => startRename(identity)}
+						>
+							<PencilIcon class="size-3.5" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-6"
+							aria-label={copy.remove}
+							onclick={() => forget(identity.id)}
+						>
+							<XIcon class="size-3.5" />
+						</Button>
+					</div>
 				{/if}
 				<button
 					type="button"
@@ -474,7 +534,7 @@
 					onclick={() => select(identity)}
 				>
 					{#if !compact}<FileIcon class="text-muted-foreground size-5" />{/if}
-					<span class="w-full truncate pr-5 font-medium">{identity.label}</span>
+					<span class="w-full truncate pr-12 font-medium">{identity.label}</span>
 					<span class="text-muted-foreground w-full truncate">{identity.commonName}</span>
 					{#if !compact}
 					<span
@@ -493,6 +553,7 @@
 					{/if}
 				</button>
 			</div>
+			{/if}
 		{/each}
 
 		{#if !compact}

@@ -1,19 +1,19 @@
 # AutoFirme Desktop — features roadmap
 
 Status: **approved plan, not started**. No code exists yet. This document supersedes
-`docs/PIVOT-STUDY.md` §5 (desktop rejected) and the "four shells" model in `README.md`.
+`docs/PIVOT-STUDY.md` §5 (desktop rejected) and the retired PWA/self-host framing in `README.md`.
 
 ## 1. Decisions (locked 2026-10-20)
 
 | # | Decision | Consequence |
 |---|---|---|
-| 1 | **No web product.** The Cloudflare-hosted SPA stops being a published app. | The Worker deploy is retired in P8. `build/` survives as the extension's options page and as the dev harness. `AGENTS.md`'s "wrangler stays assets-only" rule becomes vestigial and must be replaced. |
+| 1 | **No web product.** The Cloudflare-hosted SPA stops being a published app. | The Worker deploy is retired in P8. `build/` survives as the extension's options page and as the dev harness. `AGENTS.md` rule 4 (no new web deploy surface) locks the retirement in place. |
 | 2 | OS order: **Linux → Windows → macOS**. | v0.1 is Linux-only. Windows is the second target, macOS last (notarization + Developer Program are the long poles). |
 | 3 | **Desktop and extension are separate products.** Extension ships standalone: in-extension PKCS#12 signing and its own portal interception, no desktop dependency. The optional bridge between them is a **native messaging host**, never a localhost API. | No `triphase.ts` retarget. The extension keeps its own MCP bridge (agents → browser-confirmed signature). The desktop app gets its own MCP. They share the engine source, not a runtime. |
 | 4 | Certificate store: **OS keystore + PKCS#11 authoritative; PKCS#12 import kept; IndexedDB demoted to migration-only.** | One-time migration path; every cert shows its source. Divergence between stores becomes a bug class, not a feature. |
 | 5 | **P2P slice 1 = LAN + Tailscale only**, no relays. | Nothing to operate. File-out fallback always present. |
 | 6 | **No hosted presence at all.** No docs site, no landing page, no demo host. | Docs live in the repo. Nothing to deploy, nothing to keep green. |
-| 7 | **Firefox after Windows.** | Firefox `userScripts` (#18) stays `fleet:hold` until the Windows MSI exists. |
+| 7 | **Firefox after Windows.** | Firefox `userScripts` (#117) stays parked until the Windows MSI exists. |
 | 8 | **macOS committed from the start, notarization included.** | Apple Developer Program purchase moves into the P7 budget, not "someday". Keychain provider is mandatory, not optional. |
 | 9 | **GitHub Releases is the only distribution channel.** | No apt/dnf repo, no Forgejo pages, no third-party store as primary. Packages are attached assets + `SHA256SUMS`, minisign signatures. |
 
@@ -58,7 +58,7 @@ CAdES/XAdES/PAdES and never learns where the key lives.
 
 | Phase | Features | Effort | Exit criteria |
 |---|---|---|---|
-| **P0** Shell + parity gate | Tauri v2 scaffold, secure-context resolution, 12-item engine smoke, CI `cargo check` + headless smoke, **plus audit fixes §9.1–9.6: delete wrangler/Containerfile/Caddyfile + deploy jobs, pin Node, disable the service worker, add the `mcp` CI job, extend `check-versions`** | 10–14 d | all 12 green on Linux; one signed PDF validates in Acrobat; CI has no deploy job and no untested project |
+| **P0** Shell + parity gate | Tauri v2 scaffold, secure-context resolution, 12-item engine smoke, CI `cargo check` + headless smoke, **plus audit fixes §10.1–10.6: delete wrangler/Containerfile/Caddyfile + deploy jobs, pin Node, disable the service worker, add the `mcp` CI job, extend `check-versions`** | 10–14 d | all 12 green on Linux; one signed PDF validates in Acrobat; CI has no deploy job and no untested project |
 | **P1** Key layer | `KeyProvider` seam, PKCS#11 modules, OS stores, smartcard autodetect + native PIN, hot-plug | 15–20 d | DNIe 3.x signs CAdES with PIN prompted natively, key non-exportable |
 | **P2** Portal + native messaging | `afirma://` registration, local sign server (protocol 3 + 4), native messaging host + manifests, extension optional upgrade | 13–17 d | real sede completes a signature end to end, twice: extension-only, and via desktop |
 | **P3** Format parity | OOXML wired, XAdES-T, FacturaE 3.0/3.1/3.2.2, co-sign/counter-sign, ASiC-S, XAdES detached/enveloping, ODF, XMLDSig | 25–30 d | PARITY P0/P1 rows green |
@@ -118,7 +118,7 @@ of ~45 d. Verify this first, in P1, day 1.
 - Extension treats host absence as normal (`curl`-equivalent probe fails → in-extension
   PKCS#12 path). Version skew handled by `hello.capabilities`, not by version compare.
 - Firefox needs `allowed_extensions` with the add-on ID and its own signed manifest; budget
-  an extra day and treat Firefox as a later deliverable (see issue #18).
+  an extra day and treat Firefox as a later deliverable (see issue #117).
 
 ### 5.4 MCP inside the app (P5)
 
@@ -252,6 +252,10 @@ starts staggered 2 days apart inside it, plus hard `depends-on` edges where sibl
 14 slices are wave-ready today, gated only by their date.
 
 ## 10. Stack audit (2026-10-20, before any code)
+
+> **Superseded:** the A1–A5 audit fixes landed on `bullet-develop`
+> `13c72ebf`. The findings below are kept as the pre-code record; do not
+> re-derive work from them.
 
 Findings from reading the tree at `ef5f92f`, plus a real run of the suites: `pnpm check` clean
 (0 errors, 0 warnings), vitest 244 passed / 1 skipped, node --test 19 + 8 passed. The stack is
