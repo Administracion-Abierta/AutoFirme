@@ -23,3 +23,6 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+        # act: `${{ secrets.GITHUB_TOKEN }}` is only injected when the step declares it.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
