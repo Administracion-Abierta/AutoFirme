@@ -83,6 +83,23 @@ export function timeStampImprint(token: Bytes): Bytes {
 	const imprint = at(children(token, tstInfo), 2, 'messageImprint');
 	return content(token, at(children(token, imprint), 1, 'hashedMessage'));
 }
+/**
+ * Throw unless `token`'s `messageImprint` is `SHA-256(data)` — the check that turns a decorated
+ * blob into proof the TSA saw these exact bytes. Specific messages, so a verifier can quote them
+ * as the failure reason instead of inventing one.
+ */
+export async function verifyTimeStampImprint(token: Bytes, data: Bytes): Promise<void> {
+	const expected = new Uint8Array(await crypto.subtle.digest('SHA-256', data));
+	let echoed: Bytes;
+	try {
+		echoed = timeStampImprint(token);
+	} catch {
+		throw new Error('the timestamp token is unreadable: no RFC 3161 messageImprint found');
+	}
+	if (echoed.length !== expected.length || echoed.some((byte, index) => byte !== expected[index])) {
+		throw new Error('the timestamp token covers different bytes: messageImprint mismatch');
+	}
+}
 
 /**
  * Ask `url` to timestamp `data` and return its DER `TimeStampToken`. Throws on anything that is

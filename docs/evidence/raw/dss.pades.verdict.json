@@ -1,0 +1,33 @@
+{
+  "source": "https://ec.europa.eu/digital-building-blocks/DSS/webapp-demo/services/rest/validation/validateSignature",
+  "request_date": "2026-10-21",
+  "http_status": 200,
+  "method": "POST application/json {signedDocument:{bytes,name}[,originalDocuments]}",
+  "document": "pades.pdf",
+  "validation_policy": "QES AES/QC AES TL based",
+  "signatures_count": 1,
+  "valid_signatures_count": 0,
+  "signature": {
+    "format": "PAdES-BES",
+    "signed_by": "\u00d1and\u00fa Prueba",
+    "claimed_signing_time": "2026-10-21T16:59:51Z",
+    "digest_algorithm": "SHA256",
+    "encryption_algorithm": "RSA",
+    "key_length": "2048",
+    "signature_intact": true,
+    "signature_valid": true,
+    "signature_scope": [
+      {
+        "value": "The document ByteRange : [0, 1590, 6120, 669]",
+        "Id": "D-D5B3BDA7B3E7890B6CC06165289CEB086B092630AA4915E176C98C57004B5CD1",
+        "name": "Full PDF",
+        "scope": "FULL"
+      }
+    ],
+    "indication": "INDETERMINATE",
+    "sub_indication": "NO_CERTIFICATE_CHAIN_FOUND",
+    "errors": [
+      "BBB_XCV_CCCBB_SIG_ANS"
+    ]
+  }
+}

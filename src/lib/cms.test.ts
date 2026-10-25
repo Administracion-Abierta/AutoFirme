@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { type Bytes, type Der, explicit, oid, parseDer } from './asn1';
+import { type Bytes, type Der, concatBytes, derContent, explicit, oid, parseDer } from './asn1';
 import { signCadesDetached } from './cms';
 import { loadSignerSession } from './keystore';
 import { OID_TIME_STAMP_TOKEN } from './timestamp';
@@ -28,7 +28,12 @@ const OID_CONTENT_TYPE = '1.2.840.113549.1.9.3';
 const OID_MESSAGE_DIGEST = '1.2.840.113549.1.9.4';
 const OID_SIGNING_TIME = '1.2.840.113549.1.9.5';
 const OID_SIGNING_CERTIFICATE_V2 = '1.2.840.113549.1.9.16.2.47';
-
+const OID_CERTIFICATE_REFS = '1.2.840.113549.1.9.16.2.21';
+const OID_REVOCATION_REFS = '1.2.840.113549.1.9.16.2.22';
+/** `id-aa-ets-escTimeStamp` — the CAdES-C time-stamp CAdES-X Long type 1 carries. */
+const OID_ESC_TIME_STAMP = '1.2.840.113549.1.9.16.2.25';
+/** `id-aa-ets-certCRLTimestamp` — the refs-only time-stamp type 2 carries. */
+const OID_CERT_CRL_TIME_STAMP = '1.2.840.113549.1.9.16.2.26';
 const SIGNING_TIME = new Date(Date.UTC(2026, 9, 14, 12, 0, 0));
 /** Vitest runs with the project directory as cwd; `import.meta.url` is an http URL under jsdom. */
 const GOLDEN_DIR = resolve(process.cwd(), 'src/test/fixtures/cades');
@@ -167,6 +172,99 @@ describe('CAdES-BES detached signing', () => {
 		const withoutKey = session.certificates.find((certificate) => certificate.key === null)!;
 
 		await expect(signCadesDetached(withoutKey, fixtures.content)).rejects.toThrow('no private key');
+	});
+
+	it('adds certificate and revocation refs for X Long type 1', async () => {
+		const tsa = createTsaFixtures();
+		try {
+			const { signer } = await loadSignerSession(fixtures.p12, FIXTURE_PIN);
+			vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+				const query = init.body;
+				if (!(query instanceof Uint8Array)) throw new Error('the timestamp request has no DER body');
+				return new Response(tsa.respond(query), { status: 200 });
+			});
+
+			const signature = await signCadesDetached(signer, fixtures.content, {
+				signingTime: SIGNING_TIME,
+				timeStamp: 'https://tsa.test/',
+				xLong: 1
+			});
+			vi.unstubAllGlobals();
+
+			expect(verify(signature, fixtures.contentPath, fixtures.caPath, ['-cades'])).toBeNull();
+			const unsigned = new Map(
+				signerInfo(signature).children[6].children.map((attribute) => [oid(attribute.children[0]), attribute])
+			);
+			expect([...unsigned.keys()].sort()).toEqual(
+				[OID_TIME_STAMP_TOKEN, OID_CERTIFICATE_REFS, OID_REVOCATION_REFS, OID_ESC_TIME_STAMP].sort()
+			);
+			// One OtherCertID sequence per embedded certificate; openssl parses the refs structure.
+			expect(unsigned.get(OID_CERTIFICATE_REFS)!.children[1].children[0].tag).toBe(0x30);
+
+			// SET OF sorts attributes, so locate the tokens by OID instead of position.
+			const timeStampAttr = unsigned.get(OID_TIME_STAMP_TOKEN)!;
+			const token = timeStampAttr.children[1].children[0].raw;
+			const { signature: value } = cmsTimeStamp(signature);
+			// The CAdES-T token still covers the bare signature value (RFC 5126 §6.1).
+			expect(tsVerifyToken(tsa.dir, tsa.certPath, token, value)).toMatch(/Verification: OK/);
+
+			// The escTimeStamp covers the signature, that token and both refs — each attribute as
+			// attrType+attrValues without its outer SEQUENCE (RFC 5126 §6.3.5 NOTE 2).
+			const covered = concatBytes([
+				value,
+				derContent(timeStampAttr.raw),
+				derContent(unsigned.get(OID_CERTIFICATE_REFS)!.raw),
+				derContent(unsigned.get(OID_REVOCATION_REFS)!.raw)
+			]);
+			const xToken = unsigned.get(OID_ESC_TIME_STAMP)!.children[1].children[0].raw;
+			expect(tsVerifyToken(tsa.dir, tsa.certPath, xToken, covered)).toMatch(/Verification: OK/);
+		} finally {
+			vi.unstubAllGlobals();
+			rmSync(tsa.dir, { recursive: true, force: true });
+		}
+	});
+
+	it('timestamps the refs for X Long type 2 (CAdES-C timestamp)', async () => {
+		const tsa = createTsaFixtures();
+		try {
+			const { signer } = await loadSignerSession(fixtures.p12, FIXTURE_PIN);
+			vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+				const query = init.body;
+				if (!(query instanceof Uint8Array)) throw new Error('the timestamp request has no DER body');
+				return new Response(tsa.respond(query), { status: 200 });
+			});
+
+			const signature = await signCadesDetached(signer, fixtures.content, {
+				signingTime: SIGNING_TIME,
+				timeStamp: 'https://tsa.test/',
+				xLong: 2
+			});
+			vi.unstubAllGlobals();
+
+			expect(verify(signature, fixtures.contentPath, fixtures.caPath, ['-cades'])).toBeNull();
+			const unsigned = signerInfo(signature).children[6].children;
+			const byOid = (id: string) => unsigned.filter((attribute) => oid(attribute.children[0]) === id);
+			// One CAdES-T token over the signature, one certCRLTimestamp over the refs.
+			expect(unsigned.map((attribute) => oid(attribute.children[0])).sort()).toEqual(
+				[OID_TIME_STAMP_TOKEN, OID_CERT_CRL_TIME_STAMP, OID_CERTIFICATE_REFS, OID_REVOCATION_REFS].sort()
+			);
+			const refs = concatBytes([
+				derContent(byOid(OID_CERTIFICATE_REFS)[0].raw),
+				derContent(byOid(OID_REVOCATION_REFS)[0].raw)
+			]);
+			const token = byOid(OID_CERT_CRL_TIME_STAMP)[0].children[1].children[0].raw;
+			// Type 2 covers the refs alone — the signature is not part of the imprint.
+			expect(tsVerifyToken(tsa.dir, tsa.certPath, token, refs)).toMatch(/Verification: OK/);
+		} finally {
+			vi.unstubAllGlobals();
+			rmSync(tsa.dir, { recursive: true, force: true });
+		}
+	});
+	it('refuses X Long without a TSA (it builds on CAdES-T)', async () => {
+		const { signer } = await loadSignerSession(fixtures.p12, FIXTURE_PIN);
+		await expect(
+			signCadesDetached(signer, fixtures.content, { signingTime: SIGNING_TIME, xLong: 1 })
+		).rejects.toThrow(/builds on CAdES-T/);
 	});
 });
 

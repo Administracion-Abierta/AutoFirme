@@ -46,6 +46,7 @@ import {
 } from './der';
 import {
 	buildAppearance,
+	mapAutoFirmaRect,
 	rectForCorner,
 	serializeObject,
 	type VisibleSignatureOptions
@@ -90,6 +91,7 @@ export interface PadesSignatureOptions {
 	name?: string;
 	reason?: string;
 	location?: string;
+	contact?: string;
 	/** Draw a visible signature block. Omit for an invisible signature. */
 	visible?: VisibleSignatureOptions;
 	/**
@@ -314,19 +316,36 @@ export async function signPdf(
 	if (context.trailerInfo.Encrypt) throw new Error('encrypted PDFs cannot be signed');
 
 	const pageIndex = options.visible?.page ?? 0;
-	const page = document.getPages()[pageIndex];
+	const pages = document.getPages();
+	const resolvedPage = pageIndex < 0 ? pages.length + pageIndex : pageIndex;
+	// AutoFirma ignores an out-of-range page and stamps the last one.
+	const page = pages[
+		options.visible?.autoFirmaRect && (resolvedPage < 0 || resolvedPage >= pages.length)
+			? pages.length - 1
+			: resolvedPage
+	];
 	if (!page) throw new Error(`input PDF has no page ${pageIndex}`);
 
 	const visible = options.visible;
 	// Explicit coordinates win; otherwise the block is placed against the page's chosen corner.
 	const rect: [number, number, number, number] = visible
 		? (visible.rect ??
-			rectForCorner(page.getSize(), visible.corner ?? 'bottom-right', visible.size))
+			(visible.autoFirmaRect
+				? mapAutoFirmaRect(
+						page.getMediaBox(),
+						page.getRotation().angle,
+						visible.autoFirmaRect
+					)
+				: rectForCorner(page.getSize(), visible.corner ?? 'bottom-right', visible.size)))
 		: [0, 0, 0, 0];
 	const appearance = visible
 		? await buildAppearance(document, rect, {
 				lines: visible.lines ?? [options.name ?? 'Firmado'],
-				image: visible.image
+				image: visible.image,
+				fontFamily: visible.fontFamily,
+				fontSize: visible.fontSize,
+				fontStyle: visible.fontStyle,
+				fontColor: visible.fontColor
 			})
 		: null;
 
@@ -391,6 +410,7 @@ export async function signPdf(
 	if (options.name) out.push(`/Name ${pdfTextString(options.name)}\n`);
 	if (options.reason) out.push(`/Reason ${pdfTextString(options.reason)}\n`);
 	if (options.location) out.push(`/Location ${pdfTextString(options.location)}\n`);
+	if (options.contact) out.push(`/ContactInfo ${pdfTextString(options.contact)}\n`);
 	out.push('>>');
 	closeObject();
 
@@ -413,7 +433,7 @@ export async function signPdf(
 		openObject(appearanceRef.objectNumber);
 		out.push(
 			`<< /Type /XObject /Subtype /Form /FormType 1 /BBox [0 0 ${width} ${height}] ` +
-				`/Resources << /Font << /Helv ${fontRef.toString()} >>${xobjects} >> ` +
+				`/Resources << /Font << /F1 ${fontRef.toString()} >>${xobjects} >> ` +
 				`/Length ${encoder.encode(appearance.content).length} >>\nstream\n`
 		);
 		out.push(appearance.content);
@@ -421,7 +441,7 @@ export async function signPdf(
 		closeObject();
 
 		openObject(fontRef.objectNumber);
-		out.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
+		out.push(`<< /Type /Font /Subtype /Type1 /BaseFont /${appearance.fontBase} /Encoding /WinAnsiEncoding >>`);
 		closeObject();
 
 		// Image streams (and their /SMask) are pdf-lib's own; they are appended verbatim so the

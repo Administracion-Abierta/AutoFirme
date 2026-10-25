@@ -222,6 +222,45 @@ describe('PAdES B-B signing', () => {
 		);
 	});
 
+	it('draws AutoFirma’s visible box on the requested page and keeps the signature valid', async () => {
+		const signed = await signSource({
+			contact: 'signer@example.test',
+			visible: {
+				page: -1,
+				autoFirmaRect: [45, 80, 560, 140],
+				lines: ['Firmado por Test Signer RSA el 02/01/2026 (03:04:05)'],
+				fontFamily: 1,
+				fontSize: 8,
+				fontStyle: 2,
+				fontColor: [0.5, 0.5, 0.5]
+			}
+		});
+		const extracted = await extractSignature(signed);
+
+		expect(
+			extracted.field
+				.lookup(PDFName.of('Rect'), PDFArray)
+				.asArray()
+				.map((entry) => (entry as PDFNumber).asNumber())
+		).toEqual([45, 80, 560, 140]);
+		expect(
+			extracted.signature.lookup(PDFName.of('ContactInfo'), PDFString).decodeText()
+		).toBe('signer@example.test');
+
+		const appearance = extracted.field.lookup(PDFName.of('AP'), PDFDict);
+		const form = extracted.document.context.lookup(appearance.lookup(PDFName.of('N')) as PDFRef, PDFStream);
+		const content = new TextDecoder('latin1').decode(form.getContents());
+		expect(content).toContain('BT /F1 8 Tf 0.5 0.5 0.5 rg');
+		const font = form.dict.lookup(PDFName.of('Resources'), PDFDict).lookup(PDFName.of('Font'), PDFDict);
+		const fontRef = font.get(PDFName.of('F1')) as PDFRef;
+		expect(
+			extracted.document.context.lookup(fontRef, PDFDict).lookup(PDFName.of('BaseFont'), PDFName).asString()
+		).toBe('/Helvetica-Oblique');
+		expect(opensslVerify(trimTrailingZeros(extracted.contents), extracted.content)).toMatch(
+			/Verification successful/i
+		);
+	});
+
 	it('draws an image plus signer text in a corner block, and still verifies', async () => {
 		const signed = await signSource({
 			visible: {

@@ -1,0 +1,66 @@
+name: Develop release
+
+# Every push to develop ships a pre-release tagged dev-<short-sha>: the rolling
+# test channel for the extension zip and the static site. Production releases
+# keep coming from release-please on main (release.yml).
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: develop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  artifacts:
+    name: build and publish dev-<commit> release
+    runs-on: ubuntu-latest
+    container: node:24-trixie
+    timeout-minutes: 25
+    steps:
+      # node:24-trixie ships node, git, python3, tar and curl; only the CA bundle
+      # for the API calls below is missing.
+      - name: Install toolchain
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm build:extension
+      - run: pnpm package:extension
+      - name: Create the development pre-release tagged dev-<short-sha>
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: |-
+            :construction: **Development build — not for production use.**
+
+            Rolling pre-release of the `develop` branch, rebuilt on every push. It can break or change format without notice; signatures are real but the surrounding UX and formats may drift between builds. Use the latest stable release for anything that matters.
+
+            - Commit: ${{ github.sha }}
+            - Extension (Chrome only for now): `autofirme-extension-*.zip` — load unpacked or install manually; unsigned, so developer mode is required.
+            - Static site: `build/` is published as the `autofirme-web` artifact below — serve the extracted folder with any static host.
+
+            Verify with `SHA256SUMS` before installing.
+        run: |
+          TAG="dev-${GITHUB_SHA::7}"
+          echo "$NOTES" > release-notes.md
+          scripts/forgejo-release.sh "$TAG" \
+            --sha "$GITHUB_SHA" \
+            --title "[Development build] $TAG — unstable, for testing only" \
+            --notes-file release-notes.md \
+            --prerelease \
+            dist/autofirme-extension-*.zip dist/SHA256SUMS
+          echo "release $TAG created"
+      - uses: actions/upload-artifact@v3
+        with:
+          name: autofirme-web
+          path: build/
+          if-no-files-found: error

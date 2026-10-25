@@ -1,0 +1,11 @@
+{
+	"extends": "$app/tsconfig",
+	"include": ["extension", "scripts", "demo"],
+	"compilerOptions": {
+		"checkJs": true,
+		"strict": true,
+		"noImplicitAny": false,
+		"moduleResolution": "bundler",
+		"paths": { "#lib/*": ["./src/lib/*"] }
+	}
+}

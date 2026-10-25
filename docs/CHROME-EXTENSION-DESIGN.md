@@ -3,24 +3,25 @@
 Status: implemented in extension 0.1.2. This document describes the current code.
 Installation and supported calls are in [CHROME-EXTENSION.md](CHROME-EXTENSION.md).
 Recorded checks are in [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md).
+En español: las funciones de la extensión están en [LEEME.md](LEEME.md).
 
 ## 1. Shared app, separate build target
 
-The web build and extension render the same `src/routes/+page.svelte` and
+The SvelteKit build and the extension render the same `src/routes/+page.svelte` and
 `App.svelte`. Both use the existing certificate store, signing and verification
 engines, batch queue, PDF stamp controls, saved outputs, settings and translations.
 The extension bundles the app locally instead of loading a hosted page or copying
 its engines into a second application.
 
-`pnpm build` produces the ordinary SvelteKit site. `pnpm build:extension` uses a
-standalone Vite entry to produce `dist/extension`. That entry avoids SvelteKit's
-inline bootstrap and the webapp service worker. PWA installation and update
-controls appear only in the web build. Chrome installs and updates the extension.
+`pnpm build` produces the SvelteKit output that serves as the extension's options
+page and the local dev harness. `pnpm build:extension` uses a standalone Vite entry
+to produce `dist/extension`. That entry avoids SvelteKit's inline bootstrap and the
+app service worker. Chrome installs and updates the extension.
 
 The Manifest V3 policy is `script-src 'self'; object-src 'none'`. Scripts, fonts
 and styles ship in the package. The build checker rejects inline executable
 scripts, dynamic code execution, remote bootstrap assets, missing app modules
-and webapp service-worker registration.
+and app service-worker registration.
 
 | Component | Responsibility |
 |---|---|
@@ -34,7 +35,7 @@ and webapp service-worker registration.
 | `src/lib/extension/ExtensionShell.svelte` | Full-app window controls |
 | `src/lib/extension/RequestChooser.svelte` | Request review and confirmation |
 | `src/lib/extension/SiteAccess.svelte` | Disabled-site list and TSA permission controls |
-| `src/lib/extension/sign-request.ts` | Certificate eligibility and local CAdES signing |
+| `src/lib/extension/sign-request.ts` | Certificate eligibility and local CAdES/PAdES/XAdES signing |
 
 ## 2. App windows and certificate storage
 
@@ -57,15 +58,18 @@ mutations also handle disclosure and PIN/import changes when painting is paused.
 Resizing uses the original browser-frame height to avoid viewport feedback loops.
 
 The extension uses the app's PIN-protected identity store in extension-origin
-IndexedDB. Hosted webapp storage belongs to a different origin and does not migrate
-automatically. Private keys and PINs stay in extension-owned contexts. This build
+IndexedDB. Storage from the retired hosted web app belongs to a different origin and
+does not migrate automatically. Private keys and PINs stay in extension-owned contexts. This build
 uses imported PKCS#12 identities and does not access the operating-system store.
 
 ## 3. Website access
 
-The manifest requests `http://*/*` and `https://*/*` host permissions. Interception
-is enabled by default wherever Chrome grants access. Users can restrict that
-access in Chrome or disable an exact origin in AutoFirme.
+The manifest declares `http://*/*` and `https://*/*` as install-time
+`host_permissions` (Chrome 116+): a fresh install intercepts every HTTP(S) site with
+no prompt. The site-access panel is the exception list, not an allow list: users
+disable an exact origin there, and the panel can re-request a per-origin grant
+(`chrome.permissions.request` on user activation) when Chrome's own site-access
+settings withheld it.
 
 The worker stores exceptions in `disabledOrigins`. It registers MAIN and ISOLATED
 scripts at `document_start` in all matching frames, excluding disabled origins.
@@ -84,15 +88,28 @@ proxy.
 
 ## 4. Supported requests and app messages
 
-The bridge accepts certificate selection and RSA/SHA-256 CAdES signing with
-implicit or explicit content, up to 4 MiB of canonical Base64. Unsupported methods,
-formats, filters, sticky identities and custom stores use the original AutoFirma
-implementation. The full app retains its broader interactive format support.
+The bridge accepts certificate selection and RSA/SHA-256 signing as CAdES
+(implicit or explicit), PAdES and enveloped XAdES, plus `AUTO` content sniffing, up
+to 4 MiB of canonical Base64. Legacy `SHA1withRSA` calls are accepted only for
+enveloped XAdES (CORES' compatibility test, for one); the SHA-1 key view is still
+non-extractable and every other format remains SHA-256-only. It also accepts
+`CAdEStri` from Aragon's portafirmas: the page supplies `serverUrl`, so the
+extension performs the pre-sign and post-sign calls while the private key stays
+local; RSA/SHA-256 and RSA/SHA-512 are supported.
+Explicit XAdES stays outside the contract because the engine only emits enveloped
+signatures. Unsupported methods, filters, sticky identities, other `*Tri` formats
+and custom stores use the original AutoFirma implementation. PAdES requests may
+carry AutoFirma's visible-stamp bag (`signaturePage`, `signaturePositionOnPage*`,
+`signatureRubricImage`, `layer2*`, reason/city/contact); it is mapped to the local
+appearance, while a non-zero `signatureRotation` falls back to native. The full app
+retains its broader interactive format support.
 
 Page ports use the name `autofirme-page`. A request carries `{id, request}`; a
 reply carries `{id, response}`. The background uses Chrome's sender metadata to
 bind the request to its tab, frame, document and origin. It allows at most eight
-pending requests per document and gives each a five-minute deadline.
+pending requests per document and at most sixteen in flight across the whole
+extension; a request beyond that global cap is answered `fallback` immediately and
+never opens a chooser window. Each accepted request gets a five-minute deadline.
 
 Extension UI messages use `chrome.runtime.sendMessage`. Replies are
 `{ok: true, value}` or `{ok: false, error}`.
@@ -107,7 +124,7 @@ Extension UI messages use `chrome.runtime.sendMessage`. Replies are
 | `request:cancel`, `id` | Cancel a waiting request |
 | `request:fallback`, `id` | Resume the original call before signing begins |
 | `app:open`, optional `tab` | Open the full app without resolving the request |
-| `sites:list` | Return `disabledOrigins` and `suggestedOrigin` |
+| `sites:list` | Return `disabledOrigins`, `suggestedOrigin`, `grantedOrigins` and `allSites` |
 | `sites:set`, `origin`, `enabled` | Remove or add a disabled-origin exception |
 
 The chooser URL is `index.html?request=<UUID>`. The worker records its actual tab
@@ -148,5 +165,5 @@ OpenSSL independently verifies generated CAdES and PDF signatures.
 
 See [CHROME-EXTENSION-VERIFICATION.md](CHROME-EXTENSION-VERIFICATION.md) for the
 recorded results and checks that still need a physical browser or desktop app.
-The extension inherits the webapp's format and trust-verification limits. It does
+The extension inherits the app's format and trust-verification limits. It does
 not add online revocation checks or OS biometrics.

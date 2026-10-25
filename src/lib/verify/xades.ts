@@ -17,6 +17,7 @@ import {
 } from './x509';
 import { trustedRoots } from './roots';
 import type { Bytes, Check, Signer, VerificationReport, VerifyOptions } from './types';
+import { verifyTimeStampImprint } from '../timestamp';
 import { summarize } from './types';
 
 const DS = 'http://www.w3.org/2000/09/xmldsig#';
@@ -225,6 +226,44 @@ export async function verifyXades(bytes: Bytes, options: VerifyOptions = {}): Pr
 			});
 		} catch (error) {
 			checks.push({ id: 'reference', status: 'fail', detail: `${label}: ${(error as Error).message}` });
+		}
+	}
+
+	const signatureTimeStamp = Array.from(document.getElementsByTagName('*')).find(
+		(element) => element.localName === 'SignatureTimeStamp' && (element.namespaceURI ?? '').startsWith(XADES_PREFIX)
+	);
+	if (!signatureTimeStamp) {
+		checks.push({ id: 'timestamp', status: 'info', detail: 'no xades:SignatureTimeStamp — XAdES-BES/EPES' });
+	} else if (!signatureValueElement) {
+		checks.push({ id: 'timestamp', status: 'fail', detail: 'xades:SignatureTimeStamp present but ds:SignatureValue is missing' });
+	} else {
+		const stampC14nUri =
+			childByLocalName(signatureTimeStamp, DS, 'CanonicalizationMethod')?.getAttribute('Algorithm') ?? '';
+		const stampC14n = C14N_URIS[stampC14nUri];
+		const encapsulated = Array.from(signatureTimeStamp.getElementsByTagName('*')).find(
+			(element) => element.localName === 'EncapsulatedTimeStamp'
+		);
+		if (stampC14n === undefined || stampC14n === 'unsupported') {
+			checks.push({
+				id: 'timestamp',
+				status: 'fail',
+				detail: `unsupported SignatureTimeStamp CanonicalizationMethod ${stampC14nUri}`
+			});
+		} else if (!encapsulated?.textContent?.trim()) {
+			checks.push({ id: 'timestamp', status: 'fail', detail: 'xades:SignatureTimeStamp carries no EncapsulatedTimeStamp' });
+		} else {
+			try {
+				const token = fromBase64(encapsulated.textContent);
+				const stamped = new TextEncoder().encode(canonicalize(signatureValueElement, stampC14n));
+				await verifyTimeStampImprint(token, stamped);
+				checks.push({
+					id: 'timestamp',
+					status: 'pass',
+					detail: `SignatureTimeStamp covers the canonicalised ds:SignatureValue (${stampC14nUri})`
+				});
+			} catch (error) {
+				checks.push({ id: 'timestamp', status: 'fail', detail: `SignatureTimeStamp rejected: ${(error as Error).message}` });
+			}
 		}
 	}
 

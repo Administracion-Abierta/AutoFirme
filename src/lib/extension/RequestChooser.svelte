@@ -9,8 +9,9 @@
  import type { SignerCert } from '#lib/sign';
  import { applyTheme, readTheme } from '#lib/theme';
  import { rpc, type Rpc, type ExtensionRequest } from './runtime';
- import { certificateProblem, confirmRequest, RequestValidationError } from './sign-request';
- import { extensionCopy } from './copy';
+ import { extensionCopy, errorCopy } from './copy';
+ import { certificateProblem } from './certificate';
+ import { confirmRequest, RequestValidationError } from './sign-request';
  let { id, vault = browserVault(), send = rpc }: { id:string; vault?:Vault; send?:Rpc } = $props();
  let lang = $state<Lang>('es');
  const t = $derived(extensionCopy[lang]);
@@ -24,6 +25,7 @@
  let content = $state<HTMLElement | null>(null);
  let eligibilityTime = $state(Date.now());
  const problem = $derived(cert ? certificateProblem(cert, eligibilityTime) : null);
+ const hash = $derived((request?.algorithm ?? 'SHA256withRSA').replace('withRSA', '').replace(/^SHA(\d+)/, 'SHA-$1'));
  const waiting = $derived(phase === 'waiting');
  onMount(() => {
   const cleanup = applyTheme(readTheme());
@@ -63,8 +65,12 @@
   try {await navigator.clipboard.writeText(request.digest);copied=true;}
   catch {error=t.copyFailed;}
  }
+ // The action buttons disable themselves as the phase leaves 'waiting', which would drop the
+ // pressed button and send focus to <body>; park it on the always-enabled open-app button first.
+ function keepFocus() { document.getElementById('request-open-app')?.focus(); }
  async function confirm() {
   if (!waiting || !cert || !request || problem) return;
+  keepFocus();
   phase='signing'; error='';
   try { await confirmRequest(request, cert, chain, send); phase='done'; }
   catch (reason) {
@@ -77,6 +83,7 @@
  }
  async function finish(action: 'cancel' | 'fallback') {
   if (!waiting) return;
+  keepFocus();
   phase='signing';
   try { await send({type:`request:${action}`,id}); phase=action==='cancel' ? 'cancelled' : 'continued'; }
   catch (reason) { error=reason instanceof Error ? reason.message : String(reason); phase='failed'; }
@@ -101,7 +108,7 @@
  <section id="request-site" class="flex min-w-0 items-center justify-between gap-2">
   <div class="min-w-0">
    <p class="text-muted-foreground text-xs">{t.requestedBy}</p>
-   <p id="request-origin" class="break-all text-sm font-semibold">{request?.origin ?? '…'}</p>
+   <p id="request-origin" class="break-all text-sm font-semibold">{request ? (request.bridge ? t.mcpOrigin : request.origin) : '…'}</p>
   </div>
   {#if request?.operation==='sign' && request.digest}
    <TooltipProvider><Tooltip bind:open={digestHintOpen}><TooltipTrigger>
@@ -115,8 +122,8 @@
  {#if request}
   <details id="request-details" class="text-xs">
    <summary class="text-muted-foreground cursor-pointer py-1">{t.requestDetails}</summary>
-   <div class="bg-muted/50 mt-1 grid gap-2 rounded-lg border p-2">
-    <p>{request.operation==='sign' ? `${request.format} · SHA-256 · ${request.mode}` : t.select}</p>
+   <div class="bg-muted/50 mt-1 grid gap-2 rounded-lg p-2">
+    <p>{request.operation==='sign' ? `${request.format}${request.serverUrl ? ' · ' + t.server : ''} · ${hash} · ${request.mode}` : t.select}</p>
     {#if request.operation==='sign'}
      <p class="text-muted-foreground">{t.digest}</p>
      <code id="request-digest" class="break-all">{request.digest ?? '—'}</code>
@@ -125,17 +132,22 @@
    </div>
   </details>
   {#if waiting}
-   <CertPicker copy={copy[lang]} {cert} {vault} compact detailsLabel={t.certDetails} onpick={(picked, certificates)=>{cert=picked;chain=certificates;eligibilityTime=Date.now();error='';}} />
+   <CertPicker copy={copy[lang]} {cert} {vault} compact detailsLabel={t.certDetails} initialId={request.certId} onpick={(picked, certificates, identityId)=>{
+    if (request?.bridge && request.certId && identityId !== request.certId) { cert=null; chain=[]; error=t.mcpWrongCertificate; return; }
+    cert=picked;chain=certificates;eligibilityTime=Date.now();error='';
+   }} />
    {#if problem}<p role="alert" class="text-destructive text-sm">{t[problem]}</p>{/if}
   {/if}
  {/if}
- {#if error}<p id="request-error" role="alert" class="text-destructive break-words text-sm">{error}</p>{/if}
+ {#if error}<p id="request-error" role="alert" class="text-destructive break-words text-sm">{errorCopy(lang,error)}</p>{/if}
  {#if phase!=='waiting'}<p role="status" class="text-sm">{phase==='loading' ? t.loading : phase==='signing' ? t.signing : phase==='done' ? t.done : phase==='cancelled' ? t.cancelled : phase==='continued' ? t.continued : t.failed}</p>{/if}
  <footer class="grid gap-2 border-t pt-3">
   <Button id="request-confirm" class="h-10 w-full whitespace-normal text-center leading-tight" disabled={!waiting || !cert || !!problem} onclick={confirm}>{request?.operation==='selectCertificate' ? t.confirmSelect : t.confirm}</Button>
-  <div class="grid grid-cols-2 gap-2">
+  <div class={request?.bridge ? 'grid gap-2' : 'grid grid-cols-2 gap-2'}>
    <Button id="request-cancel" variant="outline" class="h-10 w-full min-w-0 whitespace-normal text-center leading-tight" disabled={!waiting} onclick={()=>finish('cancel')}>{t.cancel}</Button>
-   <Button id="request-fallback" variant="outline" class="h-10 w-full min-w-0 whitespace-normal text-center leading-tight" disabled={!waiting} onclick={()=>finish('fallback')}>{t.fallback}</Button>
+   {#if !request?.bridge}
+    <Button id="request-fallback" variant="outline" class="h-10 w-full min-w-0 whitespace-normal text-center leading-tight" disabled={!waiting} onclick={()=>finish('fallback')}>{t.fallback}</Button>
+   {/if}
   </div>
   <Button id="request-open-app" variant="ghost" class="h-8 w-full whitespace-normal text-center text-xs" onclick={openApp}>{t.fullTab}</Button>
  </footer>

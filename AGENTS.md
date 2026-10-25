@@ -1,4 +1,4 @@
-# AGENTS.md — AutoFirme → AutoFirma Web
+# AGENTS.md — AutoFirme → desktop app + extension
 
 Origin: uni task (Computer Basics) — reverse-engineer AutoFirma v1.9 installers,
 recover the Java source. **That phase is DONE.** The jadx trees
@@ -9,20 +9,24 @@ decompiled-configurador`). The analysis itself is in `docs/`.
 
 ## Current goal
 
-Build **AutoFirma Web**: a client-side rendered web app that replicates AutoFirma's
-core (sign documents with X.509 certificates, verify signatures) — prettier, online,
-self-hostable by anyone.
+Two products, one engine. **AutoFirme Desktop** (Tauri v2 app, Linux first) and the
+**AutoFirme Extension** (Chrome/Edge MV3, Firefox later) share the signing engine in
+`src/lib` (CAdES/XAdES/PAdES over X.509 certificates). No website: the hosted SPA is
+retired; `build/` survives only as the extension's options page and the dev harness.
+Product decisions are locked in `docs/DESKTOP-ROADMAP.md` §1.
 
-- **Client-side rendered SPA.** Signing/verification runs in the browser
-  (WebCrypto API + WASM where needed). No signing server: private keys never
-  leave the client.
-- **Self-host first:** static build deployable on any nginx/k3s/static host,
-  zero backend required for core flows.
+- **Desktop = the full product.** Signing UI, native keys (OS stores, PKCS#11/DNIe),
+  `afirma://` links, local sign server, its own MCP sidecar. The `KeyProvider` seam
+  lets the engine assemble signatures without ever learning where the key lives.
+- **Extension = the portal product.** Ships standalone: in-extension PKCS#12 signing
+  plus portal `AutoScript` interception, no desktop dependency. The optional bridge
+  between the two is a **native messaging host**, never a localhost API.
 - **Reference, don't port:** AutoFirma 1.9 — https://github.com/ctt-gob-es/clienteafirma
   (GPL-2+/EUPL-1.1), or the tag above for the exact 1.9 sources — is READ-ONLY
-  reference for understanding formats and flows. Write new TypeScript from the
-  architecture doc (`docs/architecture.md`), not line-by-line translation. Keep the
-  new code clean-roomed from it and license the app GPL-compatible.
+  reference for understanding formats and flows. Derive new code (TypeScript or Rust)
+  from the architecture doc (`docs/architecture.md`), not line-by-line translation,
+  and never from decompiled Java. Keep the new code clean-roomed from it and license
+  the app GPL-compatible.
 
 ## Hard rules
 
@@ -33,10 +37,15 @@ self-hostable by anyone.
    the tree; reference them by path.
 3. Never commit a `decompiled*` tree: the reverse-engineering phase is closed and the
    tag `reference/decompile-1.9` is the record. Re-generate with jadx if ever needed
-   (command in `docs/REVERSING-NOTES.md` §7) — don't edit the trees.
-4. The app lives at the repo root — SvelteKit, Svelte 5, Tailwind v4, TypeScript.
-   Static adapter for deploy; node adapter only if a real backend need appears.
-5. Commit but do not push unless the user asks.
+   (command in `docs/REVERSING-NOTES.md` §7) — don't edit the trees, and never derive
+   new Rust code from them; `docs/architecture.md` is the only source.
+4. No new web deploy surface. No hosting config, no hosting docs, no landing
+   page: GitHub Releases is the only distribution channel (`docs/DEPLOY.md`). If a
+   deploy scaffold reappears (`adapter-cloudflare`, a Worker entrypoint), revert it.
+5. The app lives at the repo root — SvelteKit, Svelte 5, Tailwind v4, TypeScript.
+   Static adapter: the build feeds the desktop webview, the extension options page,
+   and the dev harness — never a published site.
+6. Commit but do not push unless the user asks.
 
 ## Layout
 
@@ -45,20 +54,33 @@ original/            # teacher's installers — INPUT, gitignored, read-only
 extracted/           # unpacked installers — scratch, gitignored
 work/                # scratch
 decompiled*/         # jadx output — untracked reference, gitignored (tag reference/decompile-1.9)
-docs/                # architecture.md (signing-core map), REVERSING-NOTES.md
-src/, static/        # the product — SvelteKit SPA (Svelte 5 + Tailwind v4)
+docs/                # architecture.md (signing-core map), DESKTOP-ROADMAP.md, REVERSING-NOTES.md
+src/, static/        # the engine + UI — SvelteKit (Svelte 5 + Tailwind v4), feeds desktop + extension
+src-tauri/           # desktop shell (Tauri v2) — Rust core, KeyProvider backends
+extension/           # MV3 extension — portal bridge, options page mounts the same UI
+mcp/                 # MCP server (stdio + Streamable HTTP)
 test/                # fixtures + cross-check scripts (openssl / xmlsec1)
-Containerfile        # multi-stage build: node build -> caddy serve (context = repo root)
+build/               # generated: extension options page + dev harness (`pnpm preview`) — never deployed
 ```
 
-Build/test from the repo root (pnpm is canonical; the lockfile and `Containerfile` use it):
+Build/test from the repo root (pnpm is canonical; the root `pnpm-lock.yaml` covers `mcp/` too):
 `pnpm install && pnpm test && pnpm build`.
 
 ## Agent workflow
 
+- Branches: `develop` is the integration branch (PRs target it), `main` is what gets
+  released; `main` only receives merges from `develop`.
 - Work on branches; `Refs #N` only in commits (never closing keywords).
-- Issues on Forgejo (git.eduard3v.com/EduarD3V/AutoFirme) drive the fleet (bullet).
-  Big problems get split into ≤~400-line deliverables per issue.
+- Issues on the forge (git.eduard3v.com/EduarD3V/AutoFirme) drive the fleet (bullet).
+- Big problems get split into ≤~400-line deliverables per issue; PRs to `main` need CI green
+  (`checks`, `mcp`, `shell`, `secret-scan`, `dependency-audit`), 1 review, and `CODEOWNERS`
+  sign-off on the crypto paths.
+- Versioning is automatic: conventional commits merged into `main` produce a Release Please
+  PR that bumps the single product version in `package.json`, `extension/manifest.json`
+  (Chrome reads the manifest one), `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and
+  the shell's entry in `src-tauri/Cargo.lock`, plus `CHANGELOG.md`. Never edit those
+  versions by hand; `pnpm check:versions` (in CI) fails when they drift or when a release
+  tag does not match.
 - Crypto code MUST ship with a verification check (e.g. generated signature verified
   by `openssl cms -verify` in a script/test) before the issue can move to review.
 - UI: clean, modern, accessible; ES/EN copy. Prettier than AutoFirma is a requirement,

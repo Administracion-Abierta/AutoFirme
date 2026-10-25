@@ -1,10 +1,10 @@
-# MCP server for AutoFirma Web — design study
+# MCP server for AutoFirme — design study
 
 **Issue:** #28 (stdio, CAdES only) and #46 (remote transport, deployment). **Status:**
-recommendation implemented — `mcp/` ships both transports.
+recommendation implemented — `mcp/` ships both transports. En español: qué hace el servidor MCP, en [LEEME.md](LEEME.md).
 
-AutoFirma Web's signing engine is a client-side SPA: the private key never leaves the browser and
-the CLI equivalent — desktop AutoFirma — is a Java GUI an agent cannot drive. The goal is to let a
+The signing engine (`src/lib/`) runs client-side — in the extension today, in the desktop WebView
+next — so the private key never leaves the machine, and the CLI equivalent — desktop AutoFirma — is a Java GUI an agent cannot drive. The goal is to let a
 coding agent on the same machine sign and verify documents through this engine, with an MCP server
 as the surface.
 
@@ -17,7 +17,7 @@ CAdES slice, which is what `mcp/` implements. Option (b), a Playwright harness, 
 
 The engine was audited module by module for its platform dependencies:
 
-| Module | Platform needs | Node 22+ |
+| Module | Platform needs | Node 24+ |
 |---|---|---|
 | `asn1.ts`, `der.ts`, `x509.ts` | DER + `Text{En,De}coder` | ✅ |
 | `pkcs12.ts` | `crypto.subtle` (PBKDF2, AES-CBC) | ✅ |
@@ -40,7 +40,7 @@ touches only globals Node has had as first-class citizens since 18 (`crypto`, `a
 The DOM-dependent modules are **not** on the CAdES path. `src/lib/cms.ts` (sign) and
 `src/lib/verify/cms.ts` (verify) build and parse the `SignedData` structures by hand over
 `crypto.subtle`, so a CAdES server needs **zero engine changes** — which is also why this slice is
-low-risk: the browser app keeps working exactly as before, and the Node build is a second consumer
+low-risk: the app keeps working exactly as before, and the Node build is a second consumer
 of the same code, not a fork.
 
 Cost of the rejected alternatives:
@@ -52,6 +52,12 @@ Cost of the rejected alternatives:
   DOM-free in the first place.
 - **(c) Port the engine to Java/reuse decompiled AutoFirma.** Wastes the clean-room rewrite and
   reintroduces the GPL-derived code the project deliberately keeps out of the app.
+- **(d) Run the MCP server inside the browser extension.** Not possible: Manifest V3 has no
+  server-socket API. `chrome.sockets.tcpServer` exists only for deprecated Chrome Apps, and a
+  service worker or extension page cannot bind a TCP port; it can only make outbound requests.
+  `/mcp` therefore needs a process outside Chrome. A native-messaging host can relay requests to
+  the extension if the agent must use a key that is unlocked there, but the host, not the CRX,
+  owns the listening socket.
 
 **Sequencing note:** the slice deliberately stops at CAdES. XAdES and PAdES are reachable —
 PAdES signing is already DOM-free (it needs only `pdf-lib` as a dependency) and XAdES needs a DOM
@@ -72,8 +78,8 @@ rather than pretending.
    src/lib --include=*.ts` matches only `xades.ts`, `ooxml.ts` and `verify/xades.ts`. A future
    edit that pulls a DOM into `cms.ts` or `verify/cms.ts` fails `pnpm test` (Node environment, no
    jsdom) immediately; in production the tool reports `dom_unavailable` rather than a false result.
-3. **Node version floor.** `crypto.subtle`, `atob`/`btoa` and the esbuild `--target=node22` set it;
-   Node 18–20 are untested and `mcp/package.json` declares no `engines`.
+3. **Node version floor.** `crypto.subtle`, `atob`/`btoa` and the esbuild `--target=node24` set it;
+   Node 18–22 are untested and `mcp/package.json` pins `engines.node: 24.x`.
 4. **A live signing key in a long-lived process** — the accepted residual risk of any local signer,
    and the reason stdio stays the transport a same-machine agent should use (see §5, "Server
    compromise" and the remote-mode rows added by #46).
@@ -95,6 +101,29 @@ startup.** Pass-through per call is rejected.
   the server is the revocation mechanism; so is the OS process boundary.
 - `autofirma_list_certs` returns DN, serial, validity window and a `signable` flag — never key
   material, never the container's bytes.
+
+### Extension bridge: the browser as an alternative keystore
+
+An operator who already keeps identities in the Chrome extension does not need to export a
+`.p12` or give the server a PIN. When enabled in the app's MCP settings, the extension opens an
+outbound WebSocket to `WS(S) /bridge?token=…` on the same HTTP entry (`mcp/src/bridge.ts`). The
+server then sends two job kinds: `certs` and `sign`. For a signature, the extension enforces the
+`cert_id` the agent asked for. If that identity has a live PIN in the picker's memory — the
+per-identity "remember this PIN" checkbox the user ticked, kept in `chrome.storage.session` and
+cleared when Chrome closes — the service worker unseals the identity and returns the finished
+CAdES **without opening a window or prompting again**. Otherwise it opens the consent window,
+asks for the PIN, and applies the same certificate checks as a website request. The server
+verifies that container against the document before answering the tool call, so a broken bridge
+cannot produce a silently bad artifact.
+
+The bridge does not weaken the key boundary: the private key stays in the extension, no PIN
+reaches the server, and silent signing is limited to an identity the user already opted into
+remembering for the current browser session. Without that opt-in every job needs a human click.
+It also only exists on the HTTP
+entry — stdio has no listening socket. The token travels in the query string because a browser
+`WebSocket` cannot set an `Authorization` header; keep tunnel/proxy access logs out of shared
+hands, or rotate the token if they might have been exposed. The extension refuses a socket that
+does not negotiate the `autofirme-bridge.v1` subprotocol, and the server offers only that one.
 
 **Rejected — pass-through PIN per call:** every tool call would carry the secret into the model
 conversation, the client's logs, and any MCP proxy in between. It also makes the agent responsible
@@ -126,6 +155,10 @@ Decisions inside the remote transport:
   configured → the HTTP entry refuses to start (fail closed) and the handler answers `503`.
 - **One transport and one `McpServer` per request**, closed in a `finally`. Registration is cheap;
   isolation is worth more.
+- **The extension bridge shares the listening socket**, not the transport: an HTTP `Upgrade` to
+  `/bridge` with the same token becomes a WebSocket handled by `BridgeHub`. `/mcp` itself stays
+  stateless; bridge state (connected sockets and pending jobs) belongs to the server process, so a
+  replica restart simply disconnects the extension and it reconnects.
 - **Body cap** = `AUTOFIRME_MCP_MAX_BYTES` inflated by the base64 encoding, applied both by the
   Node adapter and by the transport, so an oversized POST is refused before it is parsed.
 
@@ -139,8 +172,8 @@ Rejected for this slice, for three reasons that are costs rather than taste:
 2. **The audit trail needs to append.** `src/audit.ts` writes JSONL; Workers has no filesystem.
    Dropping the durable audit sink of a legally-weighted action to gain a free tier is a bad trade.
 3. **workerd bundling is a new build surface** for a process that must hold a live signing key
-   anyway, while the homelab already exposes services through the existing Cloudflare Tunnel
-   (`Containerfile`, `Caddyfile`), so deployment is one manifest (`mcp/deploy/k3s.yaml`).
+   anyway, while the homelab already exposes services through the existing Cloudflare Tunnel,
+   so deployment is one manifest (`mcp/deploy/k3s.yaml`).
 
 The port stays cheap: the handler is a Web-standard `(Request) => Response`, so a Worker entry would
 import `createHttpHandler` and add the cert/audit sources it lacks — see follow-up 4.
@@ -186,7 +219,10 @@ Two deliberate shape decisions:
 | **Audit** | Every `sign`, `verify`, `list_certs`, startup and keystore failure emits a JSON line with timestamp, tool, `cert_id`, format, document SHA-256 and byte count — identifiers and digests, never content, never the PIN. Always on stderr; additionally appended to `AUTOFIRME_MCP_AUDIT_LOG` (mode 0600) when set. |
 | **Expired certificate** | Signing is allowed (a timestamped workflow may legitimately need it) but the result carries `cert_expired: true` and the audit line records it. |
 | **Server compromise** | The process holds live signing keys while running. Accepted: it is the operator's own machine and their own key, and the alternative (a remote key service) is strictly worse. Documented, and the reason stdio stays the local default. |
-| **Stolen bearer token** (remote mode) | The token is the only credential and it authorises signing with the loaded certificate. TLS terminates at the operator's tunnel; the token lives in a k8s Secret, never in a tool argument or a log line; rotating it is a secret update plus a pod restart — the same restart that revokes the loaded key. Constant-time comparison, and an unset token means the HTTP entry refuses to start rather than serving unauthenticated. |
+| **Stolen bearer token** (remote mode) | The token is the only credential and it authorises signing with the loaded certificate. TLS terminates at the operator's tunnel; the token lives in a k8s Secret, never in a tool argument or a log line; rotating it is a secret update plus a pod restart — the same restart that revokes the loaded key. Constant-time comparison, and an unset token means the HTTP entry refuses to start rather than serving unauthenticated. When the extension bridge is connected the same token also opens `/bridge`; signing there needs a human confirmation in Chrome unless the operator ticked "remember this PIN" for the requested identity, in which case that session-scoped opt-in is the standing consent. Listing identities never signs. |
+| **Silent signing with remembered PIN** | The PIN stays in `chrome.storage.session` (memory only, cleared when Chrome closes) and is written only when the user ticks the per-PIN checkbox. The service worker signs only the `cert_id` the agent asked for, only while the certificate passes the same validity/key-usage checks as the chooser, and drops the PIN on the first unlock failure. It cannot auto-sign for a different identity, an expired certificate, or after the session cache is gone. |
+| **Bridge token in proxy logs** | A browser `WebSocket` cannot set `Authorization`, so `/bridge` carries the token in its query string. Server audit lines never include the URL; the operator must treat tunnel/proxy access logs as secret material (or scrub `token=`) and rotate the token if they were exposed. The server checks the token before the upgrade, and the socket must offer `autofirme-bridge.v1`. |
+| **Bridge signs with another identity** | The extension binds every job to the requested `cert_id`: the chooser shows that identity and rejects any other selection or a freshly imported container. The returned CAdES is verified server-side against the document before the tool answers `bridge_invalid`. |
 | **Unauthenticated network scan** (remote mode) | Every request re-checks the bearer header; missing, malformed and wrong credentials all answer `401` with `www-authenticate: Bearer`. Only `POST /mcp` is routed; anything else is `404`. |
 | **Session hijacking** (remote mode) | There is no session: stateless mode issues no session id, keeps no server-side state, and builds (and closes) one transport per request, so there is nothing to steal, resume or leak between callers. |
 
@@ -203,6 +239,10 @@ Two deliberate shape decisions:
 | `AUTOFIRME_MCP_TOKEN` | bearer token for the remote transport | unset → the HTTP entry refuses to start |
 | `AUTOFIRME_MCP_HOST` | interface the HTTP entry binds | `127.0.0.1` |
 | `AUTOFIRME_MCP_PORT` | port the HTTP entry binds | `8790` |
+
+There is no extra variable for the extension bridge: it is the HTTP entry's `/bridge` path, using
+the same `AUTOFIRME_MCP_TOKEN`. Enable it in the app's MCP settings (extension only) after entering
+the server's `/mcp` address and that token.
 
 Client wiring (Claude Desktop / Claude Code shape):
 
@@ -240,6 +280,10 @@ Client wiring (Claude Desktop / Claude Code shape):
   non-bearer credentials), and, over a real socket with a real MCP client
   (`StreamableHTTPClientTransport`), the identical tool list, a signature produced over HTTP that
   `openssl cms -verify` accepts against the signer CA, and `401` for a wrong token.
+- **`pnpm test` in `mcp/` (vitest), extension bridge** — a real WebSocket client answers `certs`
+  and `sign` with the fixture key; the MCP tools list those identities and return a CAdES that the
+  server's own verifier accepts. Raw upgrade requests prove `401` for a wrong token and `400`
+  without the `autofirme-bridge.v1` subprotocol.
 - **Live smoke of the built entry** — `node dist/server-http.js` answers `401` unauthenticated,
   completes `initialize` with the bearer token, and `404`s every other path.
 - **No engine change was needed** for the CAdES path: `src/lib/` is consumed read-only, which is

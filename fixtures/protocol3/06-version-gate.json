@@ -1,0 +1,1 @@
+{"expect":"SAF_21: unsupported protocol version '4'; this server speaks 3","request":"afirma://sign?dat=AA%3D%3D&v=4"}

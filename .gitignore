@@ -23,10 +23,12 @@ bun.lock
 # Extension build output and browser test artifacts.
 dist/
 test-results/
+.agents/
+.claude/
+skills-lock.json
+.vitest/
 .bullet/state/
 .bullet/meta/
 .bullet/worktrees/
 .bullet/logs/
-.agents/
-.claude/
 skills-lock.json

@@ -35,10 +35,12 @@ beforeAll(() => {
 afterAll(() => rmSync(fixtures.dir, { recursive: true, force: true }));
 
 async function pickDocumentAndKey(container: HTMLElement, keystore: Uint8Array = fixtures.modern) {
+	await loadKey(container, keystore);
+	// The flow is now two steps: the certificate on step 1, the documents on step 2.
+	await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 	await fireEvent.change(fileInput(container), {
 		target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
 	});
-	await loadKey(container, keystore);
 }
 
 /** The picker's only load path now: pick the file in the modal, type the PIN, seal it. */
@@ -97,57 +99,58 @@ describe('App (sign workflow shell)', () => {
 	// parallel files that outlasts the default 5s, so allow the operations to finish.
 	vi.setConfig({ testTimeout: 30_000 });
 
-	it('starts on the drop step, with the sign bar disabled', () => {
+	it('starts on the certificate step, with the next button disabled', () => {
 		const { container } = render(App);
 
 		expect(container.textContent).toContain('AutoFirma Web');
-		expect(container.textContent).toContain('Arrastra aquí los ficheros que quieres firmar');
-		expect(fileInput(container)).toBeInstanceOf(HTMLInputElement);
-		// Nothing can run before a document is loaded: the bar renders but stays disabled.
-		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
-		expect(container.textContent).toContain('Selecciona primero un documento.');
+		expect(container.textContent).toContain('Configura la firma');
+		// Step 1 gates on the signature alone: no certificate, no way forward.
+		const next = screen.getByRole('button', { name: 'Siguiente' });
+		expect(next.hasAttribute('disabled')).toBe(true);
+		expect(container.textContent).toContain('Selecciona un certificado para habilitar la firma');
 	});
 
-	it('shows the sign step on file selection, but keeps signing disabled until a cert exists', async () => {
+	it('advances to documents once a certificate is loaded, and Firmar gates on files', async () => {
 		const { container } = render(App);
+
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+		expect(container.textContent).toContain('Elige los documentos');
+		expect(container.textContent).toContain('CAdES-BES');
+		// The sign button needs documents even with a certificate at hand.
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
 
 		await fireEvent.change(fileInput(container), {
 			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
 		});
-
 		expect(container.textContent).toContain('contrato.pdf');
-		expect(container.textContent).toContain('8 B');
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
 
-		const sign = screen.getByRole('button', { name: 'Firmar' });
-		expect(sign.hasAttribute('disabled')).toBe(true);
-		expect(container.textContent).toContain('Selecciona un certificado para habilitar la firma');
-
-		// The picker lives behind its trigger and has loaded nothing yet.
-		expect(container.querySelector('#pkcs12-file')).not.toBeNull();
-		expect(screen.getByRole('button', { name: /Seleccionar firma/ })).toBeTruthy();
-		expect(container.textContent).toContain('CAdES-BES');
-		// The document row shows its pending status.
-		expect(container.querySelector('[data-status="pending"]')?.textContent).toContain('contrato.pdf');
-
-		// Removing the document empties the batch again.
+		// Removing the document empties the batch again and the row goes with it.
 		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
 		expect(container.querySelector('[data-status="pending"]')).toBeNull();
+		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
 	});
 
-	it('switches language', async () => {
+	it('switches language from the settings modal', async () => {
 		const { container } = render(App);
 
-		await fireEvent.click(screen.getByRole('button', { name: 'EN' }));
+		await fireEvent.click(screen.getByRole('button', { name: 'Ajustes y ayuda' }));
+		await fireEvent.click(await screen.findByRole('button', { name: 'EN' }));
 
-		expect(container.textContent).toContain('Drag the files you want to sign here');
-		expect(container.textContent).toContain('Choose files');
+		expect(container.textContent).toContain('Configure the signature');
+		expect(container.textContent).toContain('Choose a certificate to enable signing');
 	});
 
-	it('switches the theme, remembering it for the next visit', async () => {
+	it('switches the theme from the settings modal, remembering it for the next visit', async () => {
 		render(App);
 
-		// The switcher is one group of three buttons; the picker trigger also carries hovers.
-		const group = screen.getByRole('group', { name: 'Tema' });
+		await fireEvent.click(screen.getByRole('button', { name: 'Ajustes y ayuda' }));
+		// The switcher is one group of three buttons inside the modal.
+		const group = await screen.findByRole('group', { name: 'Tema' });
 		const pick = (name: string) => within(group).getByRole('button', { name });
 
 		await fireEvent.click(pick('Oscuro'));
@@ -163,40 +166,79 @@ describe('App (sign workflow shell)', () => {
 		expect(localStorage.getItem('autofirme-theme')).toBe('system');
 	});
 
-	it('opens on the tab ?tab= names and mirrors the choice back into the URL', async () => {
-		history.replaceState(null, '', '/?tab=verificar');
-		try {
-			const { container } = render(App);
-			expect(screen.getByRole('tab', { name: 'Verificar' }).getAttribute('aria-selected')).toBe('true');
-			expect(container.querySelector('#panel-verify')).not.toBeNull();
+	it('step 2: the big drop zone gives way to a row-sized add tile once a document is there, with no header row or download button', async () => {
+		const { container } = render(App);
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 
-			// Switching tabs mirrors the param, so the address bar stays linkable.
-			await fireEvent.click(screen.getByRole('tab', { name: 'Firmar' }));
-			expect(new URLSearchParams(location.search).get('tab')).toBe('firmar');
-		} finally {
-			history.replaceState(null, '', '/');
-		}
-
-		// The English spelling is accepted too.
-		history.replaceState(null, '', '/?tab=verify');
-		try {
-			const { container } = render(App);
-			expect(container.querySelector('#panel-verify')).not.toBeNull();
-		} finally {
-			history.replaceState(null, '', '/');
-		}
+		expect(container.textContent).toContain('Arrastra aquí los ficheros');
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
+		// With a file in place the big zone is gone; the row-sized add tile stays first in the list.
+		expect(container.querySelector('[data-slot="card"][class*="min-h-44"]')).toBeNull();
+		expect(container.querySelector('tbody tr')?.textContent).toContain('Seleccionar ficheros');
+		expect(container.querySelector('thead')).toBeNull();
+		expect(screen.queryByRole('button', { name: 'Descargar' })).toBeNull();
+		expect(screen.getByRole('button', { name: 'Quitar' }).querySelector('svg')).not.toBeNull();
 	});
 
-	it('loads a PKCS#12 file and enables signing with the certificate it holds', async () => {
+	it('step 2: a file dragged over the page raises the full-screen drop overlay until it leaves', async () => {
+		const { container } = render(App);
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+
+		const dragEvent = (type: string) => {
+			const event = new Event(type, { bubbles: true, cancelable: true });
+			Object.defineProperty(event, 'dataTransfer', { value: { types: ['Files'], files: [] } });
+			return event;
+		};
+		window.dispatchEvent(dragEvent('dragenter'));
+		await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Suelta los ficheros aquí'), ASYNC);
+		window.dispatchEvent(dragEvent('dragleave'));
+		await waitFor(() => expect(screen.queryByRole('status')).toBeNull(), ASYNC);
+	});
+
+	it('step 2: the file list scrolls vertically only, and shows an edge fade on each side that has hidden content', async () => {
+		const { container } = render(App);
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
+
+		const list = container.querySelector('.overflow-x-hidden.overflow-y-auto') as HTMLElement;
+		expect(list.className).toContain('overflow-x-hidden');
+		// jsdom has no layout: give the list a 300px viewport over 600px of content, scrolled to the start.
+		Object.defineProperties(list, {
+			scrollWidth: { value: 600, configurable: true },
+			clientWidth: { value: 300, configurable: true },
+			scrollLeft: { value: 0, writable: true, configurable: true }
+		});
+		await fireEvent.scroll(list);
+		await waitFor(() => expect(container.querySelector('.from-background.bg-gradient-to-l')).not.toBeNull(), ASYNC);
+		expect(container.querySelector('.from-background.bg-gradient-to-r')).toBeNull();
+
+		// Scrolled to the far end: only the left fade remains.
+		Object.defineProperty(list, 'scrollLeft', { value: 300, configurable: true });
+		await fireEvent.scroll(list);
+		await waitFor(() => expect(container.querySelector('.from-background.bg-gradient-to-r')).not.toBeNull(), ASYNC);
+		expect(container.querySelector('.from-background.bg-gradient-to-l')).toBeNull();
+	});
+
+	it('loads a PKCS#12 file and enables the next step with the certificate it holds', async () => {
 		const { container } = render(App);
 
-		await pickDocumentAndKey(container);
+		await loadKey(container);
 
 		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
 		// The trigger names the file and shows which certificate will sign.
 		expect(screen.getByRole('button', { name: /keystore\.p12/ })).toBeTruthy();
 		expect(container.textContent).toContain(LEAF_COMMON_NAME);
-		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+		expect(screen.getByRole('button', { name: 'Siguiente' }).hasAttribute('disabled')).toBe(false);
 		// And it carries the sign's summary: issuer DN and validity window under the icon.
 		const trigger = container.querySelector<HTMLButtonElement>('#pkcs12-picker')!;
 		expect(trigger.textContent).toContain(`${copy.es.signIssuer}: CN=`);
@@ -204,12 +246,9 @@ describe('App (sign workflow shell)', () => {
 		expect(trigger.textContent).toContain(copy.es.signValidity);
 	});
 
-	it('shows the wrong-PIN error from the modal add and keeps signing disabled', async () => {
+	it('shows the wrong-PIN error from the modal add and keeps the next step locked', async () => {
 		const { container } = render(App);
 
-		await fireEvent.change(fileInput(container), {
-			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
-		});
 		// The add flow lives in the picker's modal: wrong PIN there must not load anything.
 		await fireEvent.click(container.querySelector<HTMLElement>('#pkcs12-picker')!);
 		await fireEvent.change(document.querySelector<HTMLInputElement>('#pkcs12-file')!, {
@@ -233,7 +272,7 @@ describe('App (sign workflow shell)', () => {
 				).toContain('PIN incorrecto.'),
 			ASYNC
 		);
-		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+		expect(screen.getByRole('button', { name: 'Siguiente' }).hasAttribute('disabled')).toBe(true);
 	});
 
 	it('says the page is insecure when the browser withholds WebCrypto', () => {
@@ -251,13 +290,19 @@ describe('App (sign workflow shell)', () => {
 	it('warns that the picked certificate has expired and still enables signing (#40)', async () => {
 		const { container } = render(App);
 
-		await pickDocumentAndKey(container, fixtures.expired);
+		await loadKey(container, fixtures.expired);
 
-		// The amber banner (shadcn `Alert`, role=alert) says the expiry out loud…
+		// The amber banner (shadcn `Alert`, role=alert) says the expiry out loud; it lives on
+		// step 1 with the picker, before any document is chosen.
 		const banner = await screen.findByRole('alert');
 		expect(banner.textContent).toContain('caducado');
 		expect(banner.textContent).toContain(String(new Date(fixtures.expiredNotAfter).getFullYear()));
+
 		// …and the certificate still signs: AutoFirma's behaviour, and the point of #40.
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
 	});
 
@@ -265,16 +310,15 @@ describe('App (sign workflow shell)', () => {
 		const { container } = render(App);
 
 		// The add flow seals the container into the store as it loads it (label = file name) and
-		// closes the modal on the sign it selected.
-		await pickDocumentAndKey(container);
-		expect(container.textContent).toContain(LEAF_COMMON_NAME);
-		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
+		// closes the modal on the sign it selected — all on step 1, where the picker lives.
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
 
-		// Drop the session the file gave, as an empty form would on a fresh visit.
+		// Clear the session the file gave, as an empty form would, then swap in the stored one.
 		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
 			target: { files: [] }
 		});
-		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+		expect(screen.getByRole('button', { name: 'Siguiente' }).hasAttribute('disabled')).toBe(true);
 
 		// The stored sign is a cell of the picker's modal (the grid is the store's own listing).
 		// It was unsealed this visit, so one click selects it again and closes the modal; a sign
@@ -286,25 +330,33 @@ describe('App (sign workflow shell)', () => {
 		const trigger = container.querySelector<HTMLButtonElement>('#pkcs12-picker')!;
 		expect(trigger.textContent).toContain('keystore.p12');
 		expect(trigger.textContent).toContain(LEAF_COMMON_NAME);
+		expect(screen.getByRole('button', { name: 'Siguiente' }).hasAttribute('disabled')).toBe(false);
+
+		// With the sign back in hand the flow continues: documents, then Firmar enables.
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
 	});
 
-	it('clears the loaded certificates when another keystore file is picked', async () => {
+	it('clears the loaded certificate when another keystore file is picked', async () => {
 		const { container } = render(App);
 
-		await pickDocumentAndKey(container);
+		await loadKey(container);
 		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
-		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
 
+		// A different keystore file invalidates the loaded signer while the picker is still up.
 		await fireEvent.change(container.querySelector<HTMLInputElement>('#pkcs12-file')!, {
 			target: { files: [new File([fixtures.ec], 'other.p12')] }
 		});
 
-		// A different file invalidates the loaded signer: the trigger now names the new file only.
+		// The trigger now names the new file only, and step 1 gates on a signer again.
 		expect(screen.getByRole('button', { name: /other\.p12/ })).toBeTruthy();
 		expect(container.textContent).not.toContain(LEAF_COMMON_NAME);
-		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
+		expect(screen.getByRole('button', { name: 'Siguiente' }).hasAttribute('disabled')).toBe(true);
 	});
+
 
 	it('signs a 3-file batch with the loaded certificate and hands over one ZIP', async () => {
 		const downloaded: string[] = [];
@@ -318,6 +370,9 @@ describe('App (sign workflow shell)', () => {
 		Object.defineProperty(URL, 'revokeObjectURL', { value: () => {}, configurable: true });
 
 		const { container } = render(App);
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 		await fireEvent.change(fileInput(container), {
 			target: {
 				files: [
@@ -327,8 +382,6 @@ describe('App (sign workflow shell)', () => {
 				]
 			}
 		});
-		await loadKey(container);
-		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Firmar' }));
 
@@ -352,6 +405,9 @@ describe('App (sign workflow shell)', () => {
 	it('signs an XML document as XAdES-EPES in the queue and ships a .xsig xmlsec1 verifies', async () => {
 		const { container } = render(App);
 
+		await loadKey(container);
+		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 		await fireEvent.change(fileInput(container), {
 			target: {
 				files: [new File(['<fe:Facturae xmlns:fe="urn:fe"><N>2026-0001</N></fe:Facturae>'], 'facturae.xml', {
@@ -359,8 +415,6 @@ describe('App (sign workflow shell)', () => {
 				})]
 			}
 		});
-		await loadKey(container);
-		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
 		// The format chooser is a button labeled with the current format; it opens the modal.
 		await fireEvent.click(screen.getByRole('button', { name: /CAdES-BES/ }));
 		await fireEvent.click(screen.getByRole('radio', { name: /XAdES-EPES/ }));
@@ -398,10 +452,11 @@ describe('App (sign workflow shell)', () => {
 				return new Response(tsa.respond(query), { status: 200 });
 			});
 
+			await loadKey(container);
+			await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 			await fireEvent.change(fileInput(container), {
 				target: { files: [new File(['contenido\n'], 'contrato.txt', { type: 'text/plain' })] }
 			});
-			await loadKey(container);
 
 			// The TSA field starts empty (no timestamp) and takes the address the user types.
 			const tsaField = container.querySelector<HTMLInputElement>('#tsa-url');
@@ -436,17 +491,19 @@ describe('App (sign workflow shell)', () => {
 	it('keeps the picked signature but disables signing when the document list is emptied', async () => {
 		const { container } = render(App);
 
-		await pickDocumentAndKey(container);
+		await loadKey(container);
 		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+		await fireEvent.change(fileInput(container), {
+			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
+		});
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
 
 		await fireEvent.click(screen.getByRole('button', { name: 'Quitar' }));
 
 		// Removing the document must not throw the signature away — configuring the signature and
 		// choosing its documents can happen in either order — but nothing signable is left.
-		expect(container.textContent).toContain(LEAF_COMMON_NAME);
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
-		expect(container.textContent).toContain('Selecciona primero un documento.');
 
 		await fireEvent.change(fileInput(container), {
 			target: { files: [new File(['%PDF-1.4'], 'otro.pdf', { type: 'application/pdf' })] }
@@ -457,106 +514,27 @@ describe('App (sign workflow shell)', () => {
 	it('keeps a signature picked before any document exists', async () => {
 		const { container } = render(App);
 
-		// The config card is step 2 and the drop zone step 1, but a user may well start with the
-		// signature; the picker must not discard it for want of a document.
+		// The signature lives on step 1 and the documents on step 2: load it, move on, drop files.
 		await loadKey(container);
 		await waitFor(() => expect(container.textContent).toContain(LEAF_COMMON_NAME), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(true);
 
 		await fireEvent.change(fileInput(container), {
 			target: { files: [new File(['%PDF-1.4'], 'contrato.pdf', { type: 'application/pdf' })] }
 		});
-		expect(container.textContent).toContain(LEAF_COMMON_NAME);
+		// The picker's certificate summary is step-1 UI; what matters here is that moving on
+		// never discarded the picked key: Firmar enables as soon as a document lands.
 		expect(screen.getByRole('button', { name: 'Firmar' }).hasAttribute('disabled')).toBe(false);
 	});
 
 });
 
-describe('verify mode', () => {
-	it('renders a per-check validity report for a dropped artifact', async () => {
-		const { container } = render(App);
-		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
-
-		expect(container.textContent).toContain('Arrastra aquí el fichero firmado');
-
-		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/cades-tampered.csig'));
-		await fireEvent.change(fileInput(container), {
-			target: { files: [new File([bytes], 'firma.csig')] }
-		});
-
-		await screen.findByText(/no supera todas las comprobaciones/, {}, ASYNC);
-		expect(container.querySelector('[data-check="contentDigest"]')?.getAttribute('data-status')).toBe('fail');
-		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
-		expect(container.textContent).toContain('Firmante');
-	});
-
-	it('verifies a signed PDF as PAdES, check by check', async () => {
-		const { container } = render(App);
-		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
-
-		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/pades-b-b-signed.pdf'));
-		await fireEvent.change(fileInput(container), {
-			target: { files: [new File([bytes], 'contrato.pdf')] }
-		});
-
-		await screen.findByText(/comprobaciones/, {}, ASYNC);
-		expect(container.textContent).toContain('PAdES');
-		expect(container.querySelector('[data-check="contentDigest"]')?.getAttribute('data-status')).toBe('pass');
-		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
-		// The test signer is self-signed and outside the bundled roots: red banner, right reason.
-		expect(container.querySelector('[data-check="certChain"]')?.getAttribute('data-status')).toBe('fail');
-		expect(container.textContent).toContain('Test Signer RSA');
-	});
-
-	it('shows one signature at a time, closed by a button at the bottom', async () => {
-		const { container } = render(App);
-		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
-
-		// One file per pick: in this mode the chooser is single-select.
-		const drop = container.querySelector<HTMLInputElement>('input[type=file]');
-		expect(drop?.multiple).toBe(false);
-		expect(container.textContent).toContain('Comprueba una firma');
-
-		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/cades-tampered.csig'));
-		await fireEvent.change(fileInput(container), {
-			target: { files: [new File([bytes], 'firma.csig')] }
-		});
-		await screen.findByText(/no supera todas las comprobaciones/, {}, ASYNC);
-
-		// The step-1 card steps aside while a signature is loaded; Cerrar is the way out.
-		expect(container.textContent).not.toContain('Comprueba una firma');
-		expect(screen.getByRole('button', { name: 'Cerrar' })).toBeTruthy();
-
-		await fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
-		expect(container.textContent).toContain('Comprueba una firma');
-		expect(screen.queryByText(/no supera todas las comprobaciones/)).toBeNull();
-		expect(screen.queryByRole('button', { name: 'Cerrar' })).toBeNull();
-	});
-
-	it('labels the trust-chain check as failed when the root is not bundled, keeping the rest green', async () => {
-		const { container } = render(App);
-		await fireEvent.click(screen.getByRole('tab', { name: 'Verificar' }));
-
-		const bytes = readFileSync(resolve(process.cwd(), 'test/fixtures/xades-valid.xsig'));
-		await fireEvent.change(fileInput(container), {
-			target: { files: [new File([bytes], 'firma.xsig')] }
-		});
-
-		await screen.findByText(/no supera todas las comprobaciones/, {}, ASYNC);
-		expect(container.querySelector('[data-check="signature"]')?.getAttribute('data-status')).toBe('pass');
-		expect(container.querySelector('[data-check="reference"]')?.getAttribute('data-status')).toBe('pass');
-		expect(container.querySelector('[data-check="certChain"]')?.getAttribute('data-status')).toBe('fail');
-		expect(container.textContent).toContain('XAdES');
-	});
-});
-
 describe('MCP endpoint settings', () => {
-	it('stores the endpoint and token typed into the help-menu dialog', async () => {
+	it('stores the endpoint and token typed into the settings modal', async () => {
 		render(App);
-		await fireEvent.pointerDown(screen.getByRole('button', { name: 'Ayuda' }), { button: 0 });
-		const item = await screen.findByRole('menuitem', { name: 'Servidor MCP' });
-		await fireEvent.pointerDown(item, { button: 0 });
-		await fireEvent.click(item);
+		await fireEvent.click(screen.getByRole('button', { name: 'Ajustes y ayuda' }));
+		await fireEvent.click(await screen.findByRole('tab', { name: 'MCP' }));
 
 		const url = await screen.findByLabelText('Dirección del endpoint');
 		await fireEvent.input(url, { target: { value: 'https://mcp.example.com/mcp' } });
@@ -564,8 +542,9 @@ describe('MCP endpoint settings', () => {
 
 		expect(JSON.parse(localStorage.getItem('autofirme-mcp')!)).toEqual({
 			url: 'https://mcp.example.com/mcp',
-			token: 'secreto'
+			token: 'secreto',
+			enabled: false
 		});
-		await screen.findByText(/no lo envía a ningún sitio/);
+		await screen.findByText(/solo lo usa la extensión/);
 	});
 });

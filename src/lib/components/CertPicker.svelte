@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { StoreError, type IdentityMeta, type Vault } from '#lib/certstore';
 	import { Alert, AlertDescription, AlertTitle } from '#lib/components/ui/alert/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -13,11 +14,20 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import type { Copy } from '#lib/i18n';
 	import { loadSignerSession } from '#lib/keystore';
+	import {
+		forgetPin,
+		readPinMemorySettings,
+		rememberedPin,
+		rememberPin as cachePin,
+		savePinMemorySettings
+	} from '#lib/pin-memory';
 	import { Pkcs12Error } from '#lib/pkcs12';
 	import type { SignerCert, SignerSession } from '#lib/sign';
 	import { cn } from '#lib/utils.js';
 	import FileIcon from '@lucide/svelte/icons/file';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import XIcon from '@lucide/svelte/icons/x';
 
@@ -30,10 +40,21 @@
 		cert: SignerCert | null;
 		/** Client-side store of saved identities (#29). */
 		vault: Vault;
-		onpick: (cert: SignerCert | null, chain: readonly SignerCert[]) => void;
+		/** Cert, chain, and saved-identity id (null for a freshly imported container). */
+		onpick: (cert: SignerCert | null, chain: readonly SignerCert[], identityId?: string | null) => void;
+		/** Identity an extension request asks for; the picker opens its PIN prompt directly. */
+		initialId?: string | null;
 	}
 
-	let { copy, cert, vault, onpick, compact = false, detailsLabel = 'Certificate details' }: Props = $props();
+	let {
+		copy,
+		cert,
+		vault,
+		onpick,
+		compact = false,
+		detailsLabel = 'Certificate details',
+		initialId = null
+	}: Props = $props();
 
 	let file = $state<File | null>(null);
 	// A picked file already counts as a chosen signature: the dotted dim look is only the empty state.
@@ -42,7 +63,10 @@
 	let pickedName = $state('');
 	let pickerOpen = $state(false);
 	let identities = $state<IdentityMeta[]>([]);
-	const visibleIdentities = $derived(compact ? identities.filter(entry => entry.id !== usedId) : identities);
+	// An MCP job names one identity: hide every other row and the import/remove paths, so the
+	// operator cannot hand the agent a certificate it did not ask for.
+	const offered = $derived(initialId ? identities.filter(entry => entry.id === initialId) : identities);
+	const visibleIdentities = $derived(compact ? offered.filter(entry => entry.id !== usedId) : offered);
 	// `vault.persistent` is a plain getter: the store can fall back to memory at any moment, and
 	// only a state of our own makes the notice appear when it does.
 	let persistent = $state(true);
@@ -50,10 +74,17 @@
 	let openId = $state<string | null>(null);
 	/** The saved signature currently in use, so a click on it means "select this one". */
 	let usedId = $state<string | null>(null);
+	/** Identity whose alias is being edited, plus the draft text. */
+	let renameId = $state<string | null>(null);
+	let renameLabel = $state('');
 	let storePin = $state('');
 	/** PIN of the sign being added from the modal — distinct from `storePin`, which unlocks saved ones. */
 	let addPin = $state('');
 	let adding = $state(false);
+	const pinSettings = readPinMemorySettings();
+	let rememberPin = $state(pinSettings.remember);
+	const rememberLabel = $derived(copy.rememberPin.replace('{minutes}', String(pinSettings.minutes)));
+	let autoSelected = $state(false);
 	/**
 	 * Sessions opened this visit, keyed by identity id: a sign already unsealed can be selected
 	 * again without its PIN, so the next click on it just picks it and closes the modal.
@@ -63,6 +94,15 @@
 	let session = $state<SignerSession | null>(null);
 	let storeError = $state('');
 	let fileInput = $state<HTMLInputElement | null>(null);
+	// The compact chooser has no dialog focus trap: the pressed row unmounts when its PIN form
+	// opens, and an applied sign leaves the list. Park focus on a node that survives each change.
+	$effect(() => {
+		if (compact && openId) void tick().then(() => document.getElementById('store-pin')?.focus());
+	});
+	$effect(() => {
+		if (compact && usedId && cert)
+			void tick().then(() => document.getElementById('pkcs12-selection')?.focus());
+	});
 
 	const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
@@ -83,6 +123,24 @@
 	$effect(() => {
 		void refresh();
 	});
+
+	// A request from an MCP agent names the certificate it wants: open that identity at once,
+	// reusing a remembered PIN when the operator opted in.
+	$effect(() => {
+		if (!initialId || autoSelected || !identities.some((entry) => entry.id === initialId)) return;
+		autoSelected = true;
+		void selectInitial(initialId);
+	});
+
+	function persistRemember(): void {
+		savePinMemorySettings({ ...pinSettings, remember: rememberPin });
+	}
+
+	async function selectInitial(id: string): Promise<void> {
+		const pin = await rememberedPin(id);
+		if (pin !== null) await unlock(id, pin, true);
+		else openId = id;
+	}
 
 	function reasonText(reason: unknown): string {
 		if (reason instanceof StoreError) return copy.storeErrors[reason.code];
@@ -109,7 +167,7 @@
 		session = null;
 		addPin = '';
 		usedId = null;
-		onpick(null, []);
+		onpick(null, [], null);
 	}
 
 	/**
@@ -127,12 +185,19 @@
 		}
 		openId = openId === identity.id ? null : identity.id;
 		storePin = '';
+		void autoSelect(identity.id);
+	}
+
+	/** Reuse a remembered PIN without showing the prompt; a rejected PIN reopens it. */
+	async function autoSelect(id: string): Promise<void> {
+		const pin = await rememberedPin(id);
+		if (pin !== null) await unlock(id, pin, true);
 	}
 
 	/** Hands an opened session to the app and marks its identity as the sign in use. */
 	function apply(id: string, sign: SignerSession) {
 		session = sign;
-		onpick(sign.signer, sign.certificates);
+		onpick(sign.signer, sign.certificates, id);
 		pickedName = identities.find((entry) => entry.id === id)?.label ?? copy.storeTitle;
 		usedId = id;
 		openId = null;
@@ -148,17 +213,22 @@
 	}
 
 	/** Opens a saved signature: its PIN unseals the blob and opens the container inside it. */
-	async function unlock(id: string) {
+	async function unlock(id: string, pin = storePin, silent = false) {
 		storeError = '';
 		console.debug('[autofirme:picker] unlock start', id);
 		try {
-			const sign = await vault.unlockIdentity(id, storePin);
+			const sign = await vault.unlockIdentity(id, pin);
 			unlockedSessions.set(id, sign);
+			if (rememberPin) await cachePin(id, pin);
+			else await forgetPin(id);
 			apply(id, sign);
 			pickerOpen = false;
 		} catch (reason) {
+			if (silent) await forgetPin(id);
 			storeError = reasonText(reason);
 			persistent = vault.persistent;
+			openId = id;
+			storePin = '';
 			console.error('[autofirme:picker] unlock failed', reason, storeError);
 		}
 	}
@@ -186,6 +256,7 @@
 				pin: enteredPin
 			});
 			unlockedSessions.set(meta.id, sign);
+			if (rememberPin) await cachePin(meta.id, enteredPin);
 			await refresh();
 			// Another file picked while this one was sealed: the record stands, the new pick
 			// drives the panel — selecting the old sign here would override it.
@@ -210,10 +281,31 @@
 			await vault.removeIdentity(id);
 			unlockedSessions.delete(id);
 			if (openId === id) openId = null;
+			if (renameId === id) renameId = null;
 			await refresh();
 		} catch (reason) {
 			storeError = reasonText(reason);
 			console.error('[autofirme:picker] forget failed', reason, storeError);
+		}
+	}
+
+	/** Opens the alias editor for one saved signature; the PIN and sealed blob stay untouched. */
+	function startRename(identity: IdentityMeta): void {
+		storeError = '';
+		openId = null;
+		renameId = identity.id;
+		renameLabel = identity.label;
+	}
+
+	async function rename(id: string): Promise<void> {
+		storeError = '';
+		try {
+			await vault.renameIdentity(id, renameLabel);
+			renameId = null;
+			await refresh();
+		} catch (reason) {
+			storeError = reasonText(reason);
+			console.error('[autofirme:picker] rename failed', reason, storeError);
 		}
 	}
 </script>
@@ -222,7 +314,7 @@
 	<!-- The trigger is a file-shaped target: dashed and dim until a sign is loaded, then solid. -->
 	{#if compact}
 		{#if cert}
-			<div id="pkcs12-selection" class="border-primary/60 grid min-w-0 gap-1 rounded-lg border p-2.5">
+			<div id="pkcs12-selection" tabindex="-1" class="bg-muted/40 grid min-w-0 gap-1 rounded-lg p-2.5">
 				<div class="flex min-w-0 items-center gap-2">
 					<FileIcon class="text-primary size-4 shrink-0"/>
 					<div class="min-w-0">
@@ -235,7 +327,7 @@
 					<div class="text-muted-foreground grid gap-1 pt-1">
 						<p class="break-words">{cert.subject}</p>
 						<p class="break-words">{copy.signIssuer}: {cert.issuer}</p>
-						<p class="tnum">{copy.signValidity}: {dateFormat.format(cert.notBefore)} → {dateFormat.format(cert.notAfter)}</p>
+					<p class="tnum">{copy.signValidity}: {dateFormat.format(cert.notBefore)} <ArrowRightIcon class="inline size-3 align-[-0.125em]" aria-hidden="true" /> {dateFormat.format(cert.notAfter)}</p>
 					</div>
 				</details>
 			</div>
@@ -285,7 +377,9 @@
 		<section id="pkcs12-choices" aria-label={copy.storeTitle} class="grid min-w-0 gap-3">
 			<div id="pkcs12-choices-header" class="flex min-w-0 items-center justify-between gap-2">
 				<h2 class="min-w-0 text-sm font-medium">{copy.storeTitle}</h2>
-				<Button size="sm" variant="outline" class="h-8 shrink-0 gap-1 text-xs" onclick={()=>fileInput?.click()}><PlusIcon class="size-3.5"/>{copy.addSign}</Button>
+				{#if !initialId}
+					<Button size="sm" variant="outline" class="h-8 shrink-0 gap-1 text-xs" onclick={()=>fileInput?.click()}><PlusIcon class="size-3.5"/>{copy.addSign}</Button>
+				{/if}
 			</div>
 			{@render identityContent()}
 		</section>
@@ -309,7 +403,7 @@
 {#snippet identityContent()}
 	{#if !persistent}
 		<!-- No usable database: say it, and let the user throw the broken one away. -->
-		<div class="flex flex-col gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+		<div class="flex flex-col gap-2 rounded-lg bg-amber-500/5 p-3">
 			<p class="text-sm text-amber-700 dark:text-amber-400" role="alert">{copy.storeEphemeral}</p>
 			<Button variant="outline" size="sm" class="self-start" onclick={() => vault.reset()}
 				>{copy.storeReset}</Button
@@ -325,7 +419,7 @@
 	{#if openId}
 		{@const target = identities.find((entry) => entry.id === openId)}
 		<!-- One signature clicked: ask for its PIN alone, then select it and get out of the way. -->
-		<div class="flex flex-col gap-3 rounded-lg border p-3">
+		<div class="bg-muted/40 flex flex-col gap-3 rounded-lg p-3">
 			<div class="flex items-center gap-2">
 				<FileIcon class="text-muted-foreground size-5 shrink-0" />
 				<span class="min-w-0">
@@ -344,6 +438,15 @@
 						if (event.key === 'Enter') void unlock(openId!);
 					}}
 				/>
+			</label>
+			<label class="flex items-center gap-2 text-xs">
+				<input
+					type="checkbox"
+					class="accent-primary size-4"
+					bind:checked={rememberPin}
+					onchange={persistRemember}
+				/>
+				{rememberLabel}
 			</label>
 			<div class="flex items-center gap-2">
 				<Button size="sm" class="h-9" onclick={() => unlock(openId!)}
@@ -365,7 +468,7 @@
 	<div class={cn("grid max-h-80 gap-3 overflow-y-auto pr-1", compact ? "max-h-52 grid-cols-1 gap-2" : "grid-cols-2 sm:grid-cols-4")}>
 		{#if pending}
 			<!-- The sign sitting in memory: first cell, and no button — there is nothing to re-pick. -->
-			<div class="relative rounded-lg border">
+			<div class="bg-muted/40 relative rounded-lg">
 				<div class="flex h-full w-full flex-col gap-1 p-3 text-left text-xs">
 					<FileIcon class="text-muted-foreground size-5" />
 					<span class="w-full truncate font-medium">{file?.name}</span>
@@ -374,27 +477,64 @@
 		{/if}
 
 		{#each visibleIdentities as identity (identity.id)}
-			<div class="relative rounded-lg border">
-				<Button
-					variant="ghost"
-					size="icon"
-					class="absolute end-1 top-1 size-6"
-					aria-label={copy.remove}
-					onclick={() => forget(identity.id)}
+			{#if renameId === identity.id}
+				<form
+					class="bg-muted/40 flex flex-col gap-2 rounded-lg p-3 text-xs"
+					onsubmit={(event) => {
+						event.preventDefault();
+						void rename(identity.id);
+					}}
 				>
-					<XIcon class="size-3.5" />
-				</Button>
+					<label class="flex flex-col gap-1" for={`store-alias-${identity.id}`}>
+						{copy.storeAlias}
+						<Input id={`store-alias-${identity.id}`} autocomplete="off" bind:value={renameLabel} />
+					</label>
+					<div class="flex items-center gap-2">
+						<Button type="submit" size="sm" class="h-8">{copy.storeSave}</Button>
+						<Button
+							type="button"
+							variant="ghost"
+							size="sm"
+							class="h-8"
+							onclick={() => (renameId = null)}>{copy.storeBack}</Button
+						>
+					</div>
+				</form>
+			{:else}
+			<div class="bg-muted/40 relative rounded-lg">
+				{#if !initialId}
+					<div class="absolute end-1 top-1 flex gap-0.5">
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-6"
+							aria-label={copy.storeRename}
+							onclick={() => startRename(identity)}
+						>
+							<PencilIcon class="size-3.5" />
+						</Button>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-6"
+							aria-label={copy.remove}
+							onclick={() => forget(identity.id)}
+						>
+							<XIcon class="size-3.5" />
+						</Button>
+					</div>
+				{/if}
 				<button
 					type="button"
 					class={cn(
 						'hover:bg-accent/50 flex h-full w-full flex-col gap-1 rounded-lg p-3 text-left text-xs transition-colors',
-						identity.id === usedId && 'border-primary/60 border'
+						identity.id === usedId && 'bg-brand-soft'
 					)}
 					aria-expanded={openId === identity.id}
 					onclick={() => select(identity)}
 				>
 					{#if !compact}<FileIcon class="text-muted-foreground size-5" />{/if}
-					<span class="w-full truncate pr-5 font-medium">{identity.label}</span>
+					<span class="w-full truncate pr-12 font-medium">{identity.label}</span>
 					<span class="text-muted-foreground w-full truncate">{identity.commonName}</span>
 					{#if !compact}
 					<span
@@ -413,12 +553,13 @@
 					{/if}
 				</button>
 			</div>
+			{/if}
 		{/each}
 
 		{#if !compact}
 		<button
 			type="button"
-			class="hover:border-primary/50 hover:text-foreground text-muted-foreground flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-3 text-xs transition-colors"
+			class="bg-muted/40 hover:bg-muted hover:text-foreground text-muted-foreground flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg p-3 text-xs transition-colors"
 			onclick={() => fileInput?.click()}
 		>
 			<PlusIcon class="size-5" />
@@ -429,7 +570,7 @@
 
 	{#if pending}
 		<!-- File added from the modal and not sealed yet: its PIN opens it and stores it at once. -->
-		<div class="flex flex-wrap items-end gap-2 rounded-lg border p-3">
+		<div class="bg-muted/40 flex flex-wrap items-end gap-2 rounded-lg p-3">
 			<label class="flex min-w-40 flex-1 flex-col gap-1 text-xs" for="add-pin">
 				{copy.storePin}
 				<Input
@@ -441,6 +582,15 @@
 						if (event.key === 'Enter') void saveAdded();
 					}}
 				/>
+			</label>
+			<label class="flex items-center gap-2 pb-2 text-xs">
+				<input
+					type="checkbox"
+					class="accent-primary size-4"
+					bind:checked={rememberPin}
+					onchange={persistRemember}
+				/>
+				{rememberLabel}
 			</label>
 			<Button size="sm" class="h-9" disabled={adding || addPin === ''} onclick={saveAdded}
 				>{adding ? copy.certLoading : copy.storeSave}</Button
@@ -457,7 +607,7 @@
 
 {#snippet certificateSummary()}
 	<FileIcon
-		class={cn(compact ? 'size-6 shrink-0' : 'size-12 shrink-0', chosen ? 'text-primary' : 'text-muted-foreground/70')}
+		class={cn('size-12 shrink-0', chosen ? 'text-primary' : 'text-muted-foreground/70')}
 		stroke-width={1.25}
 	/>
 	<span
@@ -479,7 +629,7 @@
 					cert.expired && 'text-amber-700 dark:text-amber-400'
 				)}
 				>
-				{copy.signValidity}: {dateFormat.format(cert.notBefore)} → {dateFormat.format(cert.notAfter)}
+			{copy.signValidity}: {dateFormat.format(cert.notBefore)} <ArrowRightIcon class="inline size-3 align-[-0.125em]" aria-hidden="true" /> {dateFormat.format(cert.notAfter)}
 			</span>
 		</span>
 	{/if}

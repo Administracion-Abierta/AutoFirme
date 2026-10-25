@@ -1,18 +1,39 @@
-<!--
-	App icon source — the seal motif from src/lib/App.svelte (#47). Full-bleed teal with the mark
-	centred, so the same art also works as a maskable icon. Regenerate the PNG set with:
-	rsvg-convert -w 192 -h 192 static/icon.svg -o static/icon-192.png
-	rsvg-convert -w 512 -h 512 static/icon.svg -o static/icon-512.png
-	rsvg-convert -w 512 -h 512 static/icon-maskable.svg -o static/icon-maskable-512.png
--->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="AutoFirma Web">
-	<rect width="512" height="512" fill="#008d80" />
-	<g fill="none" stroke="#fff" stroke-linecap="round">
-		<circle cx="256" cy="256" r="146.2" stroke-width="13.6" />
-		<circle cx="256" cy="256" r="112.2" stroke-width="6.8" stroke-dasharray="17 20.4" />
-		<path
-			d="M194.8 290c30.6 8.2 64.6 4.1 88.4 -17M211.8 259.4c20.4 -23.8 51 -37.4 74.8 -34M242.4 174.4l-23.8 98.6a23.12 23.12 0 0 0 31.3 25.8"
-			stroke-width="15"
-		/>
-	</g>
+  <rect width="512" height="512" fill="#008d80"/>
+
+  <!-- Circular seal -->
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <circle cx="256" cy="256" r="151" stroke-width="10"/>
+    <circle cx="256" cy="256" r="132" stroke-width="4"
+            stroke-dasharray="2 15"/>
+  </g>
+
+  <!-- White signing mark -->
+  <g fill="#fff" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Fountain pen nib -->
+    <path d="M256 157
+      C244 190 222 220 190 245
+      L190 311
+      L220 311
+      L232 278
+      L280 278
+      L292 311
+      L322 311
+      L322 245
+      C290 220 268 190 256 157 Z"/>
+
+    <!-- Signature flourish -->
+    <path d="M191 332
+      C211 319 226 326 215 340
+      C204 354 216 360 234 344
+      L253 326
+      C265 315 275 325 263 340
+      C251 355 268 360 286 343
+      L309 324"
+      fill="none" stroke-width="9"/>
+
+    <!-- Nib detail -->
+    <path d="M256 185 L256 249"
+      fill="none" stroke="#008d80" stroke-width="7"/>
+  </g>
 </svg>

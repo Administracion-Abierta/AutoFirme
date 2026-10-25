@@ -12,6 +12,7 @@
 
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { audit } from './audit';
+import type { BridgeHub } from './bridge';
 import type { CertStore } from './certstore';
 import type { ServerConfig } from './config';
 import { buildServer } from './surface';
@@ -53,7 +54,11 @@ function bearer(request: Request): string | null {
  * `POST /mcp` and nothing else. A body carries a base64 document plus its JSON envelope on top of
  * the tool layer's own cap, so the transport's limit is that cap inflated by the encoding.
  */
-export function createHttpHandler(config: ServerConfig, store: CertStore): (request: Request) => Promise<Response> {
+export function createHttpHandler(
+	config: ServerConfig,
+	store: CertStore,
+	bridge?: BridgeHub
+): (request: Request) => Promise<Response> {
 	const maxRequestBodySize = Math.ceil((config.maxBytes * 4) / 3) + 64 * 1024;
 
 	return async (request) => {
@@ -79,7 +84,7 @@ export function createHttpHandler(config: ServerConfig, store: CertStore): (requ
 			enableJsonResponse: true,
 			maxRequestBodySize
 		});
-		const server = buildServer(config, store);
+		const server = buildServer(config, store, bridge);
 		await server.connect(transport);
 		try {
 			return await transport.handleRequest(request);

@@ -1,0 +1,10 @@
+# Crypto core: every change here needs an owner review (AGENTS.md — signatures
+# must ship with an openssl cross-check).
+/src/lib/cms.ts @eduardez
+/src/lib/x509.ts @eduardez
+/src/lib/pkcs12.ts @eduardez
+/src/lib/keystore.ts @eduardez
+/src/lib/pades.ts @eduardez
+/src/lib/xades.ts @eduardez
+/extension/core/ @eduardez
+/test/fixtures/ @eduardez

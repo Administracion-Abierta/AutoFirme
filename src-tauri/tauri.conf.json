@@ -1,0 +1,85 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AutoFirme",
+  "version": "0.1.2",
+  "identifier": "es.autofirme.web",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build:tauri",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "AutoFirme",
+        "width": 1280,
+        "height": 860,
+        "minWidth": 900,
+        "minHeight": 640
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http:; font-src 'self' data:"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["afirma"]
+      }
+    }
+  },
+  "bundle": {
+    "targets": ["deb", "rpm", "appimage"],
+    "active": true,
+    "publisher": "Administracion-Abierta",
+    "category": "Productivity",
+    "homepage": "https://github.com/Administracion-Abierta/AutoFirme",
+    "shortDescription": "Firma documentos con certificados X.509",
+    "longDescription": "AutoFirme: firma CAdES, XAdES y PAdES con certificados X.509 y verifica firmas. Todo ocurre en tu equipo; las claves privadas nunca salen del navegador ni del llavero local.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png"
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["pdf"],
+        "name": "PDF document",
+        "mimeType": "application/pdf"
+      },
+      {
+        "ext": ["xml"],
+        "name": "XML document",
+        "mimeType": "application/xml"
+      },
+      {
+        "ext": ["csig"],
+        "name": "CAdES signature",
+        "mimeType": "application/pkcs7-signature"
+      },
+      {
+        "ext": ["xsig"],
+        "name": "XAdES signature",
+        "mimeType": "application/xml"
+      }
+    ],
+    "externalBin": ["binaries/autofirme-mcp"],
+    "linux": {
+      "deb": {
+        "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0", "libssl3"],
+        "recommends": ["pcscd"],
+        "section": "utils",
+        "postInstallScript": "../packaging/linux/postinst.sh"
+      },
+      "rpm": {
+        "depends": ["webkit2gtk4.1", "gtk3", "openssl-libs"],
+        "release": "1",
+        "postInstallScript": "../packaging/linux/postinst.sh"
+      }
+    }
+  }
+}

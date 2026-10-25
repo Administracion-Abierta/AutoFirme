@@ -9,17 +9,20 @@ import { signCadesDetached } from '../../src/lib/cms.ts';
 import { detectFormat, verifyArtifact } from '../../src/lib/verify/index.ts';
 import type { VerificationReport } from '../../src/lib/verify/types.ts';
 import { audit } from './audit';
+import type { BridgeHub } from './bridge';
 import type { CertStore, CertSummary } from './certstore';
 import type { ServerConfig } from './config';
 import { type Bytes, ToolError, readSource, type Source } from './input';
 
-export type SignFormat = 'cades' | 'xades' | 'pades';
+export type SignFormat = 'cades' | 'xades' | 'pades' | 'ooxml';
 
 /** Formats this slice can actually produce, and the honest reason for the rest. */
 const FORMAT_SUPPORT: Record<SignFormat, string | null> = {
 	cades: null,
 	xades: 'XAdES needs a DOM (DOMParser/XMLSerializer); this stdio build has none — Refs #28',
-	pades: 'PAdES is not wired into this server yet; the engine can do it — Refs #28'
+	pades: 'PAdES is not wired into this server yet; the engine can do it — Refs #28',
+	// OOXML signing needs a DOM too (it builds XAdES inside the package) — Refs #127.
+	ooxml: 'OOXML needs a DOM (DOMParser/XMLSerializer); this stdio build has none — Refs #127'
 };
 
 export interface SignInput extends Source {
@@ -54,10 +57,69 @@ function domUnavailable(): boolean {
 	return typeof globalThis.DOMParser === 'undefined';
 }
 
+/**
+ * Ask the extension for a signature. The extension builds and returns the CAdES container; the
+ * server verifies it before answering, so a broken bridge cannot silently yield a bad artifact.
+ */
+async function signViaBridge(
+	config: ServerConfig,
+	bridge: BridgeHub,
+	input: SignInput,
+	signingTime: Date
+): Promise<SignResult> {
+	const certificates = await bridge.listCertificates();
+	const cert = certificates.find((entry) => entry.cert_id === input.cert_id);
+	if (!cert) throw new ToolError('unknown_certificate', `no certificate with id ${JSON.stringify(input.cert_id)}`);
+	if (!cert.signable) throw new ToolError('not_signable', `certificate ${input.cert_id} has no signing key`);
+	const document = await readSource(config, input, 'document');
+	const signed_b64 = await bridge.sign({
+		format: 'cades',
+		certId: input.cert_id,
+		data: Buffer.from(document).toString('base64'),
+		signingTime: signingTime.toISOString()
+	});
+	const signed = new Uint8Array(Buffer.from(signed_b64, 'base64'));
+	let report: VerificationReport;
+	try {
+		report = await verifyArtifact(signed, { detached: document });
+	} catch (error) {
+		throw new ToolError('bridge_invalid', `the extension returned an unreadable signature: ${(error as Error).message}`);
+	}
+	const failed = report.checks.find(
+		(check) => (check.id === 'structure' || check.id === 'contentDigest' || check.id === 'signature') && check.status === 'fail'
+	);
+	if (failed) {
+		throw new ToolError('bridge_invalid', `the extension returned an invalid signature: ${failed.detail}`);
+	}
+	const result: SignResult = {
+		format: 'cades',
+		cert_id: input.cert_id,
+		common_name: cert.common_name,
+		detached: true,
+		signed_b64,
+		bytes: signed.length,
+		sha256: await sha256Hex(signed),
+		document_sha256: await sha256Hex(document),
+		signing_time: signingTime.toISOString(),
+		cert_expired: cert.expired
+	};
+	audit(config, {
+		event: 'sign',
+		ok: true,
+		certId: input.cert_id,
+		format: 'cades',
+		documentSha256: result.document_sha256,
+		bytes: result.bytes,
+		detail: 'signed by extension after operator confirmation'
+	});
+	return result;
+}
+
 export async function signDocument(
 	config: ServerConfig,
 	store: CertStore,
-	input: SignInput
+	input: SignInput,
+	bridge?: BridgeHub
 ): Promise<SignResult> {
 	const unsupported = FORMAT_SUPPORT[input.format];
 	if (unsupported) {
@@ -68,6 +130,8 @@ export async function signDocument(
 	if (Number.isNaN(signingTime.getTime())) {
 		throw new ToolError('bad_signing_time', `signing_time ${JSON.stringify(input.signing_time)} is not a date`);
 	}
+
+	if (bridge?.online) return signViaBridge(config, bridge, input, signingTime);
 
 	const document = await readSource(config, input, 'document');
 	const cert = store.signer(input.cert_id);
@@ -109,6 +173,22 @@ export function listCerts(config: ServerConfig, store: CertStore): ListCertsResu
 		signing_ready: store.signingReady
 	};
 	audit(config, { event: 'list_certs', ok: true, detail: `${result.certificates.length} certificate(s)` });
+	return result;
+}
+
+/** The operator's browser identities, when the extension bridge is connected. */
+export async function listBridgeCerts(config: ServerConfig, bridge: BridgeHub): Promise<ListCertsResult> {
+	const certificates = await bridge.listCertificates();
+	const result: ListCertsResult = {
+		certificates,
+		errors: [],
+		signing_ready: certificates.some((cert) => cert.signable)
+	};
+	audit(config, {
+		event: 'list_certs',
+		ok: true,
+		detail: `${certificates.length} certificate(s) from the extension`
+	});
 	return result;
 }
 

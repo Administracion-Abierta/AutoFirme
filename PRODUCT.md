@@ -1,30 +1,31 @@
 # Product
 
 <!-- impeccable:product-schema 1 -->
+<!-- Resumen en español de lo que la app ya tiene: docs/LEEME.md. -->
 
 ## Platform
 
-web
+desktop (Tauri v2) + browser extension (Chrome MV3)
 
 ## Stack
 
-Delegated (established codebase): SvelteKit SPA, Svelte 5, Tailwind v4, TypeScript, shadcn-svelte (bits-ui), static adapter. Signing/verification is pure client-side WebCrypto; static hosting, zero backend.
+Delegated (established codebase): SvelteKit SPA, Svelte 5, Tailwind v4, TypeScript, shadcn-svelte (bits-ui), static adapter. Signing/verification is pure client-side WebCrypto; no backend, no hosted surface.
 
 ## Users
 
-Primary: Spanish citizens and small-office clerks who must produce legally valid electronic signatures (CAdES/XAdES/PAdES on X.509 certificates) without installing desktop software. They arrive with a PKCS#12 (.p12/.pfx) certificate file, a set of documents (PDF, Office, XML), and low tolerance for jargon — many use it a few times a year. Secondary: anyone verifying a received signature file (.csig/.xsig/signed PDF) to check authenticity.
+Primary: Spanish citizens and small-office clerks who must produce legally valid electronic signatures (CAdES/XAdES/PAdES on X.509 certificates) backed by an installable desktop app. They arrive with a PKCS#12 (.p12/.pfx) certificate file, a set of documents (PDF, Office, XML), and low tolerance for jargon — many use it a few times a year. Secondary: anyone verifying a received signature file (.csig/.xsig/signed PDF) to check authenticity.
 
 ## Product Purpose
 
-AutoFirma Web replicates the core of Spain's AutoFirma desktop tool in the browser: load a X.509 identity from a PKCS#12 container, batch-sign documents (CAdES detached, XAdES, PAdES pending), and verify signature artifacts — entirely client-side. Success: a non-expert completes a legally valid signature run without help, and trusts that keys never leave the machine.
+AutoFirme replicates the core of Spain's AutoFirma desktop tool: load a X.509 identity from a PKCS#12 container, batch-sign documents (CAdES detached, XAdES, PAdES pending), and verify signature artifacts — entirely client-side. Success: a non-expert completes a legally valid signature run without help, and trusts that keys never leave the machine.
 
 ## Positioning
 
-Private keys never leave the client: no signing server exists to breach or subpoena. Self-hostable as a static bundle on any web server. The desktop tool's flow, minus the install.
+Private keys never leave the machine: no signing server exists to breach or subpoena. The desktop tool's flow, with its own app instead of a Java wizard.
 
 ## Operating Context
 
-Used inside browsers (Chrome/Firefox/Safari/Edge, desktop and mobile). Users work with Spanish administration formats (.csig, .xsig, AutoFirma-generated artifacts) and PKCS#12 containers issued by national certifiers (FNMT, Camerfirma). Bilingual ES/EN interface; Spanish is the default and primary audience language.
+Used in the extension and in the desktop app's WebView. Users work with Spanish administration formats (.csig, .xsig, AutoFirma-generated artifacts) and PKCS#12 containers issued by national certifiers (FNMT, Camerfirma). Bilingual ES/EN interface; Spanish is the default and primary audience language.
 
 ## Capabilities and Constraints
 
@@ -34,12 +35,12 @@ Used inside browsers (Chrome/Firefox/Safari/Edge, desktop and mobile). Users wor
 - Stored identities (#29): save/unlock PKCS#12 containers in IndexedDB; PINs never persist.
 - Batch queue with per-document status; ZIP download of signed outputs; downloads vault in IndexedDB.
 - Verification of CAdES/XAdES/PDF artifacts, with detached-document re-check.
-- Constraint: private keys and PINs stay client-side; no telemetry; no backend.
+- Constraint: private keys and PINs stay on the machine; no telemetry; no backend.
 - Constraint: visual-only UI work must not change component prop interfaces or logic modules (sign/pkcs12/keystore/certs.ts, stores.ts, mcp/).
 
 ## Brand Commitments
 
-Name: AutoFirma Web (ES/EN copy everywhere, `src/lib/i18n.ts` is the single copy source). License GPL-compatible (reference: clienteafirma GPL-2+/EUPL-1.1). Visual: shadcn-svelte structure and CSS-variable dark mode per issue #27; screenshots in `work/issue27-ref/` are the operator's structural reference.
+Name: AutoFirme (ES/EN copy everywhere, `src/lib/i18n.ts` is the single copy source). License GPL-compatible (reference: clienteafirma GPL-2+/EUPL-1.1). Visual: shadcn-svelte structure and CSS-variable dark mode per issue #27; screenshots in `work/issue27-ref/` are the operator's structural reference.
 
 ## Evidence on Hand
 

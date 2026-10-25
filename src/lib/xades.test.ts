@@ -7,13 +7,15 @@
  * of the app.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { basename, join } from 'node:path';
+import { rmSync } from 'node:fs';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
 	FIXTURE_PIN,
 	createPkcs12Fixtures,
+	createTsaFixtures,
 	writeFixtureFile,
 	xmlsec1Verify,
 	type Pkcs12Fixtures
@@ -110,6 +112,47 @@ describe('signXades', () => {
 		expect(tampered).not.toBe(signed);
 		const path = writeFixtureFile(fixtures.dir, 'tampered.xsig', encoder.encode(tampered));
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('FAIL');
+	});
+
+	it('emits the enveloped body without the enveloping-only slot whitespace', () => {
+		// The enveloping data slot is interpolated before `<ds:Object>`; empty, it used to leave a
+		// stray tab + newline between `ds:KeyInfo` and the QualifyingProperties object.
+		expect(signed).toContain('</ds:KeyInfo>\n\t<ds:Object>');
+		expect(signed).not.toContain('</ds:KeyInfo>\n\t\n');
+	});
+
+	it('signs SHA1withRSA XAdES for legacy portals', async () => {
+		const sha1Signed = await signXades({
+			xml: SAMPLE,
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW,
+			hash: 'SHA-1'
+		});
+		const sha1Root = parse(sha1Signed).documentElement;
+		expect(elements(sha1Root, DS, 'SignatureMethod')[0].getAttribute('Algorithm')).toBe(
+			'http://www.w3.org/2000/09/xmldsig#rsa-sha1'
+		);
+		expect(elements(sha1Root, DS, 'DigestMethod').map((method) => method.getAttribute('Algorithm'))).toEqual([
+			'http://www.w3.org/2000/09/xmldsig#sha1',
+			'http://www.w3.org/2000/09/xmldsig#sha1',
+			'http://www.w3.org/2000/09/xmldsig#sha1',
+			'http://www.w3.org/2000/09/xmldsig#sha1'
+		]);
+		const path = writeFixtureFile(fixtures.dir, 'facturae-sha1.xsig', encoder.encode(sha1Signed));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+
+		const signedInfo = canonicalize(elements(sha1Root, DS, 'SignedInfo')[0], { exclusive: true });
+		const signature = Buffer.from(elements(sha1Root, DS, 'SignatureValue')[0].textContent!, 'base64');
+		const signedInfoPath = writeFixtureFile(fixtures.dir, 'signedinfo-sha1.bin', new Uint8Array(signedInfo));
+		const signaturePath = writeFixtureFile(fixtures.dir, 'signature-sha1.bin', new Uint8Array(signature));
+		const output = execFileSync(
+			'openssl',
+			['dgst', '-sha1', '-verify', join(fixtures.dir, 'leaf.pub.pem'), '-signature', signaturePath, signedInfoPath],
+			{ encoding: 'utf8' }
+		);
+		expect(output).toMatch(/Verified OK/);
 	});
 
 	it('keeps document-level PIs and comments and xmlsec1 still verifies', async () => {
@@ -228,10 +271,177 @@ describe('signXades', () => {
 		// The EC container is self-signed, so the leaf is its own trust anchor.
 		expect(xmlsec1Verify(path, join(fixtures.dir, 'ec.pem'))).toBe('OK');
 	});
-
 	it('refuses to sign a document that already carries a signature', async () => {
 		await expect(
 			signXades({ xml: signed, certificates: session.certificates, signer: session.signer })
 		).rejects.toThrow(/already signed/);
 	});
+
+	it('embeds a SignatureTimeStamp over the canonicalised SignatureValue (XAdES-T)', async () => {
+		const tsa = createTsaFixtures();
+		try {
+			vi.stubGlobal(
+				'fetch',
+				async (_url: string, init: RequestInit) => new Response(tsa.respond(init.body as Uint8Array), { status: 200 })
+			);
+			const stamped = await signXades({
+				xml: SAMPLE,
+				certificates: session.certificates,
+				signer: session.signer,
+				ids: IDS,
+				now: NOW,
+				timeStamp: 'https://tsa.test/'
+			});
+			vi.unstubAllGlobals();
+
+			const stampedRoot = parse(stamped).documentElement;
+			const timeStamp = elements(stampedRoot, XADES, 'SignatureTimeStamp')[0];
+			expect(timeStamp).toBeDefined();
+			expect(elements(timeStamp, DS, 'CanonicalizationMethod')[0].getAttribute('Algorithm')).toBe(
+				'http://www.w3.org/2001/10/xml-exc-c14n#'
+			);
+			// xmlsec1 ignores the unsigned properties and still verifies the core signature.
+			const path = writeFixtureFile(fixtures.dir, 'facturae-t.xsig', encoder.encode(stamped));
+			expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+
+			// The token imprint is the digest of the canonicalised SignatureValue element.
+			const token = Buffer.from(
+				elements(timeStamp, XADES, 'EncapsulatedTimeStamp')[0].textContent!,
+				'base64'
+			);
+			const valueBytes = canonicalize(elements(stampedRoot, DS, 'SignatureValue')[0], { exclusive: true });
+			const digestHex = createHash('sha256').update(valueBytes).digest('hex');
+			const tokenPath = writeFixtureFile(fixtures.dir, 'sig-t.p7', new Uint8Array(token));
+			const output = execFileSync(
+				'openssl',
+				['ts', '-verify', '-in', tokenPath, '-token_in', '-digest', digestHex, '-CAfile', tsa.certPath],
+				{ encoding: 'utf8' }
+			);
+			expect(`${output}`).toMatch(/Verification: OK/);
+		} finally {
+			vi.unstubAllGlobals();
+			rmSync(tsa.dir, { recursive: true, force: true });
+		}
+	});
+});
+
+describe('signXades reference types', () => {
+	let fixtures: Pkcs12Fixtures;
+	let session: SignerSession;
+
+	beforeAll(async () => {
+		fixtures = createPkcs12Fixtures();
+		session = await loadSignerSession(fixtures.modern, FIXTURE_PIN);
+	});
+
+	function verifySignedInfo(signed: string, name: string): void {
+		const root = parse(signed).documentElement;
+		const signedInfo = canonicalize(elements(root, DS, 'SignedInfo')[0], { exclusive: true });
+		const signature = Buffer.from(elements(root, DS, 'SignatureValue')[0].textContent!, 'base64');
+		const signedInfoPath = writeFixtureFile(fixtures.dir, `${name}.signedinfo`, new Uint8Array(signedInfo));
+		const signaturePath = writeFixtureFile(fixtures.dir, `${name}.sig`, new Uint8Array(signature));
+		const output = execFileSync(
+			'openssl',
+			['dgst', '-sha256', '-verify', join(fixtures.dir, 'leaf.pub.pem'), '-signature', signaturePath, signedInfoPath],
+			{ encoding: 'utf8' }
+		);
+		expect(output).toMatch(/Verified OK/);
+	}
+
+	function xmlsec1VerifyFromDir(signedPath: string, trustAnchor: string): 'OK' | 'FAIL' {
+		// xmlsec1 resolves a relative Reference URI against the process cwd, not the
+		// signature path — so detached signatures verify from their own directory.
+		const { status, stdout, stderr } = spawnSync(
+			'xmlsec1',
+			['--verify', '--enabled-key-data', 'x509', '--trusted-pem', trustAnchor, basename(signedPath)],
+			{ cwd: fixtures.dir, encoding: 'utf8' }
+		);
+		const output = `${stdout}${stderr}`;
+		const verdict =
+			/^(?:Verification )?status:\s*(OK|FAIL|FAILED)/m.exec(output)?.[1] ?? /^(OK|FAIL)$/m.exec(output)?.[1];
+		if (!verdict) throw new Error(`xmlsec1 printed no verdict (exit ${status}): ${output.trim()}`);
+		return verdict === 'OK' ? 'OK' : 'FAIL';
+	}
+
+	it('signs enveloping with URI="#object" and xmlsec1 verifies it', async () => {
+		const signed = await signXades({
+			xml: SAMPLE,
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: { ...IDS, dataObject: 'Object-Test' },
+			now: NOW,
+			reference: { type: 'enveloping', objectId: 'Object-Test' }
+		});
+		const root = parse(signed).documentElement;
+		expect(root.tagName).toBe('ds:Signature');
+		const references = elements(root, DS, 'Reference');
+		expect(references).toHaveLength(2);
+		expect(references[0].getAttribute('URI')).toBe('#Object-Test');
+		expect(elements(references[0], DS, 'Transform').map((transform) => transform.getAttribute('Algorithm'))).toEqual([
+			'http://www.w3.org/2001/10/xml-exc-c14n#'
+		]);
+		expect(byId(root, 'Object-Test').firstElementChild?.tagName).toBe('fe:Facturae');
+		expect(elements(root, DS, 'X509Certificate')).toHaveLength(session.certificates.length);
+		const path = writeFixtureFile(fixtures.dir, 'facturae-enveloping.xsig', encoder.encode(signed));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+		verifySignedInfo(signed, 'enveloping');
+	});
+
+	it('signs detached against a sibling file and xmlsec1 verifies it', async () => {
+		writeFixtureFile(fixtures.dir, 'invoice.xml', encoder.encode(SAMPLE));
+		const signed = await signXades({
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW,
+			reference: { type: 'detached', uri: 'invoice.xml', data: encoder.encode(SAMPLE) }
+		});
+		const root = parse(signed).documentElement;
+		expect(root.tagName).toBe('ds:Signature');
+		const references = elements(root, DS, 'Reference');
+		expect(references).toHaveLength(2);
+		expect(references[0].getAttribute('URI')).toBe('invoice.xml');
+		expect(elements(references[0], DS, 'Transform')).toHaveLength(0);
+		const path = writeFixtureFile(fixtures.dir, 'facturae-detached.xsig', encoder.encode(signed));
+		expect(xmlsec1VerifyFromDir(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+		verifySignedInfo(signed, 'detached');
+	});
+
+	it('signs externally-detached with an absolute URI and xmlsec1 verifies it', async () => {
+		const uri = `file://${join(fixtures.dir, 'external.xml')}`;
+		writeFixtureFile(fixtures.dir, 'external.xml', encoder.encode(SAMPLE));
+		const signed = await signXades({
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW,
+			reference: { type: 'detached', uri, data: encoder.encode(SAMPLE) }
+		});
+		const root = parse(signed).documentElement;
+		expect(elements(root, DS, 'Reference')[0].getAttribute('URI')).toBe(uri);
+		const path = writeFixtureFile(fixtures.dir, 'facturae-external.xsig', encoder.encode(signed));
+		expect(xmlsec1Verify(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+		verifySignedInfo(signed, 'externally-detached');
+	});
+
+	it('fails detached verification once the external bytes change', async () => {
+		writeFixtureFile(fixtures.dir, 'mutable.xml', encoder.encode(SAMPLE));
+		const signed = await signXades({
+			certificates: session.certificates,
+			signer: session.signer,
+			ids: IDS,
+			now: NOW,
+			reference: { type: 'detached', uri: 'mutable.xml', data: encoder.encode(SAMPLE) }
+		});
+		const path = writeFixtureFile(fixtures.dir, 'facturae-mutable.xsig', encoder.encode(signed));
+		expect(xmlsec1VerifyFromDir(path, join(fixtures.dir, 'leaf.pem'))).toBe('OK');
+		writeFixtureFile(fixtures.dir, 'mutable.xml', encoder.encode(SAMPLE.replace('100.00', '999.99')));
+		expect(xmlsec1VerifyFromDir(path, join(fixtures.dir, 'leaf.pem'))).toBe('FAIL');
+	});
+
+	function byId(root: Element, id: string): Element {
+		const found = [...root.querySelectorAll('[Id]')].find((element) => element.getAttribute('Id') === id);
+		if (!found) throw new Error(`no element with Id="${id}"`);
+		return found;
+	}
 });

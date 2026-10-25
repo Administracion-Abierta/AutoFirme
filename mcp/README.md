@@ -1,6 +1,6 @@
 # autofirme-mcp
 
-An [MCP](https://modelcontextprotocol.io) server that exposes AutoFirma Web's signing engine:
+An [MCP](https://modelcontextprotocol.io) server that exposes AutoFirme's signing engine:
 CAdES-BES signing with an operator-supplied certificate, and verification. It speaks **stdio** for
 an agent on the same machine and **Streamable HTTP** (spec 2025-03-26) for remote ones. The design
 study behind it — alternatives, threat model, key lifecycle — is `../docs/MCP-DESIGN.md`.
@@ -18,7 +18,7 @@ pnpm check       # tsc --noEmit
 pnpm e2e         # builds, then signs through the stdio server and verifies with openssl cms -verify
 ```
 
-Requires Node ≥ 22 and `openssl` on `PATH` (tests and the e2e check only).
+Requires Node 24 (`engines.node`) and `openssl` on `PATH` (tests and the e2e check only).
 
 ## Configuration
 
@@ -67,6 +67,20 @@ Web-standard `fetch` function (`src/http.ts`) and `src/server-http.ts` is only t
 this is the file a Cloudflare Worker or Deno port would reuse.
 
 **Stateless**: no session id, no server-side session table. One POST is one complete MCP exchange.
+
+### Extension bridge (browser-held identities)
+
+If the operator keeps identities in the AutoFirme Chrome extension, no `.p12` directory or
+`AUTOFIRME_MCP_PIN` is needed. In the extension's MCP settings enter this server's `/mcp` URL and
+`AUTOFIRME_MCP_TOKEN`, then enable **MCP bridge**. The extension connects outbound to
+`WS(S) /bridge` (same host, same token), lists its identities to `autofirma_list_certs`, and opens
+a Chrome consent window for every `autofirma_sign`. The server receives only the public
+certificate and the finished CAdES, which it verifies before answering.
+
+The bridge lives on this HTTP entry; the stdio server has no listening socket and cannot use it.
+The token travels in the WebSocket query string because browsers cannot set an `Authorization`
+header on `WebSocket` — keep tunnel/proxy access logs private. Signing still needs the operator's
+click, but a stolen token can list identities and open consent windows.
 
 Client wiring (remote shape):
 

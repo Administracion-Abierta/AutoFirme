@@ -1,0 +1,6 @@
+# batch smoke: 50 sequential CAdES-BES detached signs through #lib/cms (Refs #96)
+# date: 2026-10-21T21:25:06Z · host: Linux 5.14.0-687.15.1.el9_8.x86_64 x86_64 · node v26.7.0
+# engine: signCadesDetached over the fixture PKCS#12 (CN=Ñandú Prueba, RSA-2048/SHA-256)
+# $ node --import ./scripts/ts-hook.mjs <50-sign loop, 2048-byte payload>
+50 signs in 63 ms = 1.3 ms/file
+exit=0

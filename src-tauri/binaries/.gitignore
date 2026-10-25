@@ -1,0 +1,4 @@
+# Built sidecar binaries (`pnpm --filter autofirme-mcp build:binary`): 70+ MB of
+# build output, regenerated from `mcp/src`. Never commit them.
+*
+!.gitignore

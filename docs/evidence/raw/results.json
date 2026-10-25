@@ -1,0 +1,122 @@
+[
+  {
+    "n": "01",
+    "name": "CAdES-BES sign (detached, SHA-256)",
+    "status": "PASS",
+    "detail": "1520 bytes",
+    "artifacts": [
+      "docs/evidence/raw/cades.p7s"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "02",
+    "name": "CAdES self-verify (verifyArtifact)",
+    "status": "PASS",
+    "detail": "7 checks, 0 fail",
+    "artifacts": [
+      "docs/evidence/raw/cades.selfverify.json"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "03",
+    "name": "CAdES openssl cms -verify interop",
+    "status": "PASS",
+    "detail": "openssl verified",
+    "artifacts": [
+      "docs/evidence/raw/cades.openssl.log"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "04",
+    "name": "XAdES-EPES sign (enveloped)",
+    "status": "PASS",
+    "detail": "5845 chars",
+    "artifacts": [
+      "docs/evidence/raw/xades.xml"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "05",
+    "name": "XAdES self-verify (verifyArtifact)",
+    "status": "PASS",
+    "detail": "8 checks, 0 fail",
+    "artifacts": [
+      "docs/evidence/raw/xades.selfverify.json"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "06",
+    "name": "XAdES xmlsec1 verify interop",
+    "status": "PASS",
+    "detail": "xmlsec1 OK",
+    "artifacts": [
+      "docs/evidence/raw/xades.xmlsec1.log"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "07",
+    "name": "PAdES B-B sign (incremental update)",
+    "status": "PASS",
+    "detail": "6789 bytes",
+    "artifacts": [
+      "docs/evidence/raw/pades.pdf"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "08",
+    "name": "PAdES self-verify (verifyArtifact)",
+    "status": "PASS",
+    "detail": "7 checks, 0 fail",
+    "artifacts": [
+      "docs/evidence/raw/pades.selfverify.json"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "09",
+    "name": "PAdES openssl+pdfsig interop (ByteRange CMS, prefix intact)",
+    "status": "PASS",
+    "detail": "openssl OK, prefix intact",
+    "artifacts": [
+      "docs/evidence/raw/pades.interop.log"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "10",
+    "name": "OOXML sign (signature part added)",
+    "status": "PASS",
+    "detail": "4655 bytes",
+    "artifacts": [
+      "docs/evidence/raw/ooxml.docx"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "11",
+    "name": "Cross-family tamper negative (1-byte flip must fail)",
+    "status": "PASS",
+    "detail": "cades=invalid xades=invalid pades=invalid",
+    "artifacts": [
+      "docs/evidence/raw/tamper.negative.json"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  },
+  {
+    "n": "12",
+    "name": "Batch smoke (50 CAdES signs, <2 s/file)",
+    "status": "PASS",
+    "detail": "1.3 ms/file (50 signs in 63 ms, re-run 2026-10-21)",
+    "artifacts": [
+      "docs/evidence/raw/batch.perf.log"
+    ],
+    "note": "format-level independent-validator run; not one of #19's 12 items (see GATE-12.md)"
+  }
+]

@@ -2,9 +2,12 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { explicit, oid, parseDer } from '#lib/asn1';
 import { signCadesDetached } from '#lib/cms';
 import { loadSignerSession } from '#lib/keystore';
+import { requestTimeStamp } from '#lib/timestamp';
+import { signXades } from '#lib/xades';
 import {
 	detectFormat,
 	extractPadesSignatures,
@@ -12,7 +15,13 @@ import {
 	type CheckStatus,
 	type VerificationReport
 } from '#lib/verify';
-import { createCadesFixtures, FIXTURE_PIN } from '../test/fixtures';
+import {
+	createCadesFixtures,
+	createPkcs12Fixtures,
+	createTsaFixtures,
+	FIXTURE_PIN,
+	type TsaFixtures
+} from '../test/fixtures';
 
 const fixtures = resolve(process.cwd(), 'test/fixtures') + '/';
 const read = (name: string) => new Uint8Array(readFileSync(fixtures + name));
@@ -318,6 +327,166 @@ describe('expired signer certificates (#40)', () => {
 		expect(report.status).toBe('invalid');
 		expect(report.ok).toBe(false);
 		expect(status(report, 'certValidity')).toBe('warn');
+	});
+});
+
+describe('timestamps, XAdES-T and CAdES-X Long (#125)', () => {
+	const cades = createCadesFixtures();
+	afterAll(() => rmSync(cades.dir, { recursive: true, force: true }));
+	const tsaUrl = 'https://tsa.test/';
+
+	/** Sign through the TSA stub; the stub answers every request with a real openssl token. */
+	async function withTsa<T>(run: (tsa: TsaFixtures) => Promise<T>): Promise<T> {
+		const tsa = createTsaFixtures();
+		vi.stubGlobal(
+			'fetch',
+			async (_url: string, init: RequestInit) => new Response(tsa.respond(init.body as Uint8Array), { status: 200 })
+		);
+		try {
+			return await run(tsa);
+		} finally {
+			vi.unstubAllGlobals();
+			rmSync(tsa.dir, { recursive: true, force: true });
+		}
+	}
+
+	const roots = () => ({ detached: cades.content, trustedRoots: [readFileSync(cades.caPath, 'utf8')] });
+
+	it('passes the timestamp check for a CAdES-T signature', async () => {
+		await withTsa(async () => {
+			const { signer } = await loadSignerSession(cades.p12, FIXTURE_PIN);
+			const signature = await signCadesDetached(signer, cades.content, { timeStamp: tsaUrl });
+			const report = await verifyArtifact(signature, roots());
+
+			expect(status(report, 'timestamp')).toBe('pass');
+			expect(report.checks.find((entry) => entry.id === 'timestamp')?.detail).toMatch(/signature value/);
+			expect(report.ok).toBe(true);
+		});
+	});
+
+	it('fails the timestamp check with a reason when the signature bytes are tampered with', async () => {
+		await withTsa(async () => {
+			const { signer } = await loadSignerSession(cades.p12, FIXTURE_PIN);
+			const signature = await signCadesDetached(signer, cades.content, { timeStamp: tsaUrl });
+			// Flip one byte inside the signature OCTET STRING: DER lengths untouched, so the
+			// structure still parses and the timestamp check gets to speak for itself.
+			const signerInfo = explicit(parseDer(signature).children[1], 0xa0).children[4].children[0];
+			const value = signerInfo.children[5].value;
+			signature[value.byteOffset - signature.byteOffset] ^= 0x01;
+
+			const report = await verifyArtifact(signature, roots());
+			expect(status(report, 'timestamp')).toBe('fail');
+			expect(report.checks.find((entry) => entry.id === 'timestamp')?.detail).toMatch(/covers neither/);
+			expect(report.ok).toBe(false);
+		});
+	});
+
+	it('passes both timestamps for CAdES-X Long type 2', async () => {
+		await withTsa(async () => {
+			const { signer } = await loadSignerSession(cades.p12, FIXTURE_PIN);
+			const signature = await signCadesDetached(signer, cades.content, { timeStamp: tsaUrl, xLong: 2 });
+			const report = await verifyArtifact(signature, roots());
+
+			const stamps = report.checks.filter((entry) => entry.id === 'timestamp');
+			expect(stamps).toHaveLength(2);
+			expect(stamps.every((entry) => entry.status === 'pass')).toBe(true);
+			expect(stamps.map((entry) => entry.detail).join(' | ')).toMatch(/refs/);
+			expect(report.ok).toBe(true);
+		});
+	});
+
+	it('passes both timestamps for CAdES-X Long type 1', async () => {
+		await withTsa(async () => {
+			const { signer } = await loadSignerSession(cades.p12, FIXTURE_PIN);
+			const signature = await signCadesDetached(signer, cades.content, { timeStamp: tsaUrl, xLong: 1 });
+			const report = await verifyArtifact(signature, roots());
+
+			const stamps = report.checks.filter((entry) => entry.id === 'timestamp');
+			expect(stamps).toHaveLength(2);
+			expect(stamps.every((entry) => entry.status === 'pass')).toBe(true);
+			// The escTimeStamp covers signature + CAdES-T token + refs (RFC 5126 §6.3.5).
+			expect(stamps.map((entry) => entry.detail).join(' | ')).toMatch(/CAdES-T timestamp and the certificate and revocation refs/);
+			expect(report.ok).toBe(true);
+		});
+	});
+
+	it('fails the CAdES-C timestamp when the refs no longer match its imprint', async () => {
+		await withTsa(async () => {
+			const { signer } = await loadSignerSession(cades.p12, FIXTURE_PIN);
+			const signature = await signCadesDetached(signer, cades.content, { timeStamp: tsaUrl, xLong: 2 });
+			// Flip one byte inside the certificate-refs value: the SET still parses, but the bytes the
+			// certCRLTimestamp covers are gone, so its check must fail with a reason.
+			const signerInfo = explicit(parseDer(signature).children[1], 0xa0).children[4].children[0];
+			const refs = signerInfo.children[6].children.find(
+				(attribute) => oid(attribute.children[0]) === '1.2.840.113549.1.9.16.2.21'
+			)!;
+			const value = refs.children[1].children[0].value;
+			signature[value.byteOffset - signature.byteOffset + 3] ^= 0x01;
+
+			const report = await verifyArtifact(signature, roots());
+			const stamps = report.checks.filter((entry) => entry.id === 'timestamp');
+			expect(stamps.some((entry) => entry.status === 'fail' && /covers neither/.test(entry.detail))).toBe(true);
+			expect(report.ok).toBe(false);
+		});
+	});
+
+	it('reports info, never failure, for a BES signature without timestamps', async () => {
+		const { signer } = await loadSignerSession(cades.p12, FIXTURE_PIN);
+		const report = await verifyArtifact(await signCadesDetached(signer, cades.content), roots());
+
+		expect(status(report, 'timestamp')).toBe('info');
+		expect(report.ok).toBe(true);
+	});
+
+	it('passes the timestamp check for XAdES-T and reports info without one', async () => {
+		await withTsa(async () => {
+			const p12 = createPkcs12Fixtures();
+			try {
+				const session = await loadSignerSession(p12.modern, FIXTURE_PIN);
+				const stamped = await signXades({
+					xml: '<facturae xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><id>B12345678</id></facturae>',
+					certificates: session.certificates,
+					signer: session.signer,
+					timeStamp: tsaUrl
+				});
+				const report = await verifyArtifact(new TextEncoder().encode(stamped));
+				expect(status(report, 'timestamp')).toBe('pass');
+
+				const plain = await signXades({
+					xml: '<facturae xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><id>B12345678</id></facturae>',
+					certificates: session.certificates,
+					signer: session.signer
+				});
+				expect(status(await verifyArtifact(new TextEncoder().encode(plain)), 'timestamp')).toBe('info');
+			} finally {
+				rmSync(p12.dir, { recursive: true, force: true });
+			}
+		});
+	});
+
+	it('rejects a SignatureTimeStamp computed over a different canonicalisation', async () => {
+		await withTsa(async (tsa) => {
+			const p12 = createPkcs12Fixtures();
+			try {
+				const session = await loadSignerSession(p12.modern, FIXTURE_PIN);
+				const xml = '<facturae xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><id>B12345678</id></facturae>';
+				const stamped = await signXades({ xml, certificates: session.certificates, signer: session.signer, timeStamp: tsaUrl });
+				// A token over other bytes — e.g. a non-canonical serialisation — smuggled into
+				// the EncapsulatedTimeStamp. The XML stays well-formed, so the check must catch it.
+				const wrong = Buffer.from(
+					await requestTimeStamp(tsaUrl, new TextEncoder().encode('<ds:SignatureValue>other</ds:SignatureValue>'))
+				).toString('base64');
+				const tampered = stamped.replace(/<xades:EncapsulatedTimeStamp>[^<]*</, `<xades:EncapsulatedTimeStamp>${wrong}<`);
+				expect(tampered).not.toBe(stamped);
+
+				const report = await verifyArtifact(new TextEncoder().encode(tampered));
+				expect(status(report, 'timestamp')).toBe('fail');
+				expect(report.checks.find((entry) => entry.id === 'timestamp')?.detail).toMatch(/covers different bytes/);
+				expect(report.ok).toBe(false);
+			} finally {
+				rmSync(p12.dir, { recursive: true, force: true });
+			}
+		});
 	});
 });
 

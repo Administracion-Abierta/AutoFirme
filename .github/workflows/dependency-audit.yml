@@ -1,0 +1,34 @@
+name: Dependency audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly re-check even when nothing is pushed: new advisories land on old
+    # lockfiles. Monday 06:00 UTC.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-audit:
+    name: dependency-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: node:24-trixie
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Production tree is what ships the client-side crypto (pdf-lib, fflate);
+      # dev deps get updated by Dependabot instead. Any advisory in the prod
+      # tree fails the job (pnpm default --audit-level=low); Dependabot opens
+      # the fix PRs.
+      - run: pnpm audit --prod
