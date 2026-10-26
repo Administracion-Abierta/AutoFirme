@@ -89,6 +89,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Sidecar: `bundle.externalBin` aborts tauri build when
+      # src-tauri/binaries/autofirme-mcp-<triple> is missing (gitignored build
+      # output; ci.yml's shell job builds it the same way before cargo).
+      - uses: https://github.com/oven-sh/setup-bun@v2
+      - run: pnpm --filter autofirme-mcp build:binary
       - run: node scripts/check-versions.mjs ${{ github.event.release.tag_name }}
       - run: pnpm build:tauri
       - name: Build deb, rpm and AppImage
