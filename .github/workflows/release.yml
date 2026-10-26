@@ -109,7 +109,7 @@ jobs:
         run: |
           DEB=(src-tauri/target/release/bundle/deb/*.deb)
           dpkg-deb -c "${DEB[0]}"
-          DESKTOP=$(dpkg-deb --fsys-tarfile "${DEB[0]}" | tar -xO --wildcards './usr/share/applications/*.desktop')
+          DESKTOP=$(dpkg-deb --fsys-tarfile "${DEB[0]}" | tar -xO --wildcards 'usr/share/applications/*.desktop')
           printf '%s\n' "$DESKTOP" | grep -F 'x-scheme-handler/afirma'
           printf '%s\n' "$DESKTOP" | grep -F 'application/pdf'
       - name: Attach linux packages to the release
