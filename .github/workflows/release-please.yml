@@ -23,6 +23,10 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          # release-please-action defaults to api.github.com; Forgejo's REST lives at
+          # /api/v1 (github-compatible). Without this the Forgejo token 401s against
+          # github.com with "Bad credentials".
+          github-api-url: https://git.eduard3v.com/api/v1
         # act: `${{ secrets.GITHUB_TOKEN }}` is only injected when the step declares it.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
