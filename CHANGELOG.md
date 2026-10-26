@@ -1,0 +1,139 @@
+# Changelog
+
+## 0.2.0 (2026-10-26)
+
+Initial tagged release of AutoFirma Web: browser-first signing and verification (CAdES, XAdES, PAdES), a Chrome MV3 extension that intercepts portals' `AutoScript`/`afirma` calls, and an optional Tauri desktop shell with smartcard (PKCS#11/PC-SC) support.
+
+### Features
+
+- native save dialog via Tauri client, anchor fallback in browser
+- package full AutoFirme app for Chrome MV3
+- remake sign flow into 3 steps with per-file format, settings modal, drop downloads feature
+- sign ODF packages with XAdES signature
+- digest-mode CAdES signer, format picker, summary report
+- rename saved signatures with user-chosen aliases
+- drive built extension against live registradores test page
+- deploy autofirme worker from CI on main
+- add minimal tauri v2 shell with atomic file writes
+- Tauri fetch_revocation_bytes transport
+- probe WebCrypto for the custom-scheme question
+- add consent-bound AutoScript request bridge
+- complete CAdEStri signing requests
+- enable website interception by default
+- intercept all sites by default, invert panel to disable-list
+- intercept PAdES and AUTO signing requests
+- map AutoFirma visible PAdES parameters
+- shared catalogue, native copy, and generated Rust embed
+- sign through the extension bridge
+- QUIC transport with mDNS discovery and fingerprint identity
+- android sign entry + cloudflare pages deploy
+- sorted directory signing CLI with manifest + digest mode
+- TLS loopback sign server, protocol 3 framing, fixtures
+- afirma deep-link parse and allow-list store
+- single-instance afirma handoff and confirm commands
+- XAdES + plain XMLDSig enveloping/detached reference types
+- OpenSC PKCS#11 sign path, PC/SC session and typed errors
+- tauri build mode, client-only shell, desktop PWA off
+- split settings dialog into general, MCP and help tabs
+- white and teal theme, Inter throughout, compact header
+- one T/XL/LTA level vocabulary across CAdES, XAdES and PAdES
+- standalone policy and commitment-type checks
+- afirma request banner and allow-list UI
+- OCSP/CRL revocation checking
+
+### Bug Fixes
+
+- revert manifest version hand-bump to 0.1.2 (versions move only via release-please, AGENTS.md)
+- validate reachable extension application entry
+- unprefixed attrs never pull default ns into exclusive c14n
+- keep IdentityMeta.source through renameIdentity
+- add missing checkout to tauri-shell job; fix svelte-check strictness
+- allowlist RFC 6455 sample websocket key
+- fully qualified action URLs for non-mirrored actions; allowlist decompiled trees in gitleaks
+- install libpcsclite-dev for the tauri-shell job
+- pass GITHUB_TOKEN to release-please-action
+- release publishing via Forgejo v1 API, drop gh
+- shell job runner label blocked every develop push run
+- bump node pin to 22.22 for pnpm 11
+- wire wrangler to static build for autofirme worker
+- authenticate app after SPA history changes
+- clean up local disconnects and restored documents
+- compact certificate chooser and fit window to content
+- delegate new calls after site access removal
+- keep Chrome-reserved _headers out of the package
+- load the packaged build and auto-sign remembered MCP jobs
+- sign legacy SHA1withRSA XAdES requests
+- surface content-script registration failures in Site access
+- translate the diagnostics page into the shared catalogue
+- re-run i18n catalogue into src-tauri/src/i18n.rs after merging #103 copy
+- leave the visible stamp background transparent
+- close unterminated header comment in service worker
+- add doc cross-reference checker
+- allow user-configured TSA origins in the shell CSP
+- catch attribute copy despite whitespace around `=`
+- correct valid_value doc claim about shell metachars
+- cross-check and document the tracked pades-* golden
+- document MiniApplet in the user-facing interception list
+- document the perf script in the README and LEEME command lists
+- drop a stray double blank line in batch.ts
+- drop dead comment, split long call sites, document detached URI resolution
+- drop placeholder wordlist entries bend/orko
+- drop the invented pkcs11_* command claim from the provider header
+- drop web-rewrite framing from the engine reference
+- enforce bilingual manifest description in the parity test
+- enforce the xmlsec1 substitute oracle on the ODF package
+- enveloped template emits no stray slot whitespace
+- flag the recorded probe command as the pre-fix double-hash form
+- generate the Rust embed with the crate's 4-space indent
+- guard the answered corpus claim offline
+- ignore object headers inside PDF comments and strings
+- install the env_logger the log-capture fix promised
+- LEEME stops calling build/ a static site
+- make the OCSP fixture cross-check real and drop stale responder doc
+- match non-exhaustive CommandEvent with a wildcard arm
+- match the XAdES namespace URI exactly, not by prefix
+- name the derivation of the pinned registradores payload length
+- name the real ts-hook consumer in its doc comment
+- official FacturaE namespaces in the version table
+- only whitelist members count as a FacturaE role or commitment kind
+- pin logger config with a filter-introspection test
+- pin raw-RSA-PKCS-over-DigestInfo payload with a token-free regression test
+- pin the batch CLI memory ceiling with a 128 MB XAdES regression test
+- pin the digest-mode CAdES assembly against drift from #lib/cms
+- pin the protocol-4 in-page guarantee with an independent check
+- pin the seam contract — providers receive document bytes
+- read the XAdES SigPolicyHash digest, which lives in the ds namespace
+- recv buffer reuse, conn.close on timeout, MITM pinning test
+- refresh the LEEME test counts this branch moved
+- regenerated run logs + invariant checker for the #96 evidence pack
+- regresion del pipeline de release en pnpm test
+- regression tests pin linux-packages dist collection and trixie gh
+- reject non-ascii fingerprint hex before slicing
+- repoint AGENTS.md quote to real rule 4
+- restore the determinism assertion PROBE.md claims
+- rustfmt the two-command invoke_handler
+- scan copy wrapped in a whole-value brace expression
+- schema-valid FacturaE fixture for every preset
+- set the 500-file batch budget below a per-file key reload
+- stale words() doc, wordlist digit-suffixes + pinning tests
+- state what the ODF serializer and dc:date object actually guarantee
+- stop claiming the CMS path consumes token signature bytes
+- stop reading X-level markers out of PDF stream payloads
+- the extension README no longer calls the shared app a webapp
+- the MCP server exposes AutoFirme's engine
+- the shared build is not a web build
+- the updater is a desktop gap, not browser-moot
+- type SCARD_E_UNKNOWN_READER/UNKNOWN_CARD instead of leaking a raw code
+- unique partial file per in-flight receive
+- update stale docs that still call the OOXML signer unwired
+- validate the declared policy digest algorithm instead of ignoring it
+- declare missing axum framework dep
+- panic-safe percent decode, public router and TLS config
+- drop dead clause in afirma URL control-char check
+- pin rust-ini 0.21.0, unblocks tauri-plugin-deep-link 2.6.2 build
+- drop redundant borders on nested panels
+- require attested X-level refs for XL, not ref presence alone
+- restore AttrLike interface, type Bytes import
+- decode OCSP CertStatus correctly and trust only the issuer
+- pin revocation cache test to the fixture clock
+- digest certificates with the signature hash
