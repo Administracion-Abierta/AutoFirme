@@ -1,6 +1,6 @@
 [package]
 name = "autofirme-desktop"
-version = "0.1.2"
+version = "0.2.0"
 description = "AutoFirme Web desktop shell"
 edition = "2021"
 rust-version = "1.90"

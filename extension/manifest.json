@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AutoFirme",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "AutoFirme: firma y verifica documentos localmente / Sign and verify documents locally.",
   "minimum_chrome_version": "116",
   "permissions": [
