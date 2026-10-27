@@ -61,7 +61,7 @@ jobs:
       - run: pnpm package:extension
       # upload-artifact v4 talks to GitHub's artifact API; on Forgejo it fails
       # with GHESNotSupportedError (see run 2469), so skip it off-GitHub.
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: startsWith(github.server_url, 'https://github.com')
         with:
           name: autofirme-extension
@@ -173,7 +173,7 @@ jobs:
           timeout 120 xvfb-run -a --server-args="-screen 0 1280x1024x24" \
             ./src-tauri/target/release/autofirme-desktop | tee smoke.log
           grep -q "SHELL_SMOKE Finished" smoke.log
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: startsWith(github.server_url, 'https://github.com')
         with:
           name: shell-smoke
