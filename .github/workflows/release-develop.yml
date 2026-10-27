@@ -53,6 +53,7 @@ jobs:
             - Static site: `build/` is published as the `autofirme-web` artifact below — serve the extracted folder with any static host.
 
             Verify with `SHA256SUMS` before installing.
+        shell: bash
         run: |
           TAG="dev-${GITHUB_SHA::7}"
           echo "$NOTES" > release-notes.md
