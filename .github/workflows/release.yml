@@ -114,6 +114,7 @@ jobs:
           cp src-tauri/target/release/bundle/appimage/*.AppImage dist/
           (cd dist && sha256sum *.deb *.rpm *.AppImage > SHA256SUMS.linux)
       - name: Verify desktop and protocol registration
+        shell: bash
         run: |
           DEB=(src-tauri/target/release/bundle/deb/*.deb)
           dpkg-deb -c "${DEB[0]}"
