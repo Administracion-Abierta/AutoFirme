@@ -33,6 +33,9 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      # container runs as root; the checked-out tree is owned by the runner
+      # uid, so git refuses it without this (package-extension.py rev-parses HEAD).
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm build:extension
@@ -50,6 +53,7 @@ jobs:
             - Static site: `build/` is published as the `autofirme-web` artifact below — serve the extracted folder with any static host.
 
             Verify with `SHA256SUMS` before installing.
+        shell: bash
         run: |
           TAG="dev-${GITHUB_SHA::7}"
           echo "$NOTES" > release-notes.md

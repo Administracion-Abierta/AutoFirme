@@ -75,6 +75,9 @@ esac
 
 release=$(curl -fsS -H "Authorization: token $GITHUB_TOKEN" "$api/releases/tags/$tag")
 id=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<<"$release")
+# GitHub serves asset uploads from uploads.github.com (the release object's
+# upload_url); Forgejo accepts the plain API host. Strip the {?name,label} template.
+upload_base=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("upload_url", "").split("{")[0] or sys.exit(1))' <<<"$release" 2>/dev/null) || upload_base="$api/releases/$id"
 
 # Replace same-named assets (--clobber).
 for f in "${assets[@]}"; do
@@ -89,12 +92,12 @@ print(next((a["id"] for a in release["assets"] if a["name"] == name), ""))' "$na
 	if [ "$host" = forgejo ]; then
 		# Gitea/Forgejo asset upload is multipart.
 		curl -fsS -H "Authorization: token $GITHUB_TOKEN" \
-			-F "attachment=@$f" "$api/releases/$id/assets?name=$name" >/dev/null
+			-F "attachment=@$f" "$upload_base?name=$name" >/dev/null
 	else
 		# GitHub asset upload is a raw octet-stream body (multipart is not supported).
 		curl -fsS -H "Authorization: token $GITHUB_TOKEN" \
 			-H 'Content-Type: application/octet-stream' \
-			--data-binary "@$f" "$api/releases/$id/assets?name=$name" >/dev/null
+			--data-binary "@$f" "$upload_base?name=$name" >/dev/null
 	fi
 	echo "uploaded $name"
 done
