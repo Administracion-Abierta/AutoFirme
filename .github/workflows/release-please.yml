@@ -25,6 +25,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: googleapis/release-please-action@v4
+        # The org forbids Actions from opening pull requests; the action pushes the
+        # release branch, then fails its PR step. Let the run succeed; the PR is
+        # opened by a maintainer from that branch (same as the extension repo).
+        continue-on-error: true
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
