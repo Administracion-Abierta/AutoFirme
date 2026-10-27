@@ -61,7 +61,7 @@ jobs:
   # Issue #113: desktop shell for Linux. Static site stays host-agnostic (no
   # signing server in this repo), so only the store of files above changes.
   linux-packages:
-    name: build linux packages (deb, rpm, AppImage)
+    name: build linux packages (deb, rpm)
     runs-on: ubuntu-latest
     timeout-minutes: 40
     # node:24-trixie: same OpenSSL 3.5 floor, node preinstalled for the actions/* steps.
@@ -103,8 +103,11 @@ jobs:
           mkdir -p dist
           cp src-tauri/target/release/bundle/deb/*.deb dist/
           cp src-tauri/target/release/bundle/rpm/*.rpm dist/
-          cp src-tauri/target/release/bundle/appimage/*.AppImage dist/
-          (cd dist && sha256sum *.deb *.rpm *.AppImage > SHA256SUMS.linux)
+          # AppImage (~153 MiB) skipped: Forgejo caps release attachments at
+          # ~100 MiB (probed: 80 MiB OK, 120 MiB -> 413), so attaching it 413s
+          # the whole job. Re-add here AND in the two asset lists below if the
+          # server cap is ever raised.
+          (cd dist && sha256sum *.deb *.rpm > SHA256SUMS.linux)
       - name: Verify desktop and protocol registration
         run: |
           DEB=(src-tauri/target/release/bundle/deb/*.deb)
@@ -115,13 +118,12 @@ jobs:
       - name: Attach linux packages to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: scripts/forgejo-release.sh "${{ github.event.release.tag_name }}" dist/*.deb dist/*.rpm dist/*.AppImage dist/SHA256SUMS.linux
+        run: scripts/forgejo-release.sh "${{ github.event.release.tag_name }}" dist/*.deb dist/*.rpm dist/SHA256SUMS.linux
       - uses: actions/upload-artifact@v3
         with:
           name: linux-packages
           path: |
             dist/*.deb
             dist/*.rpm
-            dist/*.AppImage
             dist/SHA256SUMS.linux
           if-no-files-found: error
