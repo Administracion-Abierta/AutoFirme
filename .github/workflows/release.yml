@@ -85,7 +85,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
       # Plain refs work on both hosts: GitHub resolves them natively, Forgejo
       # via DEFAULT_ACTIONS_URL (which mirrors github.com).
-      - uses: dtolnay/rust-toolchain@1.90
+      - uses: dtolnay/rust-toolchain@1.120
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
