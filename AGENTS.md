@@ -9,10 +9,11 @@ decompiled-configurador`). The analysis itself is in `docs/`.
 
 ## Current goal
 
-Two products, one engine. **AutoFirme Desktop** (Tauri v2 app, Linux first) and the
-**AutoFirme Extension** (Chrome/Edge MV3, Firefox later) share the signing engine in
-`src/lib` (CAdES/XAdES/PAdES over X.509 certificates). No website: the hosted SPA is
-retired; `build/` survives only as the extension's options page and the dev harness.
+One product here, one engine. **AutoFirme Desktop** (Tauri v2 app, Linux first) is this
+repo; the **AutoFirme Extension** (Chrome/Edge MV3) lives in its own repo,
+github.com/Administracion-Abierta/AutoFirme-Extension. Both share the signing engine in
+`src/lib` (CAdES/XAdES/PAdES over X.509 certificates) — the fork copied `src/` and drifts
+deliberately. No website: `build/` is only the desktop webview input and the dev harness.
 Product decisions are locked in `docs/DESKTOP-ROADMAP.md` §1.
 
 - **Desktop = the full product.** Signing UI, native keys (OS stores, PKCS#11/DNIe),
@@ -43,8 +44,8 @@ Product decisions are locked in `docs/DESKTOP-ROADMAP.md` §1.
    page: GitHub Releases is the only distribution channel (`docs/DEPLOY.md`). If a
    deploy scaffold reappears (`adapter-cloudflare`, a Worker entrypoint), revert it.
 5. The app lives at the repo root — SvelteKit, Svelte 5, Tailwind v4, TypeScript.
-   Static adapter: the build feeds the desktop webview, the extension options page,
-   and the dev harness — never a published site.
+   Static adapter: the build feeds the desktop webview and the dev harness — never a
+   published site.
 6. Commit but do not push unless the user asks.
 
 ## Layout
@@ -55,12 +56,11 @@ extracted/           # unpacked installers — scratch, gitignored
 work/                # scratch
 decompiled*/         # jadx output — untracked reference, gitignored (tag reference/decompile-1.9)
 docs/                # architecture.md (signing-core map), DESKTOP-ROADMAP.md, REVERSING-NOTES.md
-src/, static/        # the engine + UI — SvelteKit (Svelte 5 + Tailwind v4), feeds desktop + extension
+src/, static/        # the engine + UI — SvelteKit (Svelte 5 + Tailwind v4), feeds the desktop app
 src-tauri/           # desktop shell (Tauri v2) — Rust core, KeyProvider backends
-extension/           # MV3 extension — portal bridge, options page mounts the same UI
 mcp/                 # MCP server (stdio + Streamable HTTP)
 test/                # fixtures + cross-check scripts (openssl / xmlsec1)
-build/               # generated: extension options page + dev harness (`pnpm preview`) — never deployed
+build/               # generated: options page + dev harness (`pnpm preview`) — never deployed
 ```
 
 Build/test from the repo root (pnpm is canonical; the root `pnpm-lock.yaml` covers `mcp/` too):
@@ -76,11 +76,11 @@ Build/test from the repo root (pnpm is canonical; the root `pnpm-lock.yaml` cove
   (`checks`, `mcp`, `shell`, `secret-scan`, `dependency-audit`), 1 review, and `CODEOWNERS`
   sign-off on the crypto paths.
 - Versioning is automatic: conventional commits merged into `main` produce a Release Please
-  PR that bumps the single product version in `package.json`, `extension/manifest.json`
-  (Chrome reads the manifest one), `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and
-  the shell's entry in `src-tauri/Cargo.lock`, plus `CHANGELOG.md`. Never edit those
-  versions by hand; `pnpm check:versions` (in CI) fails when they drift or when a release
-  tag does not match.
+  PR that bumps the product version in `package.json`, `src-tauri/tauri.conf.json`,
+  `src-tauri/Cargo.toml` and the shell's entry in `src-tauri/Cargo.lock`, plus
+  `CHANGELOG.md`. Never edit those versions by hand; `pnpm check:versions` (in CI) fails
+  when they drift or when a release tag does not match. The extension lives in its own
+  repo (github.com/Administracion-Abierta/AutoFirme-Extension) with its own versioning.
 - Crypto code MUST ship with a verification check (e.g. generated signature verified
   by `openssl cms -verify` in a script/test) before the issue can move to review.
 - UI: clean, modern, accessible; ES/EN copy. Prettier than AutoFirma is a requirement,
