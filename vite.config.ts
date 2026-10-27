@@ -12,16 +12,7 @@ import { defineConfig } from 'vitest/config';
  */
 const MISSING_ID_ALLOWLIST: Record<string, true> = { '': true };
 
-export default defineConfig(({ mode }) => mode === 'extension' ? {
-	root: 'extension',
-	base: './',
-	// Chrome rejects packaged files whose names start with "_" (e.g. static/_headers)
-	// and the extension needs only a few of the web app's public assets.
-	publicDir: false,
-	plugins: [tailwindcss(), svelte()],
-	resolve: { alias: { '#lib': fileURLToPath(new URL('./src/lib', import.meta.url)) } },
-	build: { outDir: '../dist/extension', emptyOutDir: true, target: 'chrome116' }
-} : {
+export default defineConfig(({ mode }) => ({
 	plugins: [
 		tailwindcss(),
 		sveltekit({
@@ -50,4 +41,4 @@ export default defineConfig(({ mode }) => mode === 'extension' ? {
 		testTimeout: 20_000,
 		hookTimeout: 120_000
 	}
-});
+}));
