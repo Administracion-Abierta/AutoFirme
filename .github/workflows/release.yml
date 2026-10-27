@@ -24,7 +24,7 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
@@ -90,7 +90,7 @@ jobs:
         with:
           workspaces: src-tauri
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
