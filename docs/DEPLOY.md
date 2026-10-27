@@ -19,19 +19,21 @@ site, no demo host, no third-party store as primary (locked in
 | `SHA256SUMS` over all assets | release workflow | Integrity check before install |
 | Minisign signatures | desktop updater path | Trust without a store |
 
-The release workflow (`.github/workflows/release.yml`) builds the extension
-package **twice from scratch** and diffs the `SHA256SUMS`: a change that breaks
+The release workflow (`.github/workflows/release.yml`) packs the site tarball
+from `build/`. The browser extension is built and released from its own repo
+(github.com/Administracion-Abierta/AutoFirme-Extension), which packages it
+**twice from scratch** and diffs the `SHA256SUMS`: a change that breaks
 packaging reproducibility fails the release before upload.
 
 ## Versioning
 
 Automatic via Release Please: conventional commits merged into `main` produce a
-release PR that bumps the single product version in `package.json`,
-`extension/manifest.json` (Chrome reads the manifest one),
+release PR that bumps the product version in `package.json`,
 `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and the shell's entry in
 `src-tauri/Cargo.lock`, plus `CHANGELOG.md`. Never edit those versions by hand.
 `pnpm check:versions` (also a CI gate) fails when they drift or when a release
-tag does not match — see `scripts/check-versions.mjs`.
+tag does not match — see `scripts/check-versions.mjs`. The extension repo
+versions its own `package.json` + `extension/manifest.json` the same way.
 
 ## Signing keys
 
@@ -39,7 +41,7 @@ tag does not match — see `scripts/check-versions.mjs`.
 - Minisign signatures cover the desktop updater path (roadmap: Apple Developer
   Program purchase rides the P7 budget; Keychain provider mandatory).
 - The extension stays **unsigned**: Chrome needs Developer Mode for a manual
-  install until a store listing exists.
+  install until a store listing exists (see the extension repo).
 
 ## Milestones
 
