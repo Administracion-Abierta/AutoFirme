@@ -37,7 +37,7 @@ jobs:
           openssl version
           xmlsec1 --version
           xmllint --version
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -86,7 +86,7 @@ jobs:
           apt-get install -y -qq --no-install-recommends openssl ca-certificates
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           openssl version
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -124,7 +124,7 @@ jobs:
       # Latent bug exposed when the label fix let this job run for the first
       # time: without a checkout the workspace is empty, and pnpm/action-setup
       # dies with "No pnpm version is specified" (no package.json in sight).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Toolchain and test oracles
         run: |
           apt-get update -qq
