@@ -33,6 +33,9 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: pnpm
+      # container runs as root; the checked-out tree is owned by the runner
+      # uid, so git refuses it without this (package-extension.py rev-parses HEAD).
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm build:extension
