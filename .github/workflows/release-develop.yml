@@ -61,6 +61,7 @@ jobs:
             dist/autofirme-extension-*.zip dist/SHA256SUMS
           echo "release $TAG created"
       - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
         with:
           name: autofirme-web
           path: build/

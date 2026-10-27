@@ -123,6 +123,20 @@ test('workflows pin upload-artifact v4 (v3 is force-failed on GitHub)', () => {
 	assert.ok(uses.length >= 4 && uses.every((u) => u === 'upload-artifact@v4'), uses.join(' '));
 });
 
+test('every upload-artifact step is skipped on non-GitHub hosts (v4 = GHESNotSupportedError there)', () => {
+	const sources = [workflow, devWorkflow, ciWorkflow];
+	const blocks = sources.flatMap((s) => s.match(/- uses: actions\/upload-artifact@\S+[^-]*?if: startsWith\(github\.server_url, 'https:\/\/github\.com'\)/gs) ?? []);
+	assert.ok(blocks.length >= 5, `found ${blocks.length} upload blocks`);
+	for (const block of blocks) {
+		assert.match(block, /if: startsWith\(github\.server_url, 'https:\/\/github\.com'\)/, block);
+	}
+});
+
+test('the tauri shell job only runs on GitHub (dtolnay/* is not on the Forgejo mirror)', () => {
+	const job = ciWorkflow.match(/^  shell:\n(?:  .*\n|\n)*/m)?.[0] ?? '';
+	assert.match(job, /if: startsWith\(github\.server_url, 'https:\/\/github\.com'\)/);
+});
+
 test('the trixie container pins the release jobs (review round 1)', () => {
 	const linux = job(workflow, 'linux-packages');
 	// node:24-trixie = debian:trixie + node; keeps the OpenSSL 3.5 floor and lets the

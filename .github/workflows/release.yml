@@ -50,7 +50,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: scripts/release.sh "${{ github.event.release.tag_name }}" dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-*.tar.gz
+      # upload-artifact v4 fails on non-GitHub hosts (GHESNotSupportedError);
+      # the Forgejo release-published event reaches this workflow, so skip there.
       - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
         with:
           name: release-artifacts
           path: |
@@ -118,6 +121,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: scripts/release.sh "${{ github.event.release.tag_name }}" dist/*.deb dist/*.rpm dist/*.AppImage dist/SHA256SUMS.linux
       - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
         with:
           name: linux-packages
           path: |
