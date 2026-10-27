@@ -42,8 +42,7 @@ test('the artifacts job builds twice and diffs SHA256SUMS before uploading', () 
 	assert.match(artifacts, /cp dist\/SHA256SUMS sums-a\.txt/);
 	assert.match(artifacts, /rm -rf dist build \.svelte-kit/);
 	assert.match(artifacts, /diff sums-a\.txt dist\/SHA256SUMS/);
-	const packs = artifacts.match(/pnpm package:extension/g);
-	assert.ok(packs && packs.length === 2, `expected exactly 2 package:extension runs, got ${packs?.length}`);
+	assert.ok(!/pnpm (build|package):extension/.test(artifacts), 'extension build lives in its own repo now');
 	assert.ok(
 		artifacts.indexOf('diff sums-a.txt') < artifacts.indexOf('scripts/release.sh'),
 		'reproducibility diff must run before the release upload'
@@ -120,13 +119,13 @@ test('workflows pin upload-artifact v4 (v3 is force-failed on GitHub)', () => {
 		assert.doesNotMatch(source, /upload-artifact@v3/);
 	}
 	const uses = [workflow, devWorkflow, ciWorkflow].join('\n').match(/upload-artifact@\S+/g) ?? [];
-	assert.ok(uses.length >= 4 && uses.every((u) => u === 'upload-artifact@v4'), uses.join(' '));
+	assert.ok(uses.length >= 3 && uses.every((u) => u === 'upload-artifact@v4'), uses.join(' '));
 });
 
 test('every upload-artifact step is skipped on non-GitHub hosts (v4 = GHESNotSupportedError there)', () => {
 	const sources = [workflow, devWorkflow, ciWorkflow];
 	const blocks = sources.flatMap((s) => s.match(/- uses: actions\/upload-artifact@\S+[^-]*?if: startsWith\(github\.server_url, 'https:\/\/github\.com'\)/gs) ?? []);
-	assert.ok(blocks.length >= 5, `found ${blocks.length} upload blocks`);
+	assert.ok(blocks.length >= 4, `found ${blocks.length} upload blocks`);
 	for (const block of blocks) {
 		assert.match(block, /if: startsWith\(github\.server_url, 'https:\/\/github\.com'\)/, block);
 	}
@@ -156,22 +155,23 @@ test('the trixie container pins the release jobs (review round 1)', () => {
 	assert.ok(!pkgs.includes('gh'), 'gh is not in the build container; release.sh uses curl');
 });
 
-// The develop pre-release channel: every push to develop ships code + extension zip
-// as a marked-unstable dev-<sha> pre-release (GitHub only).
+// The develop pre-release channel: every push to develop ships the web tarball
+// as a marked-unstable dev-<sha> pre-release (GitHub only). The extension ships
+// from its own repo (Administracion-Abierta/AutoFirme-Extension).
 
 test('develop release triggers only on develop pushes and manual dispatch', () => {
 	const onEnd = devWorkflow.indexOf('\npermissions:');
 	assert.ok(onEnd > 0, 'permissions must follow on:');
 	assert.equal(
 		devWorkflow.slice(0, onEnd),
-		`name: Develop release\n\n# Every push to develop ships a pre-release tagged dev-<short-sha>: the rolling\n# test channel for the extension zip and the static site. Production releases\n# keep coming from release-please on main (release.yml). Publish step is\n# GitHub-only: both hosts share this tree and the Forgejo side must stay quiet.\non:\n  push:\n    branches: [develop]\n  workflow_dispatch:\n`
+		`name: Develop release\n\n# Every push to develop ships a pre-release tagged dev-<short-sha>: the rolling\n# test channel for the web app and the desktop shell. Production releases\n# keep coming from release-please on main (release.yml). Publish step is\n# GitHub-only: both hosts share this tree and the Forgejo side must stay quiet.\non:\n  push:\n    branches: [develop]\n  workflow_dispatch:\n`
 	);
 });
 
-test('develop artifacts job publishes the pre-release with code, extension zip and checksums', () => {
+test('develop artifacts job publishes the pre-release with the web tarball', () => {
 	const artifacts = job(devWorkflow, 'artifacts');
 	assert.match(artifacts, /pnpm build\n/);
-	assert.match(artifacts, /pnpm package:extension/);
+	assert.ok(!/extension/.test(artifacts), 'extension steps live in their own repo now');
 	// The tag is commit-pinned so a release always maps to exactly one tree.
 	assert.match(artifacts, /TAG="dev-\$\{GITHUB_SHA::7\}"/);
 	// The helper derives tag/commit from the env GITHUB_TOKEN context: --sha pins the
@@ -180,7 +180,7 @@ test('develop artifacts job publishes the pre-release with code, extension zip a
 	assert.match(artifacts, /--prerelease/);
 	assert.match(artifacts, /--title "\[Development build\] \$TAG/);
 	assert.match(artifacts, /--notes-file release-notes\.md/);
-	assert.match(artifacts, /dist\/autofirme-extension-\*\.zip dist\/SHA256SUMS/);
+	assert.match(artifacts, /dist\/autofirme-web-\*\.tar\.gz/);
 });
 
 test('develop releases are labelled as development builds', () => {

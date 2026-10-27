@@ -14,8 +14,7 @@ site, no demo host, no third-party store as primary (locked in
 
 | Asset | Produce | Use |
 |---|---|---|
-| Extension ZIP + `SHA256SUMS` | `pnpm package:extension` | Load unpacked / store install |
-| `autofirme-web-<tag>.tar.gz` | release workflow packs `build/` | Extension options page bundle, archived for reproducibility |
+| `autofirme-web-<tag>.tar.gz` | release workflow packs `build/` | Static site, archived for reproducibility |
 | Desktop installer per platform (Linux first) | Tauri bundler (see `docs/DESKTOP-ROADMAP.md` phases) | The full product |
 | `SHA256SUMS` over all assets | release workflow | Integrity check before install |
 | Minisign signatures | desktop updater path | Trust without a store |

@@ -59,15 +59,4 @@ describe('ES/EN copy parity', () => {
 		expectParity('extensionCopy', extensionCopy);
 	});
 
-	it('keeps the manifest description bilingual', () => {
-		// Chrome truncates store descriptions past 132 characters.
-		const { description } = JSON.parse(readFileSync('extension/manifest.json', 'utf8'));
-		expect((description as string).length).toBeLessThanOrEqual(132);
-		expectBilingual('manifest description', description);
-	});
-
-	it('keeps the toolbar title bilingual', () => {
-		const { action } = JSON.parse(readFileSync('extension/manifest.json', 'utf8'));
-		expectBilingual('manifest action.default_title', action?.default_title);
-	});
 });

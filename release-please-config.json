@@ -9,11 +9,6 @@
 			"extra-files": [
 				{
 					"type": "json",
-					"path": "extension/manifest.json",
-					"jsonpath": "$.version"
-				},
-				{
-					"type": "json",
 					"path": "src-tauri/tauri.conf.json",
 					"jsonpath": "$.version"
 				},

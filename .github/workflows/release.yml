@@ -29,30 +29,26 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       # container runs as root; the checked-out tree is owned by the runner
-      # uid, so git refuses it without this (package-extension.py rev-parses HEAD).
+      # uid, so git refuses it without this (the release step rev-parses HEAD).
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: pnpm install --frozen-lockfile
-      # A release that bumps only some of the five version files must not ship.
+      # A release that bumps only some of the four version files must not ship.
       - run: node scripts/check-versions.mjs ${{ github.event.release.tag_name }}
       - run: pnpm build
-      - run: pnpm build:extension
-      - run: pnpm package:extension
       # Issue #3: build the package twice from scratch; a change that breaks the
-      # reproducibility of package-extension.py must fail here, before upload.
+      # reproducibility of the static build must fail here, before upload.
       - name: Verify packaging reproducibility (build twice, compare SHA256SUMS)
         run: |
           cp dist/SHA256SUMS sums-a.txt
           rm -rf dist build .svelte-kit
           pnpm build
-          pnpm build:extension
-          pnpm package:extension
           diff sums-a.txt dist/SHA256SUMS
       - name: Pack the static site
         run: tar -czf dist/autofirme-web-${{ github.event.release.tag_name }}.tar.gz -C build .
       - name: Attach artifacts to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: scripts/release.sh "${{ github.event.release.tag_name }}" dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-*.tar.gz
+        run: scripts/release.sh "${{ github.event.release.tag_name }}" dist/autofirme-web-*.tar.gz
       # upload-artifact v4 fails on non-GitHub hosts (GHESNotSupportedError);
       # the Forgejo release-published event reaches this workflow, so skip there.
       - uses: actions/upload-artifact@v4
@@ -60,8 +56,6 @@ jobs:
         with:
           name: release-artifacts
           path: |
-            dist/autofirme-extension-*.zip
-            dist/SHA256SUMS
             dist/autofirme-web-*.tar.gz
           if-no-files-found: error
   # Issue #113: desktop shell for Linux. Static site stays host-agnostic (no

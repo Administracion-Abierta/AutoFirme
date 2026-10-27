@@ -150,32 +150,11 @@ servidor local de firma y su propio MCP. Decisiones y fases en
 
 ## Extensión de Chrome
 
-La extensión MV3 carga la misma aplicación y añade el puente que necesita una sede electrónica:
-intercepta las llamadas `AutoScript` en sitios HTTP/HTTPS, muestra qué sitio y qué operación pide
-permiso y exige una confirmación humana antes de firmar.
-
-![Aplicación completa abierta desde la extensión](docs/images/extension-inicio.png)
-
-- **Selector por sitio**: cada origen debe habilitarse explícitamente; el resto sigue usando el
-  AutoFirma nativo si está instalado.
-- **Confirmación por operación**: se muestran el sitio, el formato, el archivo y el resumen antes de
-  firmar.
-- **Ajustes de extensión**: acceso por sitio, TSA y credenciales del puente MCP.
-
-![Ajustes de la extensión](docs/images/extension-ajustes.png)
-
-Requisitos: Chrome/Chromium 116+ y Node 24 para compilar. Firefox está pendiente
-([#117](https://git.eduard3v.com/EduarD3V/AutoFirme/issues/117)).
-
-```bash
-pnpm install --frozen-lockfile
-pnpm build:extension
-# chrome://extensions → Modo desarrollador → Cargar descomprimida → dist/extension
-pnpm package:extension   # ZIP + SHA256SUMS
-```
-
-Los detalles del contrato de sitio, la instalación y los límites están en
-[`docs/CHROME-EXTENSION.md`](docs/CHROME-EXTENSION.md).
+La extensión MV3 (misma aplicación, más el puente que intercepta las llamadas `AutoScript` de una
+sede electrónica) vive ahora en su propio repositorio:
+[**Administracion-Abierta/AutoFirme-Extension**](https://github.com/Administracion-Abierta/AutoFirme-Extension).
+Ahí están la instalación, los releases (`autofirme-extension-*.zip` + `SHA256SUMS`) y la
+documentación (`docs/CHROME-EXTENSION.md`, diseño y verificación incluidos).
 
 ## Servidor MCP
 
@@ -241,22 +220,17 @@ pnpm preview        # sirve el resultado localmente para desarrollo
 | Comando | Qué hace |
 |---|---|
 | `pnpm dev` | Servidor de desarrollo con recarga. |
-| `pnpm build` | Build estático en `build/` (opciones de la extensión + arnés local). |
+| `pnpm build` | Build estático en `build/` (opciones + arnés local). |
 | `pnpm preview` | Sirve el build estático. |
-| `pnpm check` | `svelte-check` + TypeScript de la app y la extensión. |
-| `pnpm test` | Vitest + pruebas de la extensión y de los artefactos. |
+| `pnpm check` | `svelte-check` + TypeScript. |
+| `pnpm test` | Vitest + pruebas de Node (workflows, artefactos). |
 | `pnpm perf` | Presupuestos de rendimiento: arranque en frío, PDF de 50 MB y lote de 500 archivos. |
 | `pnpm verify:real` | Firma real y verificación con OpenSSL. |
-| `pnpm test:extension:browser` | Flujo completo de la extensión en Chromium. |
-| `pnpm demo:registradores` | Prueba contra la web real de los registradores. |
-| `pnpm build:extension` | Extensión desempaquetada en `dist/extension`. |
-| `pnpm check:extension` | Comprueba el artefacto de la extensión. |
-| `pnpm package:extension` | ZIP de la extensión y `SHA256SUMS`. |
-| `pnpm check:versions` | Comprueba que la versión de la app y la del manifiesto coinciden. |
+| `pnpm check:versions` | Comprueba que las cuatro versiones (app + escritorio) coinciden. |
 
 La criptografía no se valida solo contra sí misma: cada flujo tiene una comprobación con una
 herramienta independiente. Los detalles y los resultados registrados están en
-[`docs/CHROME-EXTENSION-VERIFICATION.md`](docs/CHROME-EXTENSION-VERIFICATION.md).
+[`docs/CHROME-EXTENSION-VERIFICATION.md`](https://github.com/Administracion-Abierta/AutoFirme-Extension/blob/main/docs/CHROME-EXTENSION-VERIFICATION.md).
 
 ## Estructura del repositorio
 
@@ -264,14 +238,11 @@ herramienta independiente. Los detalles y los resultados registrados están en
 src/lib/             motor de firma: formatos, certificados, i18n, componentes (compartido)
 src/routes/          entrada SvelteKit (webview de escritorio + página de opciones)
 src-tauri/           shell de escritorio (Tauri v2) — claves nativas, deep links, MCP
-extension/           manifiesto MV3, background, content script y puente
-mcp/                 servidor MCP (stdio + Streamable HTTP)
 static/              iconos y theme bootstrap
 build/               generado: página de opciones + arnés local (`pnpm preview`) — nunca desplegado
-docs/                arquitectura, paridad, extensión, MCP y notas de ingeniería inversa
+docs/                arquitectura, paridad, MCP y notas de ingeniería inversa
 scripts/             builds, empaquetado, comprobaciones y pruebas de humo
 test/                fixtures y scripts de verificación cruzada
-demo/                prueba de la extensión contra webs reales
 ```
 
 ## Documentación
