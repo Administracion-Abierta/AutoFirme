@@ -59,7 +59,10 @@ jobs:
       # 50 MB PDF, 500-file batch and cold start; absolute ceilings calibrated on a dev box.
       - run: pnpm perf
       - run: pnpm package:extension
-      - uses: actions/upload-artifact@v3
+      # upload-artifact v4 talks to GitHub's artifact API; on Forgejo it fails
+      # with GHESNotSupportedError (see run 2469), so skip it off-GitHub.
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
         with:
           name: autofirme-extension
           path: |
@@ -67,8 +70,6 @@ jobs:
             dist/SHA256SUMS
           if-no-files-found: error
 
-  # The node sidecar used to run in no workflow at all; it is part of the pnpm
-  # workspace now, so the same install covers it.
   mcp:
     name: mcp check, test, e2e
     runs-on: ubuntu-latest
@@ -110,6 +111,10 @@ jobs:
     # label, so this job sat `waiting` forever — and, for push runs on develop,
     # the run never concluded, wedging the workflow's concurrency group and
     # queueing every later ci.yml push run behind it (run 351).
+    # dtolnay/*, Swatinem/* and oven-sh/* actions are not mirrored on
+    # data.forgejo.org (only actions/* is), so the job can only run on GitHub;
+    # Forgejo CI coverage comes from the jobs above.
+    if: startsWith(github.server_url, 'https://github.com')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     container:
@@ -135,10 +140,10 @@ jobs:
           xmlsec1 --version
           xmllint --version
           zip -v | sed -n '2p'
-      # Fully qualified URLs: data.forgejo.org (DEFAULT_ACTIONS_URL) mirrors only
-      # actions/*; dtolnay and Swatinem live on github.com.
-      - uses: https://github.com/dtolnay/rust-toolchain@stable
-      - uses: https://github.com/Swatinem/rust-cache@v2
+      # Plain refs work on both hosts: GitHub resolves them natively, Forgejo via
+      # DEFAULT_ACTIONS_URL (which mirrors github.com).
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       - uses: pnpm/action-setup@v4
@@ -168,7 +173,8 @@ jobs:
           timeout 120 xvfb-run -a --server-args="-screen 0 1280x1024x24" \
             ./src-tauri/target/release/autofirme-desktop | tee smoke.log
           grep -q "SHELL_SMOKE Finished" smoke.log
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
         with:
           name: shell-smoke
           path: smoke.log

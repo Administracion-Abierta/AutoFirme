@@ -2,7 +2,8 @@ name: Develop release
 
 # Every push to develop ships a pre-release tagged dev-<short-sha>: the rolling
 # test channel for the extension zip and the static site. Production releases
-# keep coming from release-please on main (release.yml).
+# keep coming from release-please on main (release.yml). Publish step is
+# GitHub-only: both hosts share this tree and the Forgejo side must stay quiet.
 on:
   push:
     branches: [develop]
@@ -17,7 +18,7 @@ concurrency:
 
 jobs:
   artifacts:
-    name: build and publish dev-<commit> release
+    if: startsWith(github.server_url, 'https://github.com')
     runs-on: ubuntu-latest
     container: node:24-trixie
     timeout-minutes: 25
@@ -52,14 +53,15 @@ jobs:
         run: |
           TAG="dev-${GITHUB_SHA::7}"
           echo "$NOTES" > release-notes.md
-          scripts/forgejo-release.sh "$TAG" \
+          scripts/release.sh "$TAG" \
             --sha "$GITHUB_SHA" \
             --title "[Development build] $TAG — unstable, for testing only" \
             --notes-file release-notes.md \
             --prerelease \
             dist/autofirme-extension-*.zip dist/SHA256SUMS
           echo "release $TAG created"
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
         with:
           name: autofirme-web
           path: build/

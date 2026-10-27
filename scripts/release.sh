@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Create (or reuse) a Forgejo release and attach assets, via the v1 API.
-# `gh` cannot be used here: it hardcodes the GitHub /api/v3 surface, which
-# Forgejo does not implement. Runs inside node:24-trixie (curl + python3).
+# Create (or reuse) a release and attach assets, via the host REST API.
+# Host-detecting: GitHub Actions (api.github.com, octet-stream asset upload) vs
+# Forgejo (GITHUB_SERVER_URL/api/v1, multipart asset upload). `gh` is not used:
+# it is not in the node:24-trixie build container.
 #
-# Usage: forgejo-release.sh <tag> [--sha SHA] [--title T] [--notes-file F]
-#                            [--prerelease] <asset>...
-# Env:   GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_TOKEN (all set by Actions).
+# Usage: release.sh <tag> [--sha SHA] [--title T] [--notes-file F]
+#                  [--prerelease] <asset>...
+# Env:   GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_TOKEN (all set by Actions),
+#        optional RELEASE_API_BASE to override the derived API root.
 # Re-running is safe: an existing release is reused and same-named assets are
 # replaced (delete + re-upload), the `gh --clobber` behaviour.
 set -euo pipefail
@@ -34,7 +36,19 @@ done
 for f in "${assets[@]}"; do [ -f "$f" ] || { echo "asset missing: $f" >&2; exit 1; } done
 
 : "${GITHUB_SERVER_URL:?GITHUB_SERVER_URL not set}" "${GITHUB_REPOSITORY:?GITHUB_REPOSITORY not set}" "${GITHUB_TOKEN:?GITHUB_TOKEN not set}"
-api="$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY"
+
+# Forgejo keeps the Gitea-style REST under /api/v1; GitHub serves the same
+# release surface at its API root. RELEASE_API_BASE wins if set.
+if [ -n "${RELEASE_API_BASE:-}" ]; then
+	api="$RELEASE_API_BASE/repos/$GITHUB_REPOSITORY"
+	host=github
+elif [[ "$GITHUB_SERVER_URL" == *github.com ]]; then
+	api="https://api.github.com/repos/$GITHUB_REPOSITORY"
+	host=github
+else
+	api="$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY"
+	host=forgejo
+fi
 
 body=$(python3 - "$tag" "$sha" "$title" "$notes_file" "$prerelease" <<'PY'
 import json, sys
@@ -48,13 +62,14 @@ print(json.dumps(payload))
 PY
 )
 
-# Create; a 409 means the tag/release already exists — reuse it.
+# Create; 409 (Forgejo) / 422 (GitHub, release or tag already exists) = reuse.
 code=$(curl -sS -o /tmp/fjr-create.json -w '%{http_code}' \
 	-H "Authorization: token $GITHUB_TOKEN" -H 'Content-Type: application/json' \
 	-d "$body" "$api/releases") || { echo "release create request failed" >&2; exit 1; }
 case $code in
 	201) ;;
 	409) ;;
+	422) [ "$host" = github ] || { echo "release create: HTTP $code: $(cat /tmp/fjr-create.json)" >&2; exit 1; } ;;
 	*) echo "release create: HTTP $code: $(cat /tmp/fjr-create.json)" >&2; exit 1 ;;
 esac
 
@@ -71,8 +86,16 @@ print(next((a["id"] for a in release["assets"] if a["name"] == name), ""))' "$na
 		curl -fsS -X DELETE -H "Authorization: token $GITHUB_TOKEN" "$api/releases/$id/assets/$asset_id" >/dev/null
 		echo "replaced $name"
 	fi
-	curl -fsS -H "Authorization: token $GITHUB_TOKEN" \
-		-F "attachment=@$f" "$api/releases/$id/assets?name=$name" >/dev/null
+	if [ "$host" = forgejo ]; then
+		# Gitea/Forgejo asset upload is multipart.
+		curl -fsS -H "Authorization: token $GITHUB_TOKEN" \
+			-F "attachment=@$f" "$api/releases/$id/assets?name=$name" >/dev/null
+	else
+		# GitHub asset upload is a raw octet-stream body (multipart is not supported).
+		curl -fsS -H "Authorization: token $GITHUB_TOKEN" \
+			-H 'Content-Type: application/octet-stream' \
+			--data-binary "@$f" "$api/releases/$id/assets?name=$name" >/dev/null
+	fi
 	echo "uploaded $name"
 done
 

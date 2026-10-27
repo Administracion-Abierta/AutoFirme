@@ -13,7 +13,7 @@ jobs:
   artifacts:
     name: build and attach release artifacts
     runs-on: ubuntu-latest
-    # node:24-trixie: curl + python3 for the Forgejo API upload below; the
+    # node:24-trixie: curl + python3 for the release API upload below; the
     # default label image is uncontrolled and has no curl CA bundle guarantee.
     container: node:24-trixie
     timeout-minutes: 25
@@ -49,8 +49,11 @@ jobs:
       - name: Attach artifacts to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: scripts/forgejo-release.sh "${{ github.event.release.tag_name }}" dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-*.tar.gz
-      - uses: actions/upload-artifact@v3
+        run: scripts/release.sh "${{ github.event.release.tag_name }}" dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-*.tar.gz
+      # upload-artifact v4 fails on non-GitHub hosts (GHESNotSupportedError);
+      # the Forgejo release-published event reaches this workflow, so skip there.
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
         with:
           name: release-artifacts
           path: |
@@ -61,7 +64,7 @@ jobs:
   # Issue #113: desktop shell for Linux. Static site stays host-agnostic (no
   # signing server in this repo), so only the store of files above changes.
   linux-packages:
-    name: build linux packages (deb, rpm)
+    name: build linux packages (deb, rpm, AppImage)
     runs-on: ubuntu-latest
     timeout-minutes: 40
     # node:24-trixie: same OpenSSL 3.5 floor, node preinstalled for the actions/* steps.
@@ -76,11 +79,10 @@ jobs:
           apt-get install -y -qq --no-install-recommends git ca-certificates pkg-config build-essential \
             libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev \
             libpcsclite-dev rpm desktop-file-utils shared-mime-info
-      # Fully qualified URLs: data.forgejo.org (DEFAULT_ACTIONS_URL) mirrors only
-      # actions/*; dtolnay and Swatinem live on github.com (run 340 died cloning
-      # data.forgejo.org/dtolnay/rust-toolchain — repo does not exist there).
-      - uses: https://github.com/dtolnay/rust-toolchain@1.90
-      - uses: https://github.com/Swatinem/rust-cache@v2
+      # Plain refs work on both hosts: GitHub resolves them natively, Forgejo
+      # via DEFAULT_ACTIONS_URL (which mirrors github.com).
+      - uses: dtolnay/rust-toolchain@1.90
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       - uses: pnpm/action-setup@v4
@@ -92,7 +94,7 @@ jobs:
       # Sidecar: `bundle.externalBin` aborts tauri build when
       # src-tauri/binaries/autofirme-mcp-<triple> is missing (gitignored build
       # output; ci.yml's shell job builds it the same way before cargo).
-      - uses: https://github.com/oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
       - run: pnpm --filter autofirme-mcp build:binary
       - run: node scripts/check-versions.mjs ${{ github.event.release.tag_name }}
       - run: pnpm build:tauri
@@ -103,11 +105,10 @@ jobs:
           mkdir -p dist
           cp src-tauri/target/release/bundle/deb/*.deb dist/
           cp src-tauri/target/release/bundle/rpm/*.rpm dist/
-          # AppImage (~153 MiB) skipped: Forgejo caps release attachments at
-          # ~100 MiB (probed: 80 MiB OK, 120 MiB -> 413), so attaching it 413s
-          # the whole job. Re-add here AND in the two asset lists below if the
-          # server cap is ever raised.
-          (cd dist && sha256sum *.deb *.rpm > SHA256SUMS.linux)
+          # AppImage (~153 MiB) is back: GitHub caps release assets at 2 GiB
+          # (Forgejo capped at ~100 MiB and 413'd the attach — see #190).
+          cp src-tauri/target/release/bundle/appimage/*.AppImage dist/
+          (cd dist && sha256sum *.deb *.rpm *.AppImage > SHA256SUMS.linux)
       - name: Verify desktop and protocol registration
         run: |
           DEB=(src-tauri/target/release/bundle/deb/*.deb)
@@ -118,8 +119,9 @@ jobs:
       - name: Attach linux packages to the release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: scripts/forgejo-release.sh "${{ github.event.release.tag_name }}" dist/*.deb dist/*.rpm dist/SHA256SUMS.linux
-      - uses: actions/upload-artifact@v3
+        run: scripts/release.sh "${{ github.event.release.tag_name }}" dist/*.deb dist/*.rpm dist/*.AppImage dist/SHA256SUMS.linux
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
         with:
           name: linux-packages
           path: |
