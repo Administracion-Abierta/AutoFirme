@@ -59,7 +59,7 @@ jobs:
       # 50 MB PDF, 500-file batch and cold start; absolute ceilings calibrated on a dev box.
       - run: pnpm perf
       - run: pnpm package:extension
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: autofirme-extension
           path: |
@@ -135,10 +135,10 @@ jobs:
           xmlsec1 --version
           xmllint --version
           zip -v | sed -n '2p'
-      # Fully qualified URLs: data.forgejo.org (DEFAULT_ACTIONS_URL) mirrors only
-      # actions/*; dtolnay and Swatinem live on github.com.
-      - uses: https://github.com/dtolnay/rust-toolchain@stable
-      - uses: https://github.com/Swatinem/rust-cache@v2
+      # Plain refs work on both hosts: GitHub resolves them natively, Forgejo via
+      # DEFAULT_ACTIONS_URL (which mirrors github.com).
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
       - uses: pnpm/action-setup@v4
@@ -168,7 +168,7 @@ jobs:
           timeout 120 xvfb-run -a --server-args="-screen 0 1280x1024x24" \
             ./src-tauri/target/release/autofirme-desktop | tee smoke.log
           grep -q "SHELL_SMOKE Finished" smoke.log
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: shell-smoke
           path: smoke.log
