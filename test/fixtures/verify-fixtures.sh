@@ -20,6 +20,28 @@ expect_ok() {
   if "$@" >/dev/null 2>&1; then ok "$name"; else fail "$name"; fi
 }
 
+# --- OCSP / CRL revocation fixtures (test/fixtures/revocation, #136) -------
+# `openssl ocsp` exits 0 even on "Response Verify Failure", so grep the report
+# instead of trusting the exit status.
+
+expect_ok "revocation/resp.der verifies against revocation/ca.der" \
+  sh -c 'openssl ocsp -respin revocation/resp.der -CAfile revocation/ca.der 2>&1 | grep -q "Response verify OK"'
+
+expect_ok "revocation/good_ca.der verifies against revocation/ca.der" \
+  sh -c 'openssl ocsp -respin revocation/good_ca.der -CAfile revocation/ca.der 2>&1 | grep -q "Response verify OK"'
+
+expect_ok "revocation/forged_embed.der is NOT trusted (self-signed rogue responder)" \
+  sh -c 'openssl ocsp -respin revocation/forged_embed.der -CAfile revocation/ca.der 2>&1 | grep -q "Response Verify Failure"'
+
+expect_ok "revocation/resp.der reports the pinned serial as revoked" \
+  sh -c 'openssl ocsp -respin revocation/resp.der -text -noverify 2>&1 | grep -q "Cert Status: revoked"'
+
+expect_ok "revocation/good_ca.der reports the pinned serial as good" \
+  sh -c 'openssl ocsp -respin revocation/good_ca.der -text -noverify 2>&1 | grep -q "Cert Status: good"'
+
+expect_ok "revocation/crl.der verifies against revocation/ca.der" \
+  openssl crl -in revocation/crl.der -inform der -CAfile revocation/ca.der -noout
+
 expect_fail() {
   local name="$1"
   shift
@@ -44,6 +66,7 @@ expect_fail "cades-detached.csig is rejected against document-tampered.txt" \
 
 FIXTURES="$FIXTURES" python3 - <<'PY'
 import base64
+import binascii
 import ssl
 import hashlib
 import os
@@ -218,6 +241,51 @@ check("xades-tampered.xsig differs from xades-valid.xsig in exactly one byte "
       and between(valid, "<ds:SignedInfo>", "</ds:SignedInfo>")
       == between(tampered, "<ds:SignedInfo>", "</ds:SignedInfo>")
       and signature_value == ET.fromstring(tampered).find(".//{%s}SignatureValue" % DS).text)
+
+# --- PAdES golden (app-produced, see README) -------------------------------
+def pades_parts(pdf):
+    byte_range = re.search(rb"/ByteRange\s*\[([^\]]*)\]", pdf)
+    contents = re.search(rb"/Contents\s*<", pdf)
+    if byte_range is None or contents is None:
+        raise ValueError("no /ByteRange or /Contents")
+    nums = [int(n) for n in byte_range.group(1).split()]
+    start = contents.end()
+    end = pdf.index(b">", start)
+    hexs = pdf[start:end]
+    covered = pdf[nums[0]:nums[0] + nums[1]] + pdf[nums[2]:nums[2] + nums[3]]
+    return nums, hexs, binascii.unhexlify(hexs), covered
+
+def pades_verify(pdf):
+    nums, _, der, covered = pades_parts(pdf)
+    with tempfile.TemporaryDirectory() as tmp:
+        sigfile = os.path.join(tmp, "signature.der")
+        datafile = os.path.join(tmp, "byte-range.bin")
+        with open(sigfile, "wb") as fh:
+            fh.write(der)
+        with open(datafile, "wb") as fh:
+            fh.write(covered)
+        return subprocess.run(
+            ["openssl", "cms", "-verify", "-inform", "DER", "-binary", "-in", sigfile,
+             "-content", datafile, "-CAfile", os.path.join(fx, "pades-signer.crt"),
+             "-purpose", "any", "-out", os.devnull],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+
+pades = readb(os.path.join(fx, "pades-b-b-signed.pdf"))
+pades_source = readb(os.path.join(fx, "pades-source.pdf"))
+nums, hexs, pades_der, pades_covered = pades_parts(pades)
+check("pades-b-b-signed.pdf /ByteRange leaves out only the /Contents hex string",
+      nums[0] == 0
+      and nums[2] == nums[1] + len(hexs) + 2
+      and nums[2] + nums[3] == len(pades)
+      and len(hexs) % 2 == 0)
+check("pades-b-b-signed.pdf keeps pades-source.pdf as a byte-identical prefix inside /ByteRange",
+      pades.startswith(pades_source) and pades_source in pades_covered)
+check("pades-b-b-signed.pdf CMS verifies over /ByteRange with pades-signer.crt",
+      pades_verify(pades))
+patched = bytearray(pades)
+patched[pades_covered.index(pades_source) + len(pades_source) // 2] ^= 0x01
+check("pades-b-b-signed.pdf CMS rejects a patched byte inside /ByteRange",
+      not pades_verify(bytes(patched)))
 
 # --- c14n oracles ----------------------------------------------------------
 names = sorted(n[:-4] for n in os.listdir(os.path.join(fx, "c14n")) if n.endswith(".xml"))

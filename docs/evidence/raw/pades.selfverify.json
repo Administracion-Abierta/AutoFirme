@@ -1,0 +1,51 @@
+{
+  "format": "pdf",
+  "status": "valid",
+  "ok": true,
+  "checks": [
+    {
+      "id": "structure",
+      "status": "pass",
+      "detail": "ByteRange [0 1590 6120 669]: CMS SignedData v1, 2 certificate(s), content detached"
+    },
+    {
+      "id": "contentDigest",
+      "status": "pass",
+      "detail": "SHA-256 of the content matches the signed messageDigest (236fe39907495d33…)"
+    },
+    {
+      "id": "signature",
+      "status": "pass",
+      "detail": "RSASSA-PKCS1-v1_5 / SHA-256 over signedAttrs (4 attributes)"
+    },
+    {
+      "id": "signerCert",
+      "status": "pass",
+      "detail": "CN=Ñandú Prueba, O=AutoFirme, C=ES — serial 258ea18077f01450aa58b45be63dfadbbc0b0189"
+    },
+    {
+      "id": "certValidity",
+      "status": "pass",
+      "detail": "valid 2026-10-21T16:59:49.000Z → 2027-10-21T16:59:49.000Z"
+    },
+    {
+      "id": "certChain",
+      "status": "pass",
+      "detail": "1 certificate(s): chain terminates in trust anchor CN=Ñandú Prueba, O=AutoFirme, C=ES"
+    },
+    {
+      "id": "signingTime",
+      "status": "pass",
+      "detail": "2026-10-21T16:59:51.000Z (signed attribute)"
+    }
+  ],
+  "signer": {
+    "subject": "CN=Ñandú Prueba, O=AutoFirme, C=ES",
+    "issuer": "CN=Ñandú Prueba, O=AutoFirme, C=ES",
+    "serial": "258ea18077f01450aa58b45be63dfadbbc0b0189",
+    "notBefore": "2026-10-21T16:59:49.000Z",
+    "notAfter": "2027-10-21T16:59:49.000Z",
+    "certificates": 2
+  },
+  "signingTime": "2026-10-21T16:59:51.000Z"
+}

@@ -1,11 +1,18 @@
 /**
- * Stored identities and outputs (issue #29). The vault runs over the in-memory backend — its crypto
+ * Stored identities (issue #29). The vault runs over the in-memory backend — its crypto
  * and error mapping are the same code the IndexedDB backend uses, which jsdom cannot provide.
  */
 
 import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createVault, memoryBackend, StoreError, type StoreBackend, type Vault } from './certstore';
+import {
+	createVault,
+	memoryBackend,
+	PKCS12_SOURCE,
+	StoreError,
+	type StoreBackend,
+	type Vault
+} from './certstore';
 import { loadSignerSession } from './keystore';
 import { Pkcs12Error } from './pkcs12';
 import type { SignerSession } from './sign';
@@ -73,6 +80,30 @@ describe('stored identities', () => {
 		expect(meta.commonName).toBe(LEAF_COMMON_NAME);
 		expect(new Date(meta.notAfter).getTime()).toBe(session.signer.notAfter.getTime());
 		expect(meta.size).toBe(fixtures.modern.length);
+		// Uploads are PKCS#12 unless the caller says otherwise (#100): the picker's badge.
+		expect(meta.source).toBe(PKCS12_SOURCE);
+	});
+
+	it('keeps a token source through a reload, defaulting old records to pkcs12', async () => {
+		const backend = memoryBackend();
+		const vault = createVault(backend);
+		const saved = await vault.saveIdentity({
+			label: 'Tarjeta',
+			session,
+			container: fixtures.modern,
+			pin: FIXTURE_PIN,
+			source: 'pkcs11:opensc-pkcs11.so'
+		});
+		expect(saved.source).toBe('pkcs11:opensc-pkcs11.so');
+		expect((await createVault(backend).listIdentities())[0].source).toBe('pkcs11:opensc-pkcs11.so');
+
+		// A record written before the field existed: no `source`, and the picker says pkcs12.
+		const legacy = structuredClone((await backend.list('identities'))[0].value) as {
+			source?: string;
+		};
+		delete legacy.source;
+		await backend.put('identities', { id: saved.id, value: legacy });
+		expect((await createVault(backend).listIdentities())[0].source).toBe(PKCS12_SOURCE);
 	});
 
 	it('survives a reload: a new vault over the same backend still unlocks', async () => {
@@ -84,6 +115,22 @@ describe('stored identities', () => {
 		expect((await reopened.unlockIdentity(meta.id, FIXTURE_PIN)).signer.commonName).toBe(
 			LEAF_COMMON_NAME
 		);
+	});
+
+	it('renames a saved signature without touching its sealed container', async () => {
+		const { vault } = vaultOn();
+		const meta = await stored(vault, 'despacho.p12');
+
+		const renamed = await vault.renameIdentity(meta.id, '  Firma personal  ');
+		expect(renamed).toEqual({ ...meta, label: 'Firma personal' });
+		expect((await vault.listIdentities())[0].label).toBe('Firma personal');
+		expect((await vault.unlockIdentity(meta.id, FIXTURE_PIN)).signer.commonName).toBe(
+			LEAF_COMMON_NAME
+		);
+
+		// A blank alias falls back to the certificate name rather than leaving an empty row.
+		expect((await vault.renameIdentity(meta.id, '   ')).label).toBe(LEAF_COMMON_NAME);
+		expect(await codeOf(() => vault.renameIdentity('missing', 'x'))).toBe('missing');
 	});
 
 	it('keeps several signatures, each with its own PIN', async () => {
@@ -162,43 +209,5 @@ describe('stored identities', () => {
 		};
 
 		expect(await codeOf(() => stored(createVault(full)))).toBe('quota');
-	});
-});
-
-describe('stored outputs', () => {
-	const signed = new TextEncoder().encode('firma de contrato') as Uint8Array<ArrayBuffer>;
-
-	it('stores the signed bytes with their digest and gives them back unchanged', async () => {
-		const { vault } = vaultOn();
-		const meta = await vault.saveOutput({
-			name: 'contrato.pdf.csig',
-			format: 'cades',
-			mime: 'application/octet-stream',
-			commonName: LEAF_COMMON_NAME,
-			bytes: signed
-		});
-
-		expect(await vault.listOutputs()).toEqual([meta]);
-		expect(meta.name).toBe('contrato.pdf.csig');
-		expect(meta.format).toBe('cades');
-		expect(meta.commonName).toBe(LEAF_COMMON_NAME);
-		expect(meta.sha256).toMatch(/^[0-9a-f]{64}$/);
-		expect(await vault.readOutput(meta.id)).toEqual(signed);
-	});
-
-	it('deletes an output', async () => {
-		const { vault } = vaultOn();
-		const meta = await vault.saveOutput({
-			name: 'contrato.pdf.csig',
-			format: 'cades',
-			mime: 'application/octet-stream',
-			commonName: LEAF_COMMON_NAME,
-			bytes: signed
-		});
-
-		await vault.removeOutput(meta.id);
-
-		expect(await vault.listOutputs()).toEqual([]);
-		expect(await vault.readOutput(meta.id)).toBeNull();
 	});
 });

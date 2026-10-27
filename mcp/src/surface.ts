@@ -10,10 +10,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { audit } from './audit';
+import type { BridgeHub } from './bridge';
 import { CertStore } from './certstore';
 import type { ServerConfig } from './config';
 import { ToolError } from './input';
-import { listCerts, signDocument, verifyDocument } from './tools';
+import { listBridgeCerts, listCerts, signDocument, verifyDocument } from './tools';
 
 /** A tool failure carries its code; an unexpected one is reported as `internal` but still logged. */
 function failure(error: unknown): { content: { type: 'text'; text: string }[]; isError: true } {
@@ -49,7 +50,7 @@ export async function loadStore(config: ServerConfig): Promise<CertStore> {
 }
 
 /** An MCP server with the three AutoFirma tools registered, transport-independent. */
-export function buildServer(config: ServerConfig, store: CertStore): McpServer {
+export function buildServer(config: ServerConfig, store: CertStore, bridge?: BridgeHub): McpServer {
 	const server = new McpServer({ name: 'autofirme', version: '0.0.0' });
 
 	server.registerTool(
@@ -57,28 +58,34 @@ export function buildServer(config: ServerConfig, store: CertStore): McpServer {
 		{
 			title: 'List signing certificates',
 			description:
-				'Certificates loaded from the operator keystore, with their validity window. No key material is ever returned. Use the signable certificate\'s cert_id with autofirma_sign.',
+				'Certificates available to sign, with their validity window. No key material is ever returned. Use the signable certificate\'s cert_id with autofirma_sign. When the AutoFirme extension bridge is connected these are the browser\'s saved identities.',
 			inputSchema: {}
 		},
-		() => json(listCerts(config, store))
+		async () => {
+			try {
+				return json(bridge?.online ? await listBridgeCerts(config, bridge) : listCerts(config, store));
+			} catch (error) {
+				return failure(error);
+			}
+		}
 	);
 
 	server.registerTool(
 		'autofirma_sign',
 		{
 			title: 'Sign a document',
-			description:
-				'Produce a CAdES-BES signature over the given document with a loaded certificate. The result is DETACHED: keep the document, it is needed to verify. Signing needs the operator to have set AUTOFIRME_MCP_CERTS and AUTOFIRME_MCP_PIN.',
-			inputSchema: {
-				...SOURCE_FIELDS,
-				format: z.enum(['cades', 'xades', 'pades']).describe('Only cades is available in this build.'),
-				cert_id: z.string().describe('cert_id from autofirma_list_certs; must be a signable certificate.'),
-				signing_time: z.string().optional().describe('ISO 8601 signing time; defaults to now.')
-			}
+		description:
+			'Produce a signature with a loaded certificate: CAdES-BES is DETACHED (keep the document to verify); OOXML/XAdES/PAdES refuse honestly in this DOM-less build. When the extension bridge is connected, the operator confirms the signature in Chrome and no server-side certificate or PIN is needed.',
+		inputSchema: {
+			...SOURCE_FIELDS,
+			format: z.enum(['cades', 'xades', 'pades', 'ooxml']).describe('Only cades signs in this build; the rest refuse with unsupported_format.'),
+			cert_id: z.string().describe('cert_id from autofirma_list_certs; must be a signable certificate.'),
+			signing_time: z.string().optional().describe('ISO 8601 signing time; defaults to now.')
+		}
 		},
 		async (args) => {
 			try {
-				return json(await signDocument(config, store, args));
+				return json(await signDocument(config, store, args, bridge));
 			} catch (error) {
 				audit(config, {
 					event: 'sign',

@@ -6,6 +6,7 @@ import { createVault, memoryBackend, type Vault } from '../certstore';
 import { loadSignerSession } from '../keystore';
 import { copy } from '../i18n';
 import RequestChooser from './RequestChooser.svelte';
+import type { ExtensionRequest } from './runtime';
 let fixtures: CadesFixtures;
 let vault: Vault;
 let expiresAt: number;
@@ -18,7 +19,7 @@ beforeAll(async () => {
 });
 afterAll(() => rmSync(fixtures.dir,{recursive:true,force:true}));
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();});
-const request = {id:'id',origin:'https://example.com',operation:'selectCertificate',digest:'abcdef'};
+const request: ExtensionRequest = {id:'id',origin:'https://example.com',operation:'selectCertificate',digest:'abcdef'};
 function mount(failAt = '', value = request) {
  const calls: string[] = [];
  const send = async (m: {type:string}) => { calls.push(m.type); if (m.type === 'request:get') return value; if (m.type === failAt) throw new Error('Request expired'); return true; };
@@ -165,4 +166,51 @@ it('keeps review and fallback available if clipboard access fails',async()=>{
  expect(calls).toEqual(['request:get']);
  expect((document.querySelector('#request-fallback') as HTMLButtonElement).disabled).toBe(false);
  expect(document.querySelector('#request-digest')?.textContent).toBe('abcdef');
+});
+
+it('keeps focus on the open-app button after cancelling', async () => {
+ mount();
+ await screen.findByText('https://example.com');
+ await fireEvent.click(document.querySelector('#request-cancel')!);
+ expect(document.activeElement?.id).toBe('request-open-app');
+});
+
+
+it('keeps focus on the open-app button after handing over to AutoFirma', async () => {
+ mount();
+ await screen.findByText('https://example.com');
+ await fireEvent.click(document.querySelector('#request-fallback')!);
+ expect(document.activeElement?.id).toBe('request-open-app');
+});
+
+
+it('keeps keyboard focus on the PIN field and the selection through a compact unlock', async () => {
+ mount();
+ await fireEvent.click(await screen.findByRole('button',{name:/My signing certificate/}));
+ await waitFor(()=>expect(document.activeElement?.id).toBe('store-pin'));
+ await fireEvent.input(document.querySelector('#store-pin')!,{target:{value:FIXTURE_PIN}});
+ await fireEvent.click(screen.getByRole('button',{name:copy.es.storeOpen}));
+ await waitFor(()=>expect(document.activeElement?.id).toBe('pkcs12-selection'),{timeout:15000});
+ await fireEvent.click(document.querySelector('#request-confirm')!);
+ expect(document.activeElement?.id).toBe('request-open-app');
+});
+
+
+it('offers an MCP agent only the identity it requested', async () => {
+ const [identity] = await vault.listIdentities();
+ mount('', {...request, bridge:true, certId:identity.id});
+ expect(await screen.findByText('Agente MCP')).toBeTruthy();
+ await waitFor(() => expect(document.querySelector('#store-pin')).not.toBeNull());
+ expect(screen.queryByRole('button',{name:copy.es.addSign})).toBeNull();
+ cleanup();
+ mount('', {...request, bridge:true, certId:'another-identity'});
+ expect(await screen.findByText('Agente MCP')).toBeTruthy();
+ await waitFor(() => expect(screen.queryByRole('button',{name:/My signing certificate/})).toBeNull());
+ expect(document.querySelector('#store-pin')).toBeNull();
+ expect(screen.queryByRole('button',{name:copy.es.addSign})).toBeNull();
+});
+
+it('shows worker failure messages in the default Spanish UI', async () => {
+ render(RequestChooser,{props:{id:'id',vault,send:async()=>{throw new Error('The requesting document has changed');}}});
+ expect((await screen.findByRole('alert')).textContent).toBe('El documento de la página solicitante ha cambiado.');
 });

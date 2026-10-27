@@ -23,7 +23,10 @@ export type CheckId =
 	| 'signerCert'
 	| 'certValidity'
 	| 'certChain'
-	| 'signingTime';
+	| 'signingTime'
+	| 'timestamp'
+	/** The artifact is recognised but this runtime cannot inspect it. */
+	| 'unsupported';
 
 export interface Check {
 	id: CheckId;

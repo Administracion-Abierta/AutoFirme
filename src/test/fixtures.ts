@@ -182,19 +182,24 @@ export function writeFixtureFile(dir: string, name: string, bytes: Bytes): strin
 }
 
 /**
- * Verify a `.xsig` with `xmlsec1` — the independent XMLDSig verifier. `trustedPem` is the trust
- * anchor (the fixture leaf is self-signed). Requires `xmlsec1` on `PATH`; not an app dependency.
+ * Verify a `.xsig` — or any XMLDSig document — with `xmlsec1`, the independent XMLDSig verifier.
+ * `trustedPem` is the trust anchor (the fixture leaf is self-signed). Requires `xmlsec1` on
+ * `PATH`; not an app dependency.
+ *
+ * `cwd` matters when the signature carries relative `Reference` URIs (the ODF package refs are
+ * package-relative): xmlsec1 resolves them against the process working directory, not against the
+ * signature file's location, so an ODF package must be verified from its own root.
  *
  * Returns the tool's own verdict, not its prose: 1.2.x prints a bare `OK`/`FAIL` line, 1.3.x
  * prefixes it with `status: `, and 1.3.12 prints `Verification status: OK` / `... FAILED`. `ERROR`
  * (a file the tool could not parse) and any other output mean the oracle did not run, which is an
  * error rather than a verdict.
  */
-export function xmlsec1Verify(path: string, trustedPem: string): 'OK' | 'FAIL' {
+export function xmlsec1Verify(path: string, trustedPem: string, cwd?: string): 'OK' | 'FAIL' {
 	const { status, stdout, stderr } = spawnSync(
 		'xmlsec1',
 		['--verify', '--enabled-key-data', 'x509', '--trusted-pem', trustedPem, path],
-		{ encoding: 'utf8' }
+		{ encoding: 'utf8', cwd }
 	);
 	const output = `${stdout}${stderr}`;
 	// xmlsec1 ≤1.3.0 prints `status: OK` / a bare `OK`; 1.3.12 prints `Verification status: OK`

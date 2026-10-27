@@ -1,0 +1,44 @@
+name: Verify
+
+# The independent-validator gate (#140). Separate from `ci.yml` because it depends on an
+# external service: the EU DSS demo answers most days, but a network oracle must never block a
+# legitimate PR, so this job is its own workflow, kept out of the branch-protection required set.
+#
+# `node fixtures/dss/oracle.mjs` posts the fixture corpus to DSS, compares four
+# fields against `src/lib/verify` (format, verdict, signer CN, signing time), and exits 1 on any
+# difference that `fixtures/dss/allowlist.json` does not pin. When DSS is unreachable the run is
+# a no-op — the same "a network oracle cannot gate a suite" rule `scripts/dss-issue-125.mjs`
+# documents. The offline `--self-check` runs first and never needs the network, so the comparison
+# logic itself is gated on every push regardless of DSS's availability.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  dss:
+    name: EU DSS oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # No network: proves the gate fails on a new disagreement and on a stale allowlist pin.
+      # The ts-hook lets Node import `src/lib/verify/index.ts` directly (see scripts/ts-hook.mjs).
+      - run: node --import ./scripts/ts-hook.mjs fixtures/dss/oracle.mjs --self-check
+      # Live oracle. Skips itself (exit 0) when the DSS demo is down.
+      - run: node --import ./scripts/ts-hook.mjs fixtures/dss/oracle.mjs

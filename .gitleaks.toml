@@ -1,0 +1,22 @@
+# gitleaks: keep upstream defaults, allowlist committed throwaway test-PKI keys.
+# These fixtures exist to sign/verify in tests (see test/fixtures/README.md:
+# "no real (FNMT or otherwise) key material"). Anything else that looks like a
+# private key still fails the scan.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "generated test-PKI signer keys committed as signing fixtures"
+paths = [
+  '''test/fixtures/pades-signer\.key''',
+  '''test/fixtures/pades-signer-ec\.key''',
+  # The decompiled BouncyCastle/Spongycastle trees (untracked at HEAD; only in
+  # history via reference/decompile-1.9, or in full-history scans triggered by
+  # new branches) trip gitleaks' generic-api-key rule on Java identifiers like
+  # `privateKey`/`DEFAULT_KEY`. Reverse-engineered vendor source, no credentials.
+  '''(^|/)decompiled(-configurador)?/''',
+]
+# RFC 6455 §1.3's sample Sec-WebSocket-Key ("the sample nonce"), used in
+# mcp/test/bridge.test.ts to exercise the bridge handshake. Not a credential.
+regexes = ['''dGhlIHNhbXBsZSBub25jZQ==''']
+

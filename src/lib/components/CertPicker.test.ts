@@ -141,6 +141,32 @@ describe('certificate picker', () => {
 		expect(within(modal).queryByRole('button', { name: copy.es.storeOpen })).toBeNull();
 	});
 
+	// Compact mode has no dialog focus trap: the pressed row unmounts when the PIN form opens and
+	// the applied sign leaves the list, so focus must follow into the nodes that survive each step.
+	it('keeps compact keyboard focus on the PIN form and the applied selection', async () => {
+		const vault = createVault(memoryBackend());
+		await vault.saveIdentity({
+			label: 'Trabajo',
+			session,
+			container: fixtures.modern,
+			pin: FIXTURE_PIN
+		});
+		const onpick = vi.fn();
+		const { rerender } = render(CertPicker, {
+			props: { copy: copy.es, cert: null, vault, compact: true, onpick }
+		});
+
+		await waitFor(() => expect(screen.getByRole('button', { name: /Trabajo/ })).toBeTruthy(), ASYNC);
+		await fireEvent.click(screen.getByRole('button', { name: /Trabajo/ }));
+		await waitFor(() => expect(document.activeElement?.id).toBe('store-pin'));
+
+		await field('store-pin', FIXTURE_PIN);
+		await fireEvent.click(screen.getByRole('button', { name: copy.es.storeOpen }));
+		await waitFor(() => expect(onpick).toHaveBeenCalled(), { timeout: 15_000 });
+		await rerender({ cert: onpick.mock.calls[0][0] });
+		await waitFor(() => expect(document.activeElement?.id).toBe('pkcs12-selection'));
+	});
+
 	it('says the saved signature could not be opened with that PIN', async () => {
 		const vault = createVault(memoryBackend());
 		await vault.saveIdentity({
@@ -215,6 +241,36 @@ describe('certificate picker', () => {
 
 		await waitFor(() => expect(screen.getByText(copy.es.storeEmpty)).toBeTruthy());
 		expect(await vault.listIdentities()).toEqual([]);
+	});
+
+	it('renames a stored signature from the modal', async () => {
+		const vault = createVault(memoryBackend());
+		await vault.saveIdentity({
+			label: 'despacho.p12',
+			session,
+			container: fixtures.modern,
+			pin: FIXTURE_PIN
+		});
+		mount(vault);
+
+		await openPicker();
+		const modal = await screen.findByRole('dialog');
+		await waitFor(
+			() => expect(within(modal).getByRole('button', { name: /despacho\.p12/ })).toBeTruthy(),
+			ASYNC
+		);
+
+		await fireEvent.click(within(modal).getByRole('button', { name: copy.es.storeRename }));
+		await fireEvent.input(within(modal).getByLabelText(copy.es.storeAlias), {
+			target: { value: 'Firma personal' }
+		});
+		await fireEvent.click(within(modal).getByRole('button', { name: copy.es.storeSave }));
+
+		await waitFor(
+			() => expect(within(modal).getByRole('button', { name: /Firma personal/ })).toBeTruthy(),
+			ASYNC
+		);
+		expect((await vault.listIdentities())[0].label).toBe('Firma personal');
 	});
 
 	it('seals every sign added from the modal and keeps them all in the store', async () => {

@@ -1,0 +1,6 @@
+/_app/immutable/*
+  Cache-Control: public, max-age=31536000, immutable
+/icon-*.png
+  Cache-Control: public, max-age=604800
+/manifest.webmanifest
+  Content-Type: application/manifest+json

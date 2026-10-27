@@ -1,0 +1,135 @@
+name: Release
+
+# Runs on the GitHub release that Release Please publishes, never on a plain tag: the
+# release PR is what keeps the five version files and CHANGELOG.md in step.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  artifacts:
+    name: build and attach release artifacts
+    runs-on: ubuntu-latest
+    # node:24-trixie: curl + python3 for the release API upload below; the
+    # default label image is uncontrolled and has no curl CA bundle guarantee.
+    container: node:24-trixie
+    timeout-minutes: 25
+    steps:
+      - name: Install toolchain
+        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends ca-certificates
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # container runs as root; the checked-out tree is owned by the runner
+      # uid, so git refuses it without this (package-extension.py rev-parses HEAD).
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: pnpm install --frozen-lockfile
+      # A release that bumps only some of the five version files must not ship.
+      - run: node scripts/check-versions.mjs ${{ github.event.release.tag_name }}
+      - run: pnpm build
+      - run: pnpm build:extension
+      - run: pnpm package:extension
+      # Issue #3: build the package twice from scratch; a change that breaks the
+      # reproducibility of package-extension.py must fail here, before upload.
+      - name: Verify packaging reproducibility (build twice, compare SHA256SUMS)
+        run: |
+          cp dist/SHA256SUMS sums-a.txt
+          rm -rf dist build .svelte-kit
+          pnpm build
+          pnpm build:extension
+          pnpm package:extension
+          diff sums-a.txt dist/SHA256SUMS
+      - name: Pack the static site
+        run: tar -czf dist/autofirme-web-${{ github.event.release.tag_name }}.tar.gz -C build .
+      - name: Attach artifacts to the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/release.sh "${{ github.event.release.tag_name }}" dist/autofirme-extension-*.zip dist/SHA256SUMS dist/autofirme-web-*.tar.gz
+      # upload-artifact v4 fails on non-GitHub hosts (GHESNotSupportedError);
+      # the Forgejo release-published event reaches this workflow, so skip there.
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
+        with:
+          name: release-artifacts
+          path: |
+            dist/autofirme-extension-*.zip
+            dist/SHA256SUMS
+            dist/autofirme-web-*.tar.gz
+          if-no-files-found: error
+  # Issue #113: desktop shell for Linux. Static site stays host-agnostic (no
+  # signing server in this repo), so only the store of files above changes.
+  linux-packages:
+    name: build linux packages (deb, rpm, AppImage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # node:24-trixie: same OpenSSL 3.5 floor, node preinstalled for the actions/* steps.
+    container: node:24-trixie
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+      - name: Toolchain
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends git ca-certificates pkg-config build-essential \
+            libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev \
+            libpcsclite-dev rpm desktop-file-utils shared-mime-info
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # Plain refs work on both hosts: GitHub resolves them natively, Forgejo
+      # via DEFAULT_ACTIONS_URL (which mirrors github.com).
+      - uses: dtolnay/rust-toolchain@1.90
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Sidecar: `bundle.externalBin` aborts tauri build when
+      # src-tauri/binaries/autofirme-mcp-<triple> is missing (gitignored build
+      # output; ci.yml's shell job builds it the same way before cargo).
+      - uses: oven-sh/setup-bun@v2
+      - run: pnpm --filter autofirme-mcp build:binary
+      - run: node scripts/check-versions.mjs ${{ github.event.release.tag_name }}
+      - run: pnpm build:tauri
+      - name: Build deb, rpm and AppImage
+        run: npx -y @tauri-apps/cli@2 build
+      - name: Collect packages and checksums
+        run: |
+          mkdir -p dist
+          cp src-tauri/target/release/bundle/deb/*.deb dist/
+          cp src-tauri/target/release/bundle/rpm/*.rpm dist/
+          # AppImage (~153 MiB) is back: GitHub caps release assets at 2 GiB
+          # (Forgejo capped at ~100 MiB and 413'd the attach — see #190).
+          cp src-tauri/target/release/bundle/appimage/*.AppImage dist/
+          (cd dist && sha256sum *.deb *.rpm *.AppImage > SHA256SUMS.linux)
+      - name: Verify desktop and protocol registration
+        run: |
+          DEB=(src-tauri/target/release/bundle/deb/*.deb)
+          dpkg-deb -c "${DEB[0]}"
+          DESKTOP=$(dpkg-deb --fsys-tarfile "${DEB[0]}" | tar -xO --wildcards 'usr/share/applications/*.desktop')
+          printf '%s\n' "$DESKTOP" | grep -F 'x-scheme-handler/afirma'
+          printf '%s\n' "$DESKTOP" | grep -F 'application/pdf'
+      - name: Attach linux packages to the release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: scripts/release.sh "${{ github.event.release.tag_name }}" dist/*.deb dist/*.rpm dist/*.AppImage dist/SHA256SUMS.linux
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.server_url, 'https://github.com')
+        with:
+          name: linux-packages
+          path: |
+            dist/*.deb
+            dist/*.rpm
+            dist/SHA256SUMS.linux
+          if-no-files-found: error

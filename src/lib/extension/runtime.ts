@@ -5,15 +5,24 @@ export interface ExtensionRequest {
  operation: 'sign' | 'selectCertificate';
  format?: string;
  mode?: 'explicit' | 'implicit';
+ algorithm?: string;
+ serverUrl?: string;
+ params?: Record<string, string>;
  data?: string;
  digest?: string;
+ /** Set when an MCP agent (not a website) requested the signature. */
+ bridge?: boolean;
+ /** Identity the agent asked for; the chooser preselects it. */
+ certId?: string | null;
+ /** Agent-supplied ISO signing time, so the MCP response matches the signed attribute. */
+ signingTime?: string;
 }
 export interface SignatureResult { certificate: string; signature?: string }
 export type Message = { type: string; [key: string]: unknown };
 export type Rpc = (message: Message) => Promise<unknown>;
 interface ChromeApi {
  runtime: { sendMessage(message: Message): Promise<{ ok: boolean; value?: unknown; error?: string }> };
- permissions: { request(grant: { origins: string[] }): Promise<boolean>; remove(grant: {origins: string[]}): Promise<boolean> };
+ permissions: { request(grant: { origins: string[] }): Promise<boolean>; remove(grant: { origins: string[] }): Promise<boolean> };
 }
 export function isExtension(locationLike: Pick<Location, 'protocol'> | undefined = typeof location === 'object' ? location : undefined): boolean {
  return locationLike?.protocol === 'chrome-extension:';
@@ -36,7 +45,4 @@ export function exactOrigin(input: string): string {
 }
 export function requestOriginPermission(input: string): Promise<boolean> {
  return api().permissions.request({ origins: [`${exactOrigin(input)}/*`] });
-}
-export function removeOriginPermission(input: string): Promise<boolean> {
- return api().permissions.remove({ origins: [`${exactOrigin(input)}/*`] });
 }

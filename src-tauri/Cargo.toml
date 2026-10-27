@@ -1,0 +1,54 @@
+[package]
+name = "autofirme-desktop"
+version = "0.2.0"
+description = "AutoFirme Web desktop shell"
+edition = "2021"
+rust-version = "1.90"
+
+[lib]
+name = "autofirme_desktop_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+# P5.1 MCP sidecar (Refs #107): shell plugin spawns the bundled `autofirme-mcp`
+# binary (`tauri_plugin_shell::ShellExt::sidecar`); tokio time + log drive the
+# supervisor backoff loop; parking_lot Mutex holds the supervised child handle.
+# tokio, log and parking_lot were already in the lockfile via tauri; only the
+# plugin itself and its deps (open, os_pipe, shared_child, …) are new here.
+tauri-plugin-shell = "2.5.0"
+log = "0.4"
+# P5.1 log capture (Refs #107): the app's only logger, so the supervisor's `log`
+# calls (sidecar stderr included) reach stderr; `RUST_LOG` overrides `info`.
+# ponytail: stdout/stderr only — swap in a `tauri-plugin-log` file target when a
+# settings UI grows a log viewer.
+env_logger = "0.11"
+parking_lot = "0.12"
+tauri-plugin-deep-link = "2.6.2"
+tauri-plugin-single-instance = { version = "2.5.4", features = ["deep-link"] }
+# P1.4a smartcard layer (Refs #98): PC/SC reader/session plus the OpenSC PKCS#11
+# sign path, absorbed as the `smartcard` module of the desktop lib.
+cryptoki = "0.12.1"
+pcsc = "2.9"
+quinn = "0.11.12"
+mdns-sd = "0.21.6"
+rcgen = "0.14.10"
+sha2 = "0.11.1"
+tokio = { version = "1.54.1", features = ["rt", "time", "io-util", "sync", "macros", "fs", "net"] }
+rustls = { version = "0.23.46", features = ["ring"] }
+# P2.2a loopback sign server, protocol 3 (Refs #104): axum WebSocket on
+# 127.0.0.1:63117 behind rustls; per-install self-signed cert via rcgen.
+axum = { version = "0.8", features = ["ws"] }
+axum-server = { version = "0.8", features = ["tls-rustls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+# TLS WebSocket client for the server round-trip tests (Refs #104).
+tokio-tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+url = "2"

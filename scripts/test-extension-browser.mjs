@@ -12,18 +12,20 @@ import {CDP} from './extension-cdp.mjs';
 const root = resolve('dist/extension');
 await access(join(root, 'index.html')); // A web build alone does not satisfy this test.
 const directory = await mkdtemp(join(tmpdir(), 'autofirme-browser-'));
-let processHandle, cdp, server, mainSession;
+let processHandle, cdp, server, mainSession, main;
 try {
   const extension = join(directory, 'extension');
   await cp(root, extension, {recursive: true});
   const manifest = JSON.parse(await readFile(join(extension, 'manifest.json'), 'utf8'));
   assert.equal(manifest.manifest_version, 3);
   assert.equal(manifest.action.default_popup, undefined, 'app must survive focus changes');
-  assert.deepEqual(manifest.host_permissions, ['http://*/*','https://*/*'], 'all websites enabled on installation');
+  assert.deepEqual(manifest.host_permissions, ['http://*/*','https://*/*'], 'all-sites interception is the install-time default');
+  assert.equal(manifest.optional_host_permissions, undefined, 'all-sites access is no longer an opt-in');
   let executable = process.env.CHROME_PATH;
   if (!executable) {
     const cache = join(homedir(), '.cache/ms-playwright');
-    const entries = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a,b) => Number(b.split('-')[1])-Number(a.split('-')[1]));
+    let entries = [];
+    try {entries = (await readdir(cache)).filter(name => /^chromium-\d+$/.test(name)).sort((a,b) => Number(b.split('-')[1])-Number(a.split('-')[1]));} catch {} // No Playwright cache anywhere: fall through to the CHROME_PATH hint below instead of ENOENT.
     for (const entry of entries) {
       for (const suffix of ['chrome-linux64/chrome', 'chrome-linux/chrome']) {
         const candidate = join(cache, entry, suffix);
@@ -33,15 +35,26 @@ try {
     }
   }
   if (!executable) throw Error('Set CHROME_PATH to Chrome/Chromium or install Chromium with Playwright.');
+  // Branded Google Chrome builds >=137 ignore --load-extension; only Chromium and Chrome for
+  // Testing keep it. Say so before launch instead of dying on a chooser timeout.
+  const version = spawnSync(executable, ['--version'], {encoding: 'utf8'});
+  const flavour = `${version.stdout ?? ''}${version.stderr ?? ''}`.trim();
+  if (/^Google Chrome\b/.test(flavour) && !/for Testing/.test(flavour)) throw Error(`${flavour} ignores --load-extension since 137. Set CHROME_PATH to Chromium or Chrome for Testing, e.g. after: npx playwright install --with-deps chromium (~/.cache/ms-playwright/chromium-<build>/chrome-linux64/chrome).`);
   const fixture = await readFile('test/extension-site.html');
   server = createServer((request, response) => {response.writeHead(200, {'content-type': 'text/html; charset=utf-8'}); response.end(fixture);});
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const origin = `http://127.0.0.1:${server.address().port}`;
-  processHandle = spawn(executable, ['--headless=new','--no-proxy-server','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${join(directory,'profile')}`,`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'about:blank'], {stdio:'ignore'});
-  let endpoint;
-  for (let i=0;i<100;i++) {try {const [port,path]=(await readFile(join(directory,'profile/DevToolsActivePort'),'utf8')).trim().split('\n'); endpoint=`ws://127.0.0.1:${port}${path}`; break;} catch {await new Promise(resolve=>setTimeout(resolve,100));}}
-  if (!endpoint) throw Error('Chromium did not start');
-  cdp = await CDP.connect(endpoint);
+  const address = server.address();
+  if (!address || typeof address === 'string') throw Error('fixture server did not bind a TCP port');
+  const origin = `http://127.0.0.1:${address.port}`;
+  const profileDir = join(directory, 'profile');
+  const launch = async () => {
+    const handle = spawn(executable, ['--headless=new','--no-proxy-server','--no-sandbox','--disable-dev-shm-usage','--no-first-run','--remote-debugging-port=0',`--user-data-dir=${profileDir}`,`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'about:blank'], {stdio:'ignore'});
+    let endpoint;
+    for (let i=0;i<300;i++) {try {const [port,path]=(await readFile(join(profileDir,'DevToolsActivePort'),'utf8')).trim().split('\n'); endpoint=`ws://127.0.0.1:${port}${path}`; break;} catch {await new Promise(resolve=>setTimeout(resolve,100));}}
+    if (!endpoint) throw Error('Chromium did not start');
+    return {processHandle: handle, cdp: await CDP.connect(endpoint)};
+  };
+  ({processHandle, cdp} = await launch());
   const id = createHash('sha256').update(extension).digest('hex').slice(0,32).replace(/[0-9a-f]/g,c=>String.fromCharCode(97+parseInt(c,16)));
   const appURL = `chrome-extension://${id}/index.html`;
   const open = async url => {const {targetId}=await cdp.send('Target.createTarget',{url}); return {targetId,session:await cdp.attach(targetId)};};
@@ -49,10 +62,10 @@ try {
   const openssl = args => {const result=spawnSync('openssl',args); assert.equal(result.status,0,result.stderr.toString()); return result;};
   openssl(['req','-x509','-newkey','rsa:2048','-nodes','-sha256','-days','2','-subj','/C=ES/O=Local non-production fixture/CN=AutoFirme Browser Test','-addext','basicConstraints=critical,CA:FALSE','-addext','keyUsage=critical,digitalSignature,nonRepudiation','-keyout',fixtureKey,'-out',fixtureCert]);
   openssl(['pkcs12','-export','-inkey',fixtureKey,'-in',fixtureCert,'-passout','pass:fixture-password','-out',p12]);
-  const main = await open(appURL); mainSession=main.session;
+  main = await open(appURL); mainSession=main.session;
   await cdp.wait(main.session, `document.querySelector('h1')?.textContent.includes('AutoFirma')`);
   assert.equal(await cdp.evaluate(main.session, 'location.protocol'), 'chrome-extension:');
-  assert.ok(await cdp.evaluate(main.session, "document.body.textContent.includes('CAdES')"));
+  assert.ok(await cdp.evaluate(main.session, "document.body.textContent.includes('Configura la firma')"));
   const click = (session, selector) => cdp.evaluate(session, `document.querySelector(${JSON.stringify(selector)}).click()`);
   const set = (session, selector, value) => cdp.evaluate(session, `(()=>{const el=document.querySelector(${JSON.stringify(selector)});el.value=${JSON.stringify(value)};el.dispatchEvent(new Event('input',{bubbles:true}));})()`);
   const enter = (session, selector) => cdp.evaluate(session, `document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}))`);
@@ -79,6 +92,11 @@ try {
     assert.ok(node.nodeId, `missing file input ${selector}`);
     await cdp.send('DOM.setFileInputFiles',{nodeId:node.nodeId,files},session);
   }
+  // Two steps now: certificate on step 1, then the documents card that holds the format chooser.
+  // The Next button carries no aria-describedby once a certificate is picked; match its text.
+  await cdp.wait(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Siguiente')?.disabled===false`);
+  await cdp.evaluate(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Siguiente').click()`);
+  await cdp.wait(main.session, "Boolean(document.querySelector('#panel-sign fieldset button[aria-haspopup=dialog]'))");
   await cdp.evaluate(main.session, `[...document.querySelectorAll('button[aria-haspopup=dialog]')].find(b=>b.textContent.includes('CAdES-BES')).click()`);
   await cdp.wait(main.session, 'Boolean(document.querySelector("input[name=format][value=pades]"))');
   await click(main.session,'input[name=format][value=pades]');
@@ -88,39 +106,89 @@ try {
   const source=resolve('test/fixtures/pades-source.pdf'), second=join(directory,'second.pdf');
   await cp(source,second);
   await upload(main.session,'#panel-sign input[type=file][multiple]',[source,second]);
-  await cdp.wait(main.session, 'document.querySelector("button[aria-describedby=sign-hint]")?.disabled===false');
-  await click(main.session,'button[aria-describedby=sign-hint]');
-  const outputQuery=`new Promise((resolve,reject)=>{const open=indexedDB.open('autofirme-web',2);open.onerror=()=>reject(Error('test output DB unavailable'));open.onsuccess=()=>{const db=open.result;const tx=db.transaction('outputs');const q=tx.objectStore('outputs').getAll();q.onsuccess=()=>{const rows=q.result;db.close();resolve(rows.map(r=>({name:r.value.name,bytes:Array.from(r.value.bytes)})));};q.onerror=()=>reject(Error('test outputs unavailable'));};})`;
-  await cdp.wait(main.session, `(${outputQuery}).then(rows=>rows.length===2)`);
-  const outputs=await cdp.evaluate(main.session,outputQuery);
-  let producedPDF;
-  for(const record of outputs) {
-    const pdf=Buffer.from(record.bytes), text=pdf.toString('latin1');
-    const ranges=[...text.matchAll(/\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g)].at(-1);
-    assert.ok(ranges,'actual app must generate a PDF signature');
-    const [a,b,c,d]=ranges.slice(1).map(Number);
-    const signature=Buffer.from([...text.matchAll(/\/Contents\s*<([a-fA-F0-9]+)>/g)].at(-1)[1],'hex');
-    const contentPath=join(directory,'pdf-content'),sigPath=join(directory,'pdf-signature.der');
-    await writeFile(contentPath,Buffer.concat([pdf.subarray(a,a+b),pdf.subarray(c,c+d)]));
-    await writeFile(sigPath,signature);
-    openssl(['cms','-verify','-cades','-binary','-inform','DER','-in',sigPath,'-content',contentPath,'-CAfile',fixtureCert,'-purpose','any','-out',join(directory,'pdf-verified')]);
-    producedPDF=join(directory,'signed.pdf');await writeFile(producedPDF,pdf);
-  }
+  await cdp.wait(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Firmar')?.disabled===false`);
+  await cdp.evaluate(main.session, `[...document.querySelectorAll('#panel-sign button')].find(b=>b.textContent.trim()==='Firmar').click()`);
+  await cdp.wait(main.session, `document.querySelector('[aria-live=polite]')?.textContent.includes('2/2')`);
+  // The signed bytes live only in the queue now: pull them from the ZIP the app downloads.
   await cdp.send('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:directory});
   await cdp.evaluate(main.session, `[...document.querySelectorAll('button')].find(b=>b.textContent.includes('Descargar ZIP')).click()`);
   let archive;
   for(let i=0;i<100;i++){archive=(await readdir(directory)).find(name=>name.endsWith('.zip'));if(archive)break;await new Promise(r=>setTimeout(r,100));}
   assert.ok(archive,'batch ZIP download');
   const zipCheck=spawnSync('unzip',['-t',join(directory,archive)]);assert.equal(zipCheck.status,0,zipCheck.stdout.toString()+zipCheck.stderr.toString());
+  const names=spawnSync('unzip',['-Z1',join(directory,archive)]).stdout.toString().split('\n').filter(Boolean);
+  assert.equal(names.length,3,'ZIP carries both signed documents plus the manifest');
+  let producedPDF;
+  for(const name of names) {
+    if(name==='manifest.json') continue;
+    const pdf=Buffer.from(spawnSync('unzip',['-p',join(directory,archive),name]).stdout);
+    const text=pdf.toString('latin1');
+    const ranges=[...text.matchAll(/\/ByteRange\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*\]/g)].at(-1);
+    assert.ok(ranges,'actual app must generate a PDF signature');
+    const [a,b,c,d]=ranges.slice(1).map(Number);
+    const contentsMatch = [...text.matchAll(/\/Contents\s*<([a-fA-F0-9]+)>/g)].at(-1);
+    assert.ok(contentsMatch, 'actual app must embed a /Contents hex blob');
+    const signature=Buffer.from(contentsMatch[1],'hex');
+    const contentPath=join(directory,'pdf-content'),sigPath=join(directory,'pdf-signature.der');
+    await writeFile(contentPath,Buffer.concat([pdf.subarray(a,a+b),pdf.subarray(c,c+d)]));
+    await writeFile(sigPath,signature);
+    openssl(['cms','-verify','-cades','-binary','-inform','DER','-in',sigPath,'-content',contentPath,'-CAfile',fixtureCert,'-purpose','any','-out',join(directory,'pdf-verified')]);
+    producedPDF=join(directory,'signed.pdf');await writeFile(producedPDF,pdf);
+  }
   await click(main.session,'[role=tab][aria-controls=panel-verify]');
   await cdp.wait(main.session,'Boolean(document.querySelector("#panel-verify input[type=file]"))');
   await upload(main.session,'#panel-verify input[type=file]',[producedPDF]);
   await cdp.wait(main.session, 'document.querySelector("[data-check=signature]")?.dataset.status==="pass"');
   assert.equal(await cdp.evaluate(main.session,'document.querySelector("[data-check=structure]").dataset.status'),'pass');
-  process.stdout.write('PASS: full app PDF stamps, two-document batch signing, saved outputs, valid ZIP and PDF verification; OpenSSL checks both signatures.\n');
-  // No sites:set: the first website request must work with fresh storage.
+  process.stdout.write('PASS: full app PDF stamps, two-document batch signing, valid ZIP and PDF verification; OpenSSL checks both signatures.\n');
+  // Clean install intercepts every HTTP(S) site: the fixture page gets the bridge
+  // immediately and the first sign call opens the chooser.
+  const cold = await open(origin);
+  await cdp.wait(cold.session, "Boolean(window.AutoScript && Object.getOwnPropertyDescriptor(window,'AutoScript').set)");
+  await click(cold.session, '#sign');
+  let coldChooser;
+  for (let i=0;i<100;i++) {
+    const {targetInfos}=await cdp.send('Target.getTargets');
+    coldChooser=targetInfos.find(t=>t.type==='page'&&t.url.startsWith(appURL+'?request='));
+    if (coldChooser) break;
+    await new Promise(r=>setTimeout(r,100));
+  }
+  assert.ok(coldChooser,'a clean install must capture the first website call');
+  await cdp.send('Target.closeTarget',{targetId:coldChooser.targetId});
+  await cdp.wait(cold.session, 'window.fixture.fallbackCalls===0');
+  // The SiteAccess panel lives inside the app's settings dialog now: open it by its label.
+  await click(main.session, "[aria-label='Ajustes y ayuda']");
+  await cdp.wait(main.session, 'Boolean(document.querySelector("#site-access-panel"))');
+  await set(main.session, '#site-origin', origin);
+  await cdp.wait(main.session, "document.querySelector('#disable-site')?.disabled===false");
+  await click(main.session, '#disable-site');
+  await cdp.wait(main.session, "chrome.runtime.sendMessage({type:'sites:list'}).then(r=>r.value.disabledOrigins.length===1)");
+  await cdp.evaluate(main.session, "document.querySelector('[role=dialog] [data-dialog-close]')?.click()");
+  await cdp.send('Target.closeTarget', {targetId: cold.targetId});
+  process.stdout.write('PASS: a clean install intercepts websites and the panel disables an origin.\n');
+  // Restart: the wildcard grant and the disabled exception survive the browser restart.
+  cdp.close();
+  await new Promise(resolve => {
+    const timer = setTimeout(() => {processHandle.kill('SIGKILL'); resolve(undefined);}, 5000);
+    processHandle.once('exit', () => {clearTimeout(timer); resolve(undefined);});
+    processHandle.kill('SIGTERM');
+  });
+  // The dead port file would make the next launch read the previous session's endpoint.
+  await rm(join(profileDir, 'DevToolsActivePort'), {force: true});
+  ({processHandle, cdp} = await launch());
+  main = await open(appURL); mainSession = main.session;
+  const granted = await cdp.evaluate(main.session, `chrome.runtime.sendMessage({type:'sites:list'}).then(r=>r.value)`);
+  assert.equal(granted.allSites, true, 'the all-sites wildcard survives the restart');
+  assert.deepEqual(granted.disabledOrigins, [origin], 'the disabled-site exception survives the restart');
+  process.stdout.write('PASS: the wildcard grant and the disabled exception survive the restart.\n');
   const page = await open(origin);
   await cdp.wait(page.session, 'Boolean(window.fixture)');
+  // The disabled exception survived the restart, so this load keeps the original AutoFirma.
+  await click(page.session, '#sign');
+  await cdp.wait(page.session, 'window.fixture.fallbackCalls===1');
+  await cdp.evaluate(main.session, `chrome.runtime.sendMessage({type:'sites:set',origin:${JSON.stringify(origin)},enabled:true})`);
+  await cdp.send('Page.navigate',{url:origin},page.session);
+  await cdp.wait(page.session, "Boolean(window.AutoScript && Object.getOwnPropertyDescriptor(window,'AutoScript').set)");
   async function picker(selector) {
     await click(page.session, selector);
     for (let i=0;i<200;i++) {
@@ -246,6 +314,8 @@ try {
   assert.equal(await cdp.evaluate(page.session,'window.fixture.results.length'),0,'navigation cannot deliver old results');
   assert.equal(await cdp.evaluate(page.session,'window.fixture.fallbackCalls'),0,'navigation cannot replay');
   const disabled=await cdp.evaluate(main.session,`chrome.runtime.sendMessage({type:'sites:set',origin:${JSON.stringify(origin)},enabled:false})`);assert.equal(disabled.ok,true);
+  await cdp.send('Page.navigate',{url:origin+'?disabled=1'},page.session);
+  await cdp.wait(page.session, "Boolean(window.fixture) && !Object.getOwnPropertyDescriptor(window,'AutoScript')?.set");
   await click(page.session,'#sign');
   await cdp.wait(page.session,'window.fixture.fallbackCalls===1');
   assert.equal((await chooserTargets()).length,0,'disabled existing page must bypass chooser');
@@ -257,5 +327,6 @@ try {
 } finally {
   cdp?.close(); processHandle?.kill('SIGKILL');
   if (server) await new Promise(resolve=>server.close(resolve));
-  await rm(directory,{recursive:true,force:true});
+  // SIGKILL can leave the profile mid-write: retry the removal so it never masks the real error.
+  await rm(directory,{recursive:true,force:true,maxRetries:20,retryDelay:100});
 }

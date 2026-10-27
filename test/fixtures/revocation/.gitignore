@@ -1,0 +1,6 @@
+# generate.sh scratch: private keys and openssl CA bookkeeping. Only the *.der public
+# artifacts below are committed and consumed by src/lib/verify/revocation.test.ts.
+keys/
+*.pem
+index.txt
+index_good.txt
