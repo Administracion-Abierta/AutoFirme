@@ -77,10 +77,14 @@ test('out-of-scope chrome-webstore and attestation stay out', () => {
 
 test('the linux-packages job collects bundles into dist before uploading (review round 1)', () => {
 	const linux = job(workflow, 'linux-packages');
-	for (const dir of ['deb', 'rpm', 'appimage']) {
+	// AppImage dropped: ~153 MiB exceeds Forgejo's ~100 MiB release-attachment
+	// cap (run 540 attached it and got curl 413). deb+rpm are the shipped
+	// formats.
+	for (const dir of ['deb', 'rpm']) {
 		assert.match(linux, new RegExp(`cp src-tauri/target/release/bundle/${dir}/\\*\\.\\S+ dist/`));
 	}
-	assert.match(linux, /sha256sum \*\.deb \*\.rpm \*\.AppImage > SHA256SUMS\.linux/);
+	assert.doesNotMatch(linux, /bundle\/appimage/);
+	assert.match(linux, /sha256sum \*\.deb \*\.rpm > SHA256SUMS\.linux/);
 	assert.ok(
 		linux.indexOf('sha256sum') < linux.indexOf('forgejo-release.sh'),
 		'packages must be collected and checksummed before the release upload'
