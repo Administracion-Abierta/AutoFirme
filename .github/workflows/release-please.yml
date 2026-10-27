@@ -4,6 +4,11 @@ name: Release Please
 # package.json, extension/manifest.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml and
 # src-tauri/Cargo.lock + CHANGELOG.md). Merging that PR tags vX.Y.Z
 # and publishes a GitHub release, which is what triggers `release.yml`.
+#
+# GitHub-only: the action talks to api.github.com and needs a GitHub token.
+# On Forgejo releases stay manual (the procedure the 0.2.0 release used):
+# pointing the action at the Forgejo API made its token 401 against
+# api.github.com, and Forgejo lacks the GraphQL surface release-please needs.
 on:
   push:
     branches: [main]
@@ -15,18 +20,13 @@ permissions:
 
 jobs:
   release-please:
+    if: startsWith(github.server_url, 'https://github.com')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      # Fully qualified URL: data.forgejo.org (DEFAULT_ACTIONS_URL) has no googleapis mirror.
-      - uses: https://github.com/googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          # release-please-action defaults to api.github.com; Forgejo's REST lives at
-          # /api/v1 (github-compatible). Without this the Forgejo token 401s against
-          # github.com with "Bad credentials".
-          github-api-url: https://git.eduard3v.com/api/v1
-        # act: `${{ secrets.GITHUB_TOKEN }}` is only injected when the step declares it.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
