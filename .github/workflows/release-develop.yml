@@ -1,7 +1,7 @@
 name: Develop release
 
 # Every push to develop ships a pre-release tagged dev-<short-sha>: the rolling
-# test channel for the extension zip and the static site. Production releases
+# test channel for the web app and the desktop shell. Production releases
 # keep coming from release-please on main (release.yml). Publish step is
 # GitHub-only: both hosts share this tree and the Forgejo side must stay quiet.
 on:
@@ -34,12 +34,10 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       # container runs as root; the checked-out tree is owned by the runner
-      # uid, so git refuses it without this (package-extension.py rev-parses HEAD).
+      # uid, so git refuses it without this (the release step rev-parses HEAD).
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: pnpm build:extension
-      - run: pnpm package:extension
       - name: Create the development pre-release tagged dev-<short-sha>
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -49,7 +47,7 @@ jobs:
             Rolling pre-release of the `develop` branch, rebuilt on every push. It can break or change format without notice; signatures are real but the surrounding UX and formats may drift between builds. Use the latest stable release for anything that matters.
 
             - Commit: ${{ github.sha }}
-            - Extension (Chrome only for now): `autofirme-extension-*.zip` — load unpacked or install manually; unsigned, so developer mode is required.
+            - Extension: now ships from the separate [AutoFirme-Extension](https://github.com/Administracion-Abierta/AutoFirme-Extension) repo (dev builds on its own `develop`).
             - Static site: `build/` is published as the `autofirme-web` artifact below — serve the extracted folder with any static host.
 
             Verify with `SHA256SUMS` before installing.
@@ -62,7 +60,7 @@ jobs:
             --title "[Development build] $TAG — unstable, for testing only" \
             --notes-file release-notes.md \
             --prerelease \
-            dist/autofirme-extension-*.zip dist/SHA256SUMS
+            dist/autofirme-web-*.tar.gz
           echo "release $TAG created"
       - uses: actions/upload-artifact@v4
         if: startsWith(github.server_url, 'https://github.com')
