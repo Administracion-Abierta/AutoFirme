@@ -38,6 +38,7 @@ jobs:
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - run: mkdir -p dist && tar -czf "dist/autofirme-web-${GITHUB_SHA::7}.tar.gz" -C build .
       - name: Create the development pre-release tagged dev-<short-sha>
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
